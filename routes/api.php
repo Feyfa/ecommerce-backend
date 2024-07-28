@@ -48,9 +48,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/keranjang/{user_id_buyer}', [KeranjangController::class, 'index']);
-    Route::post('/keranjang/{user_id_seller}/{user_id_buyer}/{product_id}', [KeranjangController::class, 'store']);
+    Route::post('/keranjang', [KeranjangController::class, 'store']);
     Route::delete('/keranjang/{user_id_buyer}/{product_id}', [KeranjangController::class, 'delete']);
-    Route::post('/keranjang/checked/{user_id_buyer}/{product_id}/{checked}', [KeranjangController::class, 'checked']);
+    Route::post('/keranjang/checked', [KeranjangController::class, 'checked']);
+    Route::post('/keranjang/plus', [KeranjangController::class, 'plusKeranjang']);
+    Route::post('/keranjang/minus', [KeranjangController::class, 'minusKeranjang']);
 });
 
 Route::middleware('auth:sanctum')->group(function () {

@@ -62,15 +62,10 @@ class KeranjangController extends Controller
         return response()->json(['status' => 200, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 200);
     }
 
-    public function store(string $user_id_seller, string $user_id_buyer, string $product_id)
+    public function store(Request $request)
     {
         /* VALIDATOR AND GET */
-        $validator = Validator::make(
-            [
-                'user_id_seller' => $user_id_seller,
-                'user_id_buyer' => $user_id_buyer,
-                'product_id' => $product_id,
-            ],
+        $validator = Validator::make($request->all(),
             [
                 'user_id_seller' => ['required', 'integer'],
                 'user_id_buyer' => ['required', 'integer'],
@@ -156,19 +151,14 @@ class KeranjangController extends Controller
         return response()->json(['status' => 200, 'message' => 'Item In Basket Has Been Delete', 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 200);
     }
 
-    public function checked(string $user_id_buyer, string $product_id, string $checked)
+    public function checked(Request $request)
     {
         /* VALIDATOR AND GET */
-        $validator = Validator::make(
-            [
-                'user_id_buyer' => $user_id_buyer,
-                'product_id' => $product_id,
-                'checked' => $checked,
-            ],
+        $validator = Validator::make($request->all(),
             [
                 'user_id_buyer' => ['required', 'integer'],
                 'product_id' => ['required', 'integer'],
-                'checked' => ['required', 'in:true,false']
+                'checked' => ['required', 'boolean']
             ]
         );
 
@@ -185,10 +175,134 @@ class KeranjangController extends Controller
                     
         foreach($keranjangs as $keranjang)
         {
-            $keranjang->checked = ($validate['checked'] === 'true') ? true : false;
+            $keranjang->checked = ($validate['checked']) ? true : false;
             $keranjang->save();
         }
         /* CHANGE CHECKED */
+
+        /* GET ITEM IN BASKET */
+        $keranjangs = Keranjang::selectRaw('
+                                    keranjangs.id as k_id,
+                                    keranjangs.checked as k_checked,
+                                    COUNT(keranjangs.product_id) as k_total,
+                                    users.name as u_seller_name,
+                                    products.id as p_id,
+                                    products.name as p_name,
+                                    products.price as p_price,
+                                    SUM(products.price) as p_price_total,
+                                    products.stock as p_stock,
+                                    products.img as p_img
+                                ')
+                                ->join('users', 'keranjangs.user_id_seller', '=', 'users.id')
+                                ->join('products', 'keranjangs.product_id', '=', 'products.id')
+                                ->where('keranjangs.user_id_buyer', $validate['user_id_buyer'])
+                                ->groupBy('keranjangs.product_id')
+                                ->orderBy('k_id', 'DESC')
+                                ->get();
+        /* GET ITEM IN BASKET */
+
+        /* CALCULATION PRICE */
+        $totalPrice = 0;
+        foreach($keranjangs as $keranjang)
+        {
+            if($keranjang->k_checked == 1) {
+                $totalPrice += $keranjang->p_price_total; 
+            }
+        }
+        /* CALCULATION PRICE */
+
+        return response()->json(['status' => 200, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 200);
+    }
+
+    public function plusKeranjang(Request $request)
+    {
+        /* VALIDATOR AND GET */
+        $validator = Validator::make($request->all(),
+            [
+                'user_id_buyer' => ['required', 'integer'],
+                'product_id' => ['required', 'integer'],
+            ]
+        );
+
+        if($validator->fails())
+            return response()->json(['status' => 422, 'message' => $validator->messages()], 422);
+
+        $validate = $validator->validate();
+        /* VALIDATOR AND GET */
+
+        /* GET FIRST KERANJANG */
+        $keranjang = Keranjang::select('user_id_seller', 'user_id_buyer', 'product_id', 'checked')
+                              ->where('user_id_buyer', $validate['user_id_buyer'])
+                              ->where('product_id', $validate['product_id'])
+                              ->first();
+        /* GET FIRST KERANJANG */
+
+        /* DUPLICATE KERANJANG */
+        Keranjang::create([
+            'user_id_seller' => $keranjang->user_id_seller,
+            'user_id_buyer' => $keranjang->user_id_buyer,
+            'product_id' => $keranjang->product_id,
+            'checked' => $keranjang->checked,
+        ]);
+        /* DUPLICATE KERANJANG */
+
+        /* GET ITEM IN BASKET */
+        $keranjangs = Keranjang::selectRaw('
+                                    keranjangs.id as k_id,
+                                    keranjangs.checked as k_checked,
+                                    COUNT(keranjangs.product_id) as k_total,
+                                    users.name as u_seller_name,
+                                    products.id as p_id,
+                                    products.name as p_name,
+                                    products.price as p_price,
+                                    SUM(products.price) as p_price_total,
+                                    products.stock as p_stock,
+                                    products.img as p_img
+                                ')
+                                ->join('users', 'keranjangs.user_id_seller', '=', 'users.id')
+                                ->join('products', 'keranjangs.product_id', '=', 'products.id')
+                                ->where('keranjangs.user_id_buyer', $validate['user_id_buyer'])
+                                ->groupBy('keranjangs.product_id')
+                                ->orderBy('k_id', 'DESC')
+                                ->get();
+        /* GET ITEM IN BASKET */
+
+        /* CALCULATION PRICE */
+        $totalPrice = 0;
+        foreach($keranjangs as $keranjang)
+        {
+            if($keranjang->k_checked == 1) {
+                $totalPrice += $keranjang->p_price_total; 
+            }
+        }
+        /* CALCULATION PRICE */
+
+        return response()->json(['status' => 200, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 200);
+    }
+
+    public function minusKeranjang(Request $request)
+    {
+        /* VALIDATOR AND GET */
+        $validator = Validator::make($request->all(),
+            [
+                'user_id_buyer' => ['required', 'integer'],
+                'product_id' => ['required', 'integer'],
+            ]
+        );
+
+        if($validator->fails())
+            return response()->json(['status' => 422, 'message' => $validator->messages()], 422);
+
+        $validate = $validator->validate();
+        /* VALIDATOR AND GET */
+
+        /* GET FIRST KERANJANG AND DELETE */
+        $keranjang = Keranjang::where('user_id_buyer', $validate['user_id_buyer'])
+                              ->where('product_id', $validate['product_id'])
+                              ->orderBy('id', 'DESC')
+                              ->first()
+                              ->delete();
+        /* GET FIRST KERANJANG AND DELETE */
 
         /* GET ITEM IN BASKET */
         $keranjangs = Keranjang::selectRaw('
