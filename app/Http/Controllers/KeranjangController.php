@@ -389,8 +389,8 @@ class KeranjangController extends Controller
                           ->where('id', $keranjang->product_id)
                           ->first();
 
-        /* VALIDATES IF TOTAL KERANJANG >= STOCK PRODUCT */
-        if($validate['total'] >= $product->stock) {
+        /* VALIDATES IF TOTAL KERANJANG > STOCK PRODUCT */
+        if($validate['total'] > $product->stock) {
             /* GET ITEM IN BASKET */
                 $keranjangs = Keranjang::selectRaw('
                                             keranjangs.id as k_id,
@@ -423,7 +423,7 @@ class KeranjangController extends Controller
 
             return response()->json(['status' => 422, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice, 'message' => ['stock_maximum' => ["This product stock is a maximum of {$product->stock}"]]], 422);
         }  
-        /* VALIDATES IF TOTAL KERANJANG >= STOCK PRODUCT */
+        /* VALIDATES IF TOTAL KERANJANG > STOCK PRODUCT */
 
         /* CHANGE TOTAL KERANJANG */
         $keranjang->total = $validate['total'];
