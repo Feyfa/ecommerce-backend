@@ -14,5 +14,6 @@ class Keranjang extends Model
         'user_id_seller',
         'user_id_buyer',
         'checked',
+        'total',
     ];
 }

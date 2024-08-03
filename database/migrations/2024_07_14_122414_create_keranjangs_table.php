@@ -17,6 +17,7 @@ return new class extends Migration
             $table->bigInteger('user_id_buyer');
             $table->bigInteger('product_id');
             $table->boolean('checked')->default(false);
+            $table->integer('total');
             $table->timestamps();
         });
     }

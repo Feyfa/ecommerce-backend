@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Keranjang;
+use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -32,19 +33,18 @@ class KeranjangController extends Controller
         $keranjangs = Keranjang::selectRaw('
                                     keranjangs.id as k_id,
                                     keranjangs.checked as k_checked,
-                                    COUNT(keranjangs.product_id) as k_total,
+                                    keranjangs.total as k_total,
+                                    (keranjangs.total * products.price) as k_total_price,
                                     users.name as u_seller_name,
                                     products.id as p_id,
                                     products.name as p_name,
                                     products.price as p_price,
-                                    SUM(products.price) as p_price_total,
                                     products.stock as p_stock,
                                     products.img as p_img
                                 ')
                                 ->join('users', 'keranjangs.user_id_seller', '=', 'users.id')
                                 ->join('products', 'keranjangs.product_id', '=', 'products.id')
                                 ->where('keranjangs.user_id_buyer', $validate['user_id_buyer'])
-                                ->groupBy('keranjangs.product_id')
                                 ->orderBy('k_id', 'DESC')
                                 ->get();
         /* GET ITEM IN BASKET */
@@ -54,7 +54,7 @@ class KeranjangController extends Controller
         foreach($keranjangs as $keranjang)
         {
             if($keranjang->k_checked == 1) {
-                $totalPrice += $keranjang->p_price_total; 
+                $totalPrice += $keranjang->k_total_price;
             }
         }
         /* CALCULATION PRICE */
@@ -80,8 +80,40 @@ class KeranjangController extends Controller
         /* VALIDATOR AND GET */
 
         $validate['checked'] = 0;
+        $validate['total'] = 1;
 
-        Keranjang::create($validate);
+        /* GET KERANJANG */
+        $keranjang = Keranjang::where('user_id_seller', $validate['user_id_seller'])
+                              ->where('user_id_buyer', $validate['user_id_buyer'])
+                              ->where('product_id', $validate['product_id'])
+                              ->first();
+        /* GET KERANJANG */
+
+        /* WHEN KERANJANG ALREADY EXISTS */
+        if(!empty($keranjang)) 
+        {
+            $product = Product::select('stock')
+                              ->where('id', $keranjang->product_id)
+                              ->first();
+
+            /* VALIDATES IF TOTAL KERANJANG >= STOCK PRODUCT */
+            if($keranjang->total >= $product->stock) {
+                return response()->json(['status' => 422, 'message' => ['stock_maximum' => ["This product stock is a maximum of {$product->stock}"]]], 422);
+            }  
+            /* VALIDATES IF TOTAL KERANJANG >= STOCK PRODUCT */
+
+            $keranjang->total += 1;
+            $keranjang->save();
+        }
+        /* WHEN KERANJANG ALREADY EXISTS */
+
+        /* WHEN KERANJANG NOT ALREADY EXISTS */
+        else 
+        {
+            Keranjang::create($validate);
+        }
+        /* WHEN KERANJANG NOT ALREADY EXISTS */
+
 
         return response()->json(['status' => 200, 'message' => 'Item Has Been Added To Basket'], 200);
     }
@@ -109,41 +141,35 @@ class KeranjangController extends Controller
         /* DELETE KERANJANG */
         $keranjangs = Keranjang::where('user_id_buyer', $validate['user_id_buyer'])
                                ->where('product_id', $validate['product_id'])
-                               ->get();
- 
-        foreach($keranjangs as $keranjang)
-        {
-            $keranjang->delete();
-        }
+                               ->delete();
         /* DELETE KERANJANG */
 
         /* GET ITEM IN BASKET */
         $keranjangs = Keranjang::selectRaw('
                                     keranjangs.id as k_id,
                                     keranjangs.checked as k_checked,
-                                    COUNT(keranjangs.product_id) as k_total,
+                                    keranjangs.total as k_total,
+                                    (keranjangs.total * products.price) as k_total_price,
                                     users.name as u_seller_name,
                                     products.id as p_id,
                                     products.name as p_name,
                                     products.price as p_price,
-                                    SUM(products.price) as p_price_total,
                                     products.stock as p_stock,
                                     products.img as p_img
                                 ')
                                 ->join('users', 'keranjangs.user_id_seller', '=', 'users.id')
                                 ->join('products', 'keranjangs.product_id', '=', 'products.id')
                                 ->where('keranjangs.user_id_buyer', $validate['user_id_buyer'])
-                                ->groupBy('keranjangs.product_id')
                                 ->orderBy('k_id', 'DESC')
                                 ->get();
         /* GET ITEM IN BASKET */
-
+        
         /* CALCULATION PRICE */
         $totalPrice = 0;
         foreach($keranjangs as $keranjang)
         {
             if($keranjang->k_checked == 1) {
-                $totalPrice += $keranjang->p_price_total; 
+                $totalPrice += $keranjang->k_total_price;
             }
         }
         /* CALCULATION PRICE */
@@ -169,44 +195,39 @@ class KeranjangController extends Controller
         /* VALIDATOR AND GET */
 
         /* CHANGE CHECKED */
-        $keranjangs = Keranjang::where('product_id', $validate['product_id'])
-                               ->where('user_id_buyer', $validate['user_id_buyer'])
-                               ->get();
-                    
-        foreach($keranjangs as $keranjang)
-        {
-            $keranjang->checked = ($validate['checked']) ? true : false;
-            $keranjang->save();
-        }
+        $keranjang = Keranjang::where('product_id', $validate['product_id'])
+                              ->where('user_id_buyer', $validate['user_id_buyer'])
+                              ->first();
+        $keranjang->checked = ($validate['checked']) ? true : false;
+        $keranjang->save();
         /* CHANGE CHECKED */
 
         /* GET ITEM IN BASKET */
         $keranjangs = Keranjang::selectRaw('
                                     keranjangs.id as k_id,
                                     keranjangs.checked as k_checked,
-                                    COUNT(keranjangs.product_id) as k_total,
+                                    keranjangs.total as k_total,
+                                    (keranjangs.total * products.price) as k_total_price,
                                     users.name as u_seller_name,
                                     products.id as p_id,
                                     products.name as p_name,
                                     products.price as p_price,
-                                    SUM(products.price) as p_price_total,
                                     products.stock as p_stock,
                                     products.img as p_img
                                 ')
                                 ->join('users', 'keranjangs.user_id_seller', '=', 'users.id')
                                 ->join('products', 'keranjangs.product_id', '=', 'products.id')
                                 ->where('keranjangs.user_id_buyer', $validate['user_id_buyer'])
-                                ->groupBy('keranjangs.product_id')
                                 ->orderBy('k_id', 'DESC')
                                 ->get();
         /* GET ITEM IN BASKET */
-
+        
         /* CALCULATION PRICE */
         $totalPrice = 0;
         foreach($keranjangs as $keranjang)
         {
             if($keranjang->k_checked == 1) {
-                $totalPrice += $keranjang->p_price_total; 
+                $totalPrice += $keranjang->k_total_price;
             }
         }
         /* CALCULATION PRICE */
@@ -214,7 +235,7 @@ class KeranjangController extends Controller
         return response()->json(['status' => 200, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 200);
     }
 
-    public function plusKeranjang(Request $request)
+    public function plusTotalKeranjang(Request $request)
     {
         /* VALIDATOR AND GET */
         $validator = Validator::make($request->all(),
@@ -230,49 +251,52 @@ class KeranjangController extends Controller
         $validate = $validator->validate();
         /* VALIDATOR AND GET */
 
-        /* GET FIRST KERANJANG */
-        $keranjang = Keranjang::select('user_id_seller', 'user_id_buyer', 'product_id', 'checked')
+        $keranjang = Keranjang::select('id', 'product_id', 'user_id_seller', 'user_id_buyer', 'product_id', 'checked', 'total')
                               ->where('user_id_buyer', $validate['user_id_buyer'])
                               ->where('product_id', $validate['product_id'])
                               ->first();
-        /* GET FIRST KERANJANG */
 
-        /* DUPLICATE KERANJANG */
-        Keranjang::create([
-            'user_id_seller' => $keranjang->user_id_seller,
-            'user_id_buyer' => $keranjang->user_id_buyer,
-            'product_id' => $keranjang->product_id,
-            'checked' => $keranjang->checked,
-        ]);
-        /* DUPLICATE KERANJANG */
+        $product = Product::select('stock')
+                          ->where('id', $keranjang->product_id)
+                          ->first();
+
+        /* VALIDATES IF TOTAL KERANJANG >= STOCK PRODUCT */
+        if($keranjang->total >= $product->stock) {
+            return response()->json(['status' => 422, 'message' => ['stock_maximum' => ["This product stock is a maximum of {$product->stock}"]]], 422);
+        }  
+        /* VALIDATES IF TOTAL KERANJANG >= STOCK PRODUCT */
+
+        /* ADD ONE TOTAL KERANJANG */
+        $keranjang->total += 1;
+        $keranjang->save();
+        /* ADD ONE TOTAL KERANJANG */
 
         /* GET ITEM IN BASKET */
         $keranjangs = Keranjang::selectRaw('
                                     keranjangs.id as k_id,
                                     keranjangs.checked as k_checked,
-                                    COUNT(keranjangs.product_id) as k_total,
+                                    keranjangs.total as k_total,
+                                    (keranjangs.total * products.price) as k_total_price,
                                     users.name as u_seller_name,
                                     products.id as p_id,
                                     products.name as p_name,
                                     products.price as p_price,
-                                    SUM(products.price) as p_price_total,
                                     products.stock as p_stock,
                                     products.img as p_img
                                 ')
                                 ->join('users', 'keranjangs.user_id_seller', '=', 'users.id')
                                 ->join('products', 'keranjangs.product_id', '=', 'products.id')
                                 ->where('keranjangs.user_id_buyer', $validate['user_id_buyer'])
-                                ->groupBy('keranjangs.product_id')
                                 ->orderBy('k_id', 'DESC')
                                 ->get();
         /* GET ITEM IN BASKET */
-
+        
         /* CALCULATION PRICE */
         $totalPrice = 0;
         foreach($keranjangs as $keranjang)
         {
             if($keranjang->k_checked == 1) {
-                $totalPrice += $keranjang->p_price_total; 
+                $totalPrice += $keranjang->k_total_price;
             }
         }
         /* CALCULATION PRICE */
@@ -280,7 +304,7 @@ class KeranjangController extends Controller
         return response()->json(['status' => 200, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 200);
     }
 
-    public function minusKeranjang(Request $request)
+    public function minusTotalKeranjang(Request $request)
     {
         /* VALIDATOR AND GET */
         $validator = Validator::make($request->all(),
@@ -296,41 +320,142 @@ class KeranjangController extends Controller
         $validate = $validator->validate();
         /* VALIDATOR AND GET */
 
-        /* GET FIRST KERANJANG AND DELETE */
-        $keranjang = Keranjang::where('user_id_buyer', $validate['user_id_buyer'])
+        /* ADD ONE TOTAL KERANJANG */
+        $keranjang = Keranjang::select('id', 'user_id_seller', 'user_id_buyer', 'product_id', 'checked', 'total')
+                              ->where('user_id_buyer', $validate['user_id_buyer'])
                               ->where('product_id', $validate['product_id'])
-                              ->orderBy('id', 'DESC')
-                              ->first()
-                              ->delete();
-        /* GET FIRST KERANJANG AND DELETE */
+                              ->first();
+
+        $keranjang->total -= 1;
+        $keranjang->save();
+        /* ADD ONE TOTAL KERANJANG */
 
         /* GET ITEM IN BASKET */
         $keranjangs = Keranjang::selectRaw('
                                     keranjangs.id as k_id,
                                     keranjangs.checked as k_checked,
-                                    COUNT(keranjangs.product_id) as k_total,
+                                    keranjangs.total as k_total,
+                                    (keranjangs.total * products.price) as k_total_price,
                                     users.name as u_seller_name,
                                     products.id as p_id,
                                     products.name as p_name,
                                     products.price as p_price,
-                                    SUM(products.price) as p_price_total,
                                     products.stock as p_stock,
                                     products.img as p_img
                                 ')
                                 ->join('users', 'keranjangs.user_id_seller', '=', 'users.id')
                                 ->join('products', 'keranjangs.product_id', '=', 'products.id')
                                 ->where('keranjangs.user_id_buyer', $validate['user_id_buyer'])
-                                ->groupBy('keranjangs.product_id')
                                 ->orderBy('k_id', 'DESC')
                                 ->get();
         /* GET ITEM IN BASKET */
-
+        
         /* CALCULATION PRICE */
         $totalPrice = 0;
         foreach($keranjangs as $keranjang)
         {
             if($keranjang->k_checked == 1) {
-                $totalPrice += $keranjang->p_price_total; 
+                $totalPrice += $keranjang->k_total_price;
+            }
+        }
+        /* CALCULATION PRICE */
+
+        return response()->json(['status' => 200, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 200);
+    }
+
+    public function changeTotalKeranjang(Request $request)
+    {
+        /* VALIDATOR AND GET */
+        $validator = Validator::make($request->all(),
+            [
+                'user_id_buyer' => ['required', 'integer'],
+                'product_id' => ['required', 'integer'],
+                'total' => ['required', 'integer'],
+            ]
+        );
+
+        if($validator->fails())
+            return response()->json(['status' => 422, 'message' => $validator->messages()], 422);
+
+        $validate = $validator->validate();
+        /* VALIDATOR AND GET */
+
+        $keranjang = Keranjang::select('id', 'product_id', 'user_id_seller', 'user_id_buyer', 'product_id', 'checked', 'total')
+                              ->where('user_id_buyer', $validate['user_id_buyer'])
+                              ->where('product_id', $validate['product_id'])
+                              ->first();
+
+        $product = Product::select('stock')
+                          ->where('id', $keranjang->product_id)
+                          ->first();
+
+        /* VALIDATES IF TOTAL KERANJANG >= STOCK PRODUCT */
+        if($validate['total'] >= $product->stock) {
+            /* GET ITEM IN BASKET */
+                $keranjangs = Keranjang::selectRaw('
+                                            keranjangs.id as k_id,
+                                            keranjangs.checked as k_checked,
+                                            keranjangs.total as k_total,
+                                            (keranjangs.total * products.price) as k_total_price,
+                                            users.name as u_seller_name,
+                                            products.id as p_id,
+                                            products.name as p_name,
+                                            products.price as p_price,
+                                            products.stock as p_stock,
+                                            products.img as p_img
+                                        ')
+                                        ->join('users', 'keranjangs.user_id_seller', '=', 'users.id')
+                                        ->join('products', 'keranjangs.product_id', '=', 'products.id')
+                                        ->where('keranjangs.user_id_buyer', $validate['user_id_buyer'])
+                                        ->orderBy('k_id', 'DESC')
+                                        ->get();
+                                    /* GET ITEM IN BASKET */
+
+            /* CALCULATION PRICE */
+            $totalPrice = 0;
+            foreach($keranjangs as $keranjang)
+            {
+                if($keranjang->k_checked == 1) {
+                    $totalPrice += $keranjang->k_total_price;
+                }
+            }
+            /* CALCULATION PRICE */
+
+            return response()->json(['status' => 422, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice, 'message' => ['stock_maximum' => ["This product stock is a maximum of {$product->stock}"]]], 422);
+        }  
+        /* VALIDATES IF TOTAL KERANJANG >= STOCK PRODUCT */
+
+        /* CHANGE TOTAL KERANJANG */
+        $keranjang->total = $validate['total'];
+        $keranjang->save();
+        /* CHANGE TOTAL KERANJANG */
+
+        /* GET ITEM IN BASKET */
+        $keranjangs = Keranjang::selectRaw('
+                                    keranjangs.id as k_id,
+                                    keranjangs.checked as k_checked,
+                                    keranjangs.total as k_total,
+                                    (keranjangs.total * products.price) as k_total_price,
+                                    users.name as u_seller_name,
+                                    products.id as p_id,
+                                    products.name as p_name,
+                                    products.price as p_price,
+                                    products.stock as p_stock,
+                                    products.img as p_img
+                                ')
+                                ->join('users', 'keranjangs.user_id_seller', '=', 'users.id')
+                                ->join('products', 'keranjangs.product_id', '=', 'products.id')
+                                ->where('keranjangs.user_id_buyer', $validate['user_id_buyer'])
+                                ->orderBy('k_id', 'DESC')
+                                ->get();
+        /* GET ITEM IN BASKET */
+        
+        /* CALCULATION PRICE */
+        $totalPrice = 0;
+        foreach($keranjangs as $keranjang)
+        {
+            if($keranjang->k_checked == 1) {
+                $totalPrice += $keranjang->k_total_price;
             }
         }
         /* CALCULATION PRICE */
