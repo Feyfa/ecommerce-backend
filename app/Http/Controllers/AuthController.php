@@ -47,14 +47,19 @@ class AuthController extends Controller
 
         if($validator->fails())
             return response()->json(['status' => 422, 'message' => $validator->messages()], 422);
+
+        $validate = $validator->validate();
         /* VALIDATOR */
 
-        if(!Auth::attempt($request->only('email', 'password')))
+        /* CHECK EMAIL CASE SENSITIVE */
+        $user = User::whereRaw('BINARY email = ?', $validate['email'])
+                    ->first();
+        /* CHECK EMAIL CASE SENSITIVE */
+
+        if(empty($user) || !Auth::attempt(['email' => $validate['email'], 'password' => $validate['password']]))
             return response()->json(['status' => 401, 'message' => 'invalid login details'], 401);
         
         $token = $request->user()->createToken('authToken')->plainTextToken;
-        $user = User::where('email', $request->email)
-                    ->first();
 
         return response()->json(['status' => 200, 'message' => 'login success', 'token' => $token, 'user' => $user], 200);
     }
