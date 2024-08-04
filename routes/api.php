@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BelanjaController;
 use App\Http\Controllers\KeranjangController;
+use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\UserController;
 use Illuminate\Http\Request;
@@ -58,4 +59,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/belanja/{user_id_seller}', [BelanjaController::class, 'index']);
+});
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post("/payment/createtokenmidtrans", [PaymentController::class, 'createTokenMidtrans']);
 });
