@@ -130,6 +130,7 @@ class UserController extends Controller
         $user->email = $validate['email'];
         $user->jenis_kelamin = $request->jenis_kelamin;
         $user->tanggal_lahir = $request->tanggal_lahir;
+        $user->tfa = $request->tfa;
         $user->alamat = $request->alamat;
         $user->save();
         /* UPDATE USER */

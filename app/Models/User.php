@@ -23,6 +23,7 @@ class User extends Authenticatable
         'email',
         'jenis_kelamin',
         'tanggal_lahir',
+        'tfa',
         'alamat',
         'password',
     ];
