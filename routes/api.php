@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BelanjaController;
 use App\Http\Controllers\KeranjangController;
+use App\Http\Controllers\MessendController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\UserController;
@@ -63,4 +64,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post("/payment/createtokenmidtrans", [PaymentController::class, 'createTokenMidtrans']);
+});
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post("/messend/gmail/send", [MessendController::class, 'sendEmail']);
 });
