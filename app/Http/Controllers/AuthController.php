@@ -55,7 +55,6 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $type = $request->type ?? "";
-        $otp = $request->otp ?? "";
 
         /* VALIDATOR */
         $validator = Validator::make($request->all(), [
