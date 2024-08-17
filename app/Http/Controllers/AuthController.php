@@ -6,15 +6,25 @@ use App\Mail\OtpLoginMail;
 use App\Models\OtpLogin;
 use App\Models\User;
 use Carbon\Carbon;
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\RequestException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\View;
 
 class AuthController extends Controller
 {
+    protected Client $client;
+
+    public function __construct(Client $client) 
+    {
+        $this->client = $client;
+    }
+
     public function tokenValidation()
     {
         return response()->json(['status' => 200, 'message' => 'token valid'], 200);
@@ -70,52 +80,101 @@ class AuthController extends Controller
         /* VERIFICATION OTP */
         if($type === 'verification_otp')
         {
-            Log::info("masuk verification otp");
-            /* VALIDATION OTP */
-            $epochTime = Carbon::now()->timestamp;
-            $otpLogin = OtpLogin::whereRaw('BINARY email = ?', $user->email)
-                                ->where('otp', $request->otp)
-                                ->first();
-                
-            if(empty($otpLogin))
-                return response()->json(['status' => 401, 'message' => "your otp invalid"], 401);
-            if($epochTime >= $otpLogin->expired)
-                return response()->json(['status' => 401, 'message' => "your otp expired"], 401);
-            /* VALIDATION OTP */
+            /* MATCH OTP */
+            $otp_secret_key = $request->otpSecretKey ?? "";
+            $otp_code = $request->otpCode ?? "";
 
-            $otpLogin->delete();
+            try 
+            {
+                $responseMatchOtp = $this->client->post(config('messend.url') . '/api/match/otp', [
+                    'form_params' => [
+                        'user_secret_key' => config('messend.user_secret_key'),
+                        'otp_secret_key' => $otp_secret_key,
+                        'contact' => $validate['email'],
+                        'otp_code' => $otp_code
+                    ]
+                ]);
+                $responseMatchOtp = json_decode($responseMatchOtp->getBody()->getContents(), true);
+            } 
+            catch(RequestException  $e) 
+            {
+                $responseMatchOtp = json_decode($e->getResponse()->getBody()->getContents(), true);
+            }
 
-            $token = $request->user()->createToken('authToken')->plainTextToken;
-
-            return response()->json(['status' => 200, 'message' => 'login success', 'token' => $token, 'user' => $user], 200);
+            if($responseMatchOtp['status'] === 'error') {
+                return response()->json(['status' => 422, 'message' => $responseMatchOtp['message']], 422);
+            }
+            else if($responseMatchOtp['status'] === 'success') {
+                $token = $request->user()->createToken('authToken')->plainTextToken;
+                return response()->json(['status' => 200, 'message' => 'login success', 'token' => $token, 'user' => $user], 200);
+            }
+            else {
+                return response()->json(['status' => 422, 'message' => ['messend_other' => ['something went wrong']]], 422);
+            }
+            /* MATCH OTP */
         }
         /* VERIFICATION OTP */
 
         /* CREATE OTP WHEN USER USE TFA */
         if($user->tfa === 'T')
         {
-            $otp = $this->generateRandomNumber(length: 6);
-            $epochTimeAfterTwoMinute = Carbon::now()->addMinutes(2)->timestamp;
+            /* GENERATE OTP */
+            try
+            {
+                $responseGenerateOtp = $this->client->post(config('messend.url') . '/api/generate/otp', [
+                    'form_params' => [
+                        'user_secret_key' => config('messend.user_secret_key'),
+                        'contact' => $validate['email'],
+                    ]
+                ]);
+                $responseGenerateOtp = json_decode($responseGenerateOtp->getBody()->getContents(), true);
+            }
+            catch(RequestException $e) 
+            {
+                $responseGenerateOtp = json_decode($e->getResponse()->getBody()->getContents(), true);
+            }
 
-            /* DELETE OTP IF EXISTS */
-            OtpLogin::whereRaw('BINARY email = ?', $validate['email'])
-                    ->delete();
-            /* DELETE OTP IF EXISTS */
-
-            /* CREATE NEW OTP */
-            OtpLogin::create([
-                'otp' => $otp,
-                'email' => $user->email,
-                'expired' => $epochTimeAfterTwoMinute
-            ]);
-            /* CREATE NEW OTP */
+            if($responseGenerateOtp['status'] == 'error') 
+                return response()->json(['status' => 422, 'message' => $responseGenerateOtp['message']], 422);
+            /* GENERATE OTP */
 
             /* SEND EMAIL */
-            Mail::to($user->email)
-                ->send(new OtpLoginMail($otp, $user->email));
-            /* SEND EMAIL */
+            $details = [
+                'email' => $validate['email'],
+                'otp' => $responseGenerateOtp['otp_code'],
+            ];
 
-            return response()->json(['status' => 200, 'type' => 'send_otp'], 200);
+            $content = View::make('emails.otp-login')
+                           ->with('details', $details)
+                           ->render();
+            
+            try
+            {
+                $responseSendEmail = $this->client->post(config('messend.url') . '/api/gmail/send', [
+                    'form_params' => [
+                        'user_secret_key' => config('messend.user_secret_key'),
+                        'mail_host' => config('mail.mailers.smtp.host'),
+                        'mail_port' => config('mail.mailers.smtp.port'),
+                        'mail_encryption' => config('mail.mailers.smtp.encryption'),
+                        'mail_username' => config('mail.mailers.smtp.username'),
+                        'mail_password' => config('mail.mailers.smtp.password'),
+                        'to' => $validate['email'],
+                        'subject' => 'Kirim OTP',
+                        'content' => $content,
+                    ]
+                ]);
+                $responseSendEmail = json_decode($responseSendEmail->getBody()->getContents(), true);
+            }
+            catch(RequestException $e) 
+            {
+                $responseGenerateOtp = json_decode($e->getResponse()->getBody()->getContents(), true);
+            }
+
+            if($responseSendEmail['status'] == 'error') 
+                return response()->json(['status' => 422, 'message' => $responseSendEmail['message']], 422);
+            /* SEND EMAIL */
+    
+            return response()->json(['status' => 200, 'type' => 'send_otp', 'otp_secret_key' => $responseGenerateOtp['otp_secret_key']], 200);
         }
         /* CREATE OTP WHEN USER USE TFA */
 
