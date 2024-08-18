@@ -82,6 +82,7 @@ class AuthController extends Controller
             /* MATCH OTP */
             $otp_secret_key = $request->otpSecretKey ?? "";
             $otp_code = $request->otpCode ?? "";
+            $now = $request->now ?? "";
 
             try 
             {
@@ -90,7 +91,8 @@ class AuthController extends Controller
                         'user_secret_key' => config('messend.user_secret_key'),
                         'otp_secret_key' => $otp_secret_key,
                         'contact' => $validate['email'],
-                        'otp_code' => $otp_code
+                        'otp_code' => $otp_code,
+                        'now' => $now
                     ]
                 ]);
                 $responseMatchOtp = json_decode($responseMatchOtp->getBody()->getContents(), true);
@@ -118,12 +120,15 @@ class AuthController extends Controller
         if($user->tfa === 'T')
         {
             /* GENERATE OTP */
+            $expired = $request->expired ?? "";
+
             try
             {
                 $responseGenerateOtp = $this->client->post(config('messend.url') . '/api/generate/otp', [
                     'form_params' => [
                         'user_secret_key' => config('messend.user_secret_key'),
                         'contact' => $validate['email'],
+                        'expired' => $expired,
                     ]
                 ]);
                 $responseGenerateOtp = json_decode($responseGenerateOtp->getBody()->getContents(), true);
