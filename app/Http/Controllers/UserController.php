@@ -103,11 +103,13 @@ class UserController extends Controller
                 'id' => $id,
                 'name' => $request->name,
                 'email' => $request->email,
+                'phone' => $request->phone,
             ], 
             [
                 'id' => ['required', 'integer'],
                 'name' => ['required', 'string'],
                 'email' => ['required', 'string', 'max:255', 'email', Rule::unique('users')->ignore($id)],
+                'phone' => ['required', 'string', 'max:15', Rule::unique('users')->ignore($id)],
             ]
         );
         
@@ -130,6 +132,7 @@ class UserController extends Controller
         $user->email = $validate['email'];
         $user->jenis_kelamin = $request->jenis_kelamin;
         $user->tanggal_lahir = $request->tanggal_lahir;
+        $user->phone = $validate['phone'];
         $user->tfa = $request->tfa;
         $user->alamat = $request->alamat;
         $user->save();
