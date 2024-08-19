@@ -86,15 +86,19 @@ class AuthController extends Controller
 
             try 
             {
-                $responseMatchOtp = $this->client->post(config('messend.url') . '/api/match/otp', [
-                    'form_params' => [
-                        'user_secret_key' => config('messend.user_secret_key'),
-                        'otp_secret_key' => $otp_secret_key,
-                        'contact' => $validate['email'],
-                        'otp_code' => $otp_code,
-                        'now' => $now
-                    ]
-                ]);
+                if($user->tfa === "Email") 
+                {
+                    $responseMatchOtp = $this->client->post(config('messend.url') . '/api/match/otp', [
+                        'form_params' => [
+                            'user_secret_key' => config('messend.user_secret_key'),
+                            'otp_secret_key' => $otp_secret_key,
+                            'contact' => $validate['email'],
+                            'otp_code' => $otp_code,
+                            'now' => $now
+                        ]
+                    ]);
+                }
+
                 $responseMatchOtp = json_decode($responseMatchOtp->getBody()->getContents(), true);
             } 
             catch(RequestException  $e) 
@@ -117,20 +121,24 @@ class AuthController extends Controller
         /* VERIFICATION OTP */
 
         /* CREATE OTP WHEN USER USE TFA */
-        if($user->tfa === 'T')
+        if($user->tfa !== 'F' && $user->tfa !== 'Phone')
         {
             /* GENERATE OTP */
             $expired = $request->expired ?? "";
 
             try
             {
-                $responseGenerateOtp = $this->client->post(config('messend.url') . '/api/generate/otp', [
-                    'form_params' => [
-                        'user_secret_key' => config('messend.user_secret_key'),
-                        'contact' => $validate['email'],
-                        'expired' => $expired,
-                    ]
-                ]);
+                if($user->tfa === "Email")
+                {
+                    $responseGenerateOtp = $this->client->post(config('messend.url') . '/api/generate/otp', [
+                        'form_params' => [
+                            'user_secret_key' => config('messend.user_secret_key'),
+                            'contact' => $validate['email'],
+                            'expired' => $expired,
+                        ]
+                    ]);
+                }
+
                 $responseGenerateOtp = json_decode($responseGenerateOtp->getBody()->getContents(), true);
             }
             catch(RequestException $e) 
