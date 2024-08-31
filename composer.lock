@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "591b1176aa140fe58de0369c7970eac5",
+    "content-hash": "6a10c1ac092ce336616ae7d1d9b21c16",
     "packages": [
         {
             "name": "brick/math",
@@ -1049,6 +1049,49 @@
                 }
             ],
             "time": "2023-12-03T19:50:20+00:00"
+        },
+        {
+            "name": "jedun/messend",
+            "version": "1.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/Feyfa/composer-messend.git",
+                "reference": "49f1141114ff06ea736dd6257be1a918974f303b"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/Feyfa/composer-messend/zipball/49f1141114ff06ea736dd6257be1a918974f303b",
+                "reference": "49f1141114ff06ea736dd6257be1a918974f303b",
+                "shasum": ""
+            },
+            "require": {
+                "guzzlehttp/guzzle": "^7.8 || ^7.9",
+                "php": ">=7.4",
+                "rakit/validation": "^1.0 || ^1.4"
+            },
+            "require-dev": {
+                "monolog/monolog": "^3.7",
+                "phpunit/phpunit": "9.6.20"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Messend\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "authors": [
+                {
+                    "name": "Feyfa",
+                    "email": "fisikamodern00@gmail.com"
+                }
+            ],
+            "description": "Application Messend For Send Message An Other",
+            "support": {
+                "issues": "https://github.com/Feyfa/composer-messend/issues",
+                "source": "https://github.com/Feyfa/composer-messend/tree/1.0.0"
+            },
+            "time": "2024-08-31T14:09:56+00:00"
         },
         {
             "name": "laravel/framework",
@@ -3003,6 +3046,52 @@
                 "source": "https://github.com/bobthecow/psysh/tree/v0.12.4"
             },
             "time": "2024-06-10T01:18:23+00:00"
+        },
+        {
+            "name": "rakit/validation",
+            "version": "v1.4.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/rakit/validation.git",
+                "reference": "ff003a35cdf5030a5f2482299f4c93f344a35b29"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/rakit/validation/zipball/ff003a35cdf5030a5f2482299f4c93f344a35b29",
+                "reference": "ff003a35cdf5030a5f2482299f4c93f344a35b29",
+                "shasum": ""
+            },
+            "require": {
+                "ext-mbstring": "*",
+                "php": ">=7.0"
+            },
+            "require-dev": {
+                "php-coveralls/php-coveralls": "^2.2",
+                "phpunit/phpunit": "^6.5",
+                "squizlabs/php_codesniffer": "^3"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Rakit\\Validation\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Muhammad Syifa",
+                    "email": "emsifa@gmail.com"
+                }
+            ],
+            "description": "PHP Laravel like standalone validation library",
+            "support": {
+                "issues": "https://github.com/rakit/validation/issues",
+                "source": "https://github.com/rakit/validation/tree/v1.4.0"
+            },
+            "time": "2020-08-27T05:07:01+00:00"
         },
         {
             "name": "ralouphie/getallheaders",
