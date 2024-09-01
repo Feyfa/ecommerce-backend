@@ -1056,12 +1056,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/Feyfa/composer-messend.git",
-                "reference": "49f1141114ff06ea736dd6257be1a918974f303b"
+                "reference": "0fae07a03953b4794800f2efd101b77d3c4c13cd"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Feyfa/composer-messend/zipball/49f1141114ff06ea736dd6257be1a918974f303b",
-                "reference": "49f1141114ff06ea736dd6257be1a918974f303b",
+                "url": "https://api.github.com/repos/Feyfa/composer-messend/zipball/0fae07a03953b4794800f2efd101b77d3c4c13cd",
+                "reference": "0fae07a03953b4794800f2efd101b77d3c4c13cd",
                 "shasum": ""
             },
             "require": {
@@ -1091,7 +1091,7 @@
                 "issues": "https://github.com/Feyfa/composer-messend/issues",
                 "source": "https://github.com/Feyfa/composer-messend/tree/1.0.0"
             },
-            "time": "2024-08-31T14:09:56+00:00"
+            "time": "2024-09-01T00:13:21+00:00"
         },
         {
             "name": "laravel/framework",
