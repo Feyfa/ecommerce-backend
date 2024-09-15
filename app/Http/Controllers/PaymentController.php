@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Keranjang;
+use App\Models\Transaction;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -41,6 +43,9 @@ class PaymentController extends Controller
                                     keranjangs.id as k_id,
                                     keranjangs.total as k_total,
                                     (keranjangs.total * products.price) as k_total_price,
+                                    keranjangs.user_id_seller as k_user_id_seller,
+                                    keranjangs.product_id as k_product_id,
+                                    keranjangs.total as k_total,
                                     products.name as p_name,
                                     products.price as p_price
                                 ')
@@ -69,10 +74,12 @@ class PaymentController extends Controller
         }
 
         /* CREATE PARAMS FOR MIDTRANS */
+        // format (user_id_buyer)_(now_epoch_time), example $order_id = 2_1725712679
+        $order_id = $validate['user_id_buyer'] . "_" . Carbon::now()->timestamp;
         $params = [
             "item_details" => $itemDetails,
             'transaction_details' => [
-                'order_id' => rand(),
+                'order_id' => $order_id,
                 'gross_amount' => $totalPrice
             ],
             'customer_details' => [
@@ -81,6 +88,7 @@ class PaymentController extends Controller
         ];
         /* CREATE PARAMS FOR MIDTRANS */
 
+        /* CHARGE MIDTRANS */
         try 
         {
             MidtransConfig::$serverKey = env('MIDTRANS_SERVER_KEY');
@@ -93,10 +101,29 @@ class PaymentController extends Controller
         {
             return response()->json(['status' => 500, 'message' => $e->getMessage()], 500);
         }
+        /* CHARGE MIDTRANS */
     
+        /* CREATE TRANSACTION */
+        $transactions = [];
+        foreach($keranjangs as $keranjang)
+        {
+            $transactions[] = [
+                'order_id' => $order_id,
+                'user_id_seller' => $keranjang->k_user_id_seller,
+                'user_id_buyer' => $validate['user_id_buyer'],
+                'product_id' => $keranjang->k_product_id,
+                'price' => $keranjang->p_price,
+                'total' => $keranjang->k_total,
+            ];
+        }
+        Transaction::insert($transactions);
+        /* CREATE TRANSACTION */
+
         return response()->json([
             'status' => 'success',
-            'token' => $token
+            'token' => $token,
+            'order_id' => $order_id,
+            'user_id_buyer' => $validate['user_id_buyer']
         ]);
     }
 }

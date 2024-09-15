@@ -2,10 +2,12 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BelanjaController;
+use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\KeranjangController;
 use App\Http\Controllers\MessendController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\UserController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -69,3 +71,17 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::middleware('auth:sanctum')->group(function () {
     Route::post("/messend/gmail/send", [MessendController::class, 'sendEmail']);
 });
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::delete('/transaction/{user_id_buyer}/{order_id}', [TransactionController::class, 'deleteTransaction']);
+});
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/invoice', [InvoiceController::class, 'show']);
+});
+
+/* MIDTRANS WEBHOOK */
+Route::prefix('invoice')->group(function () {
+    Route::post('/', [InvoiceController::class, 'createInvoice']);
+});
+/* MIDTRANS WEBHOOK */
