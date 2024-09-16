@@ -50,14 +50,10 @@ class InvoiceController extends Controller
             /* FORMAT PAYMENT TYPE */
 
             /* FORMAT TRANSACTION STATUS */
-            $transactionStatus = "";
+            $transactionStatus = $invoice->transaction_status;
             if($invoice->transaction_status == 'settlement') 
             {
                 $transactionStatus = "done";
-            }
-            else 
-            {
-                $transactionStatus = $invoice->transaction_status;
             }
             /* FORMAT TRANSACTION STATUS */
 
