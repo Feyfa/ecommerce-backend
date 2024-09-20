@@ -62,6 +62,7 @@ class InvoiceController extends Controller
                 'transaction_time' => $invoice->transaction_time,
                 'transaction_status' => $transactionStatus,
                 'expiry_time' => $invoice->expiry_time,
+                'va_biller_code' => $invoice->va_biller_code,
                 'va_number' => $invoice->va_number,
                 'gross_amount' => $invoice->gross_amount,
                 'transactions' => $transactions
@@ -119,14 +120,41 @@ class InvoiceController extends Controller
             }
             else 
             {
+                /* VALIDATE FORMAT MIDTRANS */
+                $va_biller_code = "";
+                $va_number = "";
+                $va_bank = "";
+
+                // untuk mandiri
+                if(isset($request->biller_code) && $request->biller_code == '70012')
+                {
+                    $va_biller_code = $request->biller_code ?? "";
+                    $va_number = $request->bill_key ?? "";
+                    $va_bank = "MANDIRI";
+                }
+                // untuk permata
+                else if(isset($request->permata_va_number) && $request->permata_va_number != "") 
+                {
+                    $va_number = $request->permata_va_number ?? "";
+                    $va_bank = "PERMATA";
+                }
+                // selain mandiri dan permata
+                else 
+                {
+                    $va_number = $request->va_numbers[0]['va_number'] ?? "";
+                    $va_bank = $request->va_numbers[0]['bank'] ?? "";
+                }
+                /* VALIDATE FORMAT MIDTRANS */
+
                 Invoice::create([
                     'user_id_buyer' => $transactions[0]->user_id_buyer,
                     'order_id' => $request->order_id ?? "",
                     'payment_type' => $request->payment_type ?? "",
                     'gross_amount' => $request->gross_amount ?? "",
                     'currency' => $request->currency ?? "",
-                    'va_number' => $request->va_numbers[0]['va_number'] ?? "",
-                    'va_bank' => $request->va_numbers[0]['bank'] ?? "",
+                    'va_biller_code' => $va_biller_code,
+                    'va_number' => $va_number,
+                    'va_bank' => $va_bank,
                     'transaction_status' => $request->transaction_status ?? "",
                     'transaction_time' => $request->transaction_time ?? "",
                     'settlement_time' => $request->settlement_time ?? "",

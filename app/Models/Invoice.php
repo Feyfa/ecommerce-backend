@@ -17,6 +17,7 @@ class Invoice extends Model
         'payment_type',
         'gross_amount',
         'currency',
+        'va_biller_code',
         'va_number',
         'va_bank',
         'transaction_status',
