@@ -25,8 +25,43 @@ class InvoiceController extends Controller
         /* VALIDATOR */
 
         /* GET INVOICE AND CUSTOM FORMAT */
-        $invoices = Invoice::where('user_id_buyer', $request->user_id_buyer)
-                           ->get();
+        $invoices = Invoice::where('user_id_buyer', $request->user_id_buyer);
+        
+        if($request->filter == '' || $request->filter == null) 
+        {
+            // NOT FILTER
+            $invoices->orderBy('created_at', 'DESC');
+        } 
+        else if($request->filter == 'done') 
+        {
+            // FILTER DONE
+            $invoices->where('transaction_status', 'settlement');
+            $invoices->orderBy('created_at', 'DESC');
+        }
+        else if($request->filter == 'pending') 
+        {
+            // FILTER PENDING
+            $invoices->where('transaction_status', 'pending');
+            $invoices->orderBy('created_at', 'DESC');
+        }
+        else if($request->filter == 'expired') 
+        {
+            // FILTER EXPIRED
+            $invoices->where('transaction_status', 'expire');
+            $invoices->orderBy('created_at', 'DESC');
+        }
+        else if($request->filter == 'latest') 
+        {
+            // FILTER LATEST
+            $invoices->orderBy('created_at', 'DESC');
+        }
+        else if($request->filter == 'oldest') 
+        {
+            // FILTER OLDEST
+            $invoices->orderBy('created_at', 'ASC');
+        }
+
+        $invoices = $invoices->get();
                            
         $invoiceFormat = [];
         foreach($invoices as $invoice)
