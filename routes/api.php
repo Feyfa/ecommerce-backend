@@ -80,6 +80,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/invoice', [InvoiceController::class, 'show']);
 });
 
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/invoice/order-id-exists', [InvoiceController::class, 'checkOrderId']);
+});
+
 /* MIDTRANS WEBHOOK */
 Route::prefix('invoice')->group(function () {
     Route::post('/', [InvoiceController::class, 'createInvoice']);

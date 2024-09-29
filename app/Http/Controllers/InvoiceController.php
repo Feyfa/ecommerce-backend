@@ -8,6 +8,8 @@ use App\Models\Transaction;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+use Midtrans\Config as MidtransConfig;
+use Midtrans\Transaction as MidtransTransaction;
 
 class InvoiceController extends Controller
 {
@@ -105,9 +107,54 @@ class InvoiceController extends Controller
         }
         /* GET INVOICE AND CUSTOM FORMAT */
 
-        return response()->json([
-            'invoices' => $invoiceFormat
+        return response()->json(['status' => 'success', 'invoices' => $invoiceFormat]);
+    }
+
+    public function checkOrderId(Request $request, KeranjangController $keranjangController)
+    {
+        /* VALIDATOR */
+        $Validator = Validator::make($request->all(), [
+            'order_id' => ['required'],
+            'user_id_buyer' => ['required']
         ]);
+
+        if($Validator->fails())
+        {
+            return response()->json(['status' => 'error', 'message' => $Validator->messages()], 422);
+        }
+        /* VALIDATOR */
+
+        /* CHECK ORDER_ID EXISTS */
+        $order_id = $request->order_id;
+        for($i = 1; $i <= 8; $i++)
+        {
+            $orderIdExists = Invoice::where('order_id', $order_id) 
+                                    ->exists();
+
+            if($orderIdExists) 
+            {
+                break;
+            }
+
+            if($i == 5) 
+            {
+                return response()->json(['status' => 'error', 'message' => 'Order ID Not Found']); exit; die();
+            }
+
+            sleep(1);
+        }
+        /* CHECK ORDER_ID EXISTS */
+        
+        /* GET KERANJANG */
+        $user_id_buyer = $request->user_id_buyer;
+        $keranjangsIndex = $keranjangController->index($user_id_buyer);
+        $keranjangsData = $keranjangsIndex->getData();
+
+        $keranjangs = $keranjangsData->keranjangs;
+        $totalPrice = $keranjangsData->totalPrice;
+        /* GET KERANJANG */
+
+        return response()->json(['status' => 'success', 'message' => 'checkout successfully', 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice]);
     }
 
     public function createInvoice(Request $request)

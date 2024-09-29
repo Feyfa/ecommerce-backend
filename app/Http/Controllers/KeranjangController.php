@@ -19,7 +19,7 @@ class KeranjangController extends Controller
                 'user_id_buyer' => $user_id_buyer
             ],
             [
-                'user_id_buyer' => ['required', 'integer'],
+                'user_id_buyer' => ['required'],
             ]
         );
 
