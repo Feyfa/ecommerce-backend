@@ -84,6 +84,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/invoice/order-id-exists', [InvoiceController::class, 'checkOrderId']);
 });
 
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/stripe/check-connect-account', [PaymentController::class, 'checkConnectAccountStripe']);
+    Route::post('/stripe/connect-account', [PaymentController::class, 'connectAccountStripe']);
+});
+
 /* MIDTRANS WEBHOOK */
 Route::prefix('invoice')->group(function () {
     Route::post('/', [InvoiceController::class, 'createInvoice']);

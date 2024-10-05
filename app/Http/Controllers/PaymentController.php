@@ -4,15 +4,188 @@ namespace App\Http\Controllers;
 
 use App\Models\Keranjang;
 use App\Models\Transaction;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Midtrans\Config as MidtransConfig;
 use Midtrans\Snap as MidtransSnap;
+use Stripe\StripeClient;
 
 class PaymentController extends Controller
 {
+    public function checkConnectAccountStripe(Request $request)
+    {
+        /* VALIDATOR */
+        $validator = Validator::make($request->all(), [
+            'user_id_seller' => ['required', 'integer'],
+        ]);
+
+        if($validator->fails())
+            return response()->json(['result' => 'failed', 'message' => $validator->messages()], 422);
+        /* VALIDATOR */
+
+        $user = User::where('id', $request->user_id_seller)
+                    ->first();
+
+        Log::info('', [$user]);
+
+        /* IF USER NOT FOUND */
+        if(!$user)
+            return response()->json(['result' => 'failed', 'account' => '', 'message' => 'User Not Found'], 422);
+        /* IF USER NOT FOUND */
+
+        /* IF USER NOT YET REGISTERED */
+        if(empty($user->connect_account_id)) 
+            return response()->json(['result' => 'success', 'account' => '', 'message' => 'User Has Not Registered a Connected Account, Please Connect Your Account Before Transaction']);
+        /* IF USER NOT YET REGISTERED */
+
+        /* SETUP STRIPE */
+        $secret_key = config('stripe.secret.key');
+        $stripe = new StripeClient($secret_key);
+        /* SETUP STRIPE */
+
+        try
+        {
+            $account = $stripe->accounts->retrieve($user->connect_account_id, []);
+
+            return response()->json(['result' => 'success', 'account' => $account, 'message' => '']);
+        }
+        catch (\Exception $e)
+        {
+            return response()->json(['result' => 'success', 'account' => '', 'message' => "Something Error : {$e->getMessage()}"], 400);
+        }
+    }
+
+    public function connectAccountStripe(Request $request)
+    {
+        /* VALIDATOR */
+        $validator = Validator::make($request->all(), [
+            'user_id_seller' => ['required', 'integer'],
+        ]);
+
+        if($validator->fails())
+            return response()->json(['result' => 'failed', 'message' => $validator->messages()], 422);
+        /* VALIDATOR */
+
+        $user = User::where('id', $request->user_id_seller)
+                    ->first();
+
+        /* IF USER NOT FOUND */
+        if(!$user)
+            return response()->json(['result' => 'failed', 'message' => 'User Not Found'], 422);
+        /* IF USER NOT FOUND */
+
+        /* SETUP STRIPE */
+        $secret_key = config('stripe.secret.key');
+        $stripe = new StripeClient($secret_key);
+        /* SETUP STRIPE */
+
+        /* IF THE CONNECTED ACCOUNT NOT BEEN CREATED */
+        if(empty($user->connect_account_id))
+        {
+            Log::info("IF THE CONNECTED ACCOUNT NOT BEEN CREATED");
+            try 
+            {
+                /* CREATE ACCOUNT CONNECT */
+                $accountCreate = $stripe->accounts->create([
+                    'type' => 'standard',
+                    'business_type' => 'non_profit',
+                    'business_profile' => [
+                        'mcc' => 8661,
+                        'url' => 'https://ecommerce-frontend-delta-seven.vercel.app',
+                    ]
+                ]);
+                /* CREATE ACCOUNT CONNECT */
+
+                $accID = $accountCreate->id ?? "";
+
+                /* CREATE ACCOUNT LINK */
+                $createAccountLink = $this->createAccountLinkStripe($accID);
+                /* CREATE ACCOUNT LINK */
+
+                if($createAccountLink->result == 'success')
+                {
+                    $user->connect_account_id = $accID;
+                    $user->save();
+                    return response()->json(['result' => 'success', 'accountLink' => $createAccountLink->accountLink, 'message' => 'Success Create Account Link']);
+                }
+                else if($createAccountLink->result == 'failed')
+                {
+                    return response()->json(['result' => 'failed', 'accountLink' => '', 'message' => $createAccountLink->message], 400);
+                }
+            }
+            catch (\Exception $e)
+            {
+                return response()->json(['result' => 'failed', 'accountLink' => '', 'message' => $e->getMessage()], 400);
+            }
+        }
+        /* IF THE CONNECTED ACCOUNT NOT BEEN CREATED */
+        /* IF THE CONNECTED ACCOUNT HAS ALREADY BEEN CREATED */
+        else if(!empty($user->connect_account_id))
+        {
+            Log::info("IF THE CONNECTED ACCOUNT HAS ALREADY BEEN CREATED");
+            try 
+            {
+                $accID = $user->connect_account_id ?? "";
+
+                /* CREATE ACCOUNT LINK */
+                $createAccountLink = $this->createAccountLinkStripe($accID);
+                /* CREATE ACCOUNT LINK */
+
+                if($createAccountLink->result == 'success')
+                {
+                    $user->connect_account_id = $accID;
+                    $user->save();
+                    return response()->json(['result' => 'success', 'accountLink' => $createAccountLink->accountLink, 'message' => 'Success Create Account Link']);
+                }
+                else if($createAccountLink->result == 'failed')
+                {
+                    return response()->json(['result' => 'failed', 'accountLink' => '', 'message' => $createAccountLink->message], 400);
+                }
+            }
+            catch (\Exception $e)
+            {
+                return response()->json(['result' => 'failed', 'accountLink' => '', 'message' => $e->getMessage()], 400);
+            }
+        }
+        /* IF THE CONNECTED ACCOUNT HAS ALREADY BEEN CREATED */
+        /* IF FIELD CONNECT_ACCOUNT_ID NOT FOUND */
+        else 
+        {
+            return response()->json(['status' => 422, 'message' => 'Field connect_account_id Not Found'], 422);
+        }
+        /* IF FIELD CONNECT_ACCOUNT_ID NOT FOUND */
+    }
+
+    private function createAccountLinkStripe(string $accID)
+    {
+        $secret_key = config('stripe.secret.key');
+        Log::info(['secret_key' => $secret_key]);
+
+        $stripe = new StripeClient($secret_key);
+
+        try
+        {
+            $accountLink = $stripe->accountLinks->create([
+                'account' => $accID,
+                'refresh_url' => 'https://ecommerce-frontend-delta-seven.vercel.app',
+                'return_url' => 'https://ecommerce-frontend-delta-seven.vercel.app',
+                'type' => 'account_onboarding'
+            ]);
+
+            Log::info('', ['accountLink' => $accountLink]);
+
+            return (object) ['result' => 'success', 'accountLink' => $accountLink, 'message' => ''];
+        }
+        catch (\Exception $e)
+        {
+            Log::info('', ['error' => $e->getMessage()]);
+            return (object) ['result' => 'failed', 'accountLink' => '', 'message' => $e->getMessage()];
+        }
+    }
+
     public function createTokenMidtrans(Request $request)
     {
         /* VALIDATOR AND GET */
