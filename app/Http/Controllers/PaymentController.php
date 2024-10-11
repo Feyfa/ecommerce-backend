@@ -15,6 +15,678 @@ use Stripe\StripeClient;
 
 class PaymentController extends Controller
 {
+    public function replaceAch(Request $request)
+    {
+        /* VALIDATOR */
+        $validator = Validator::make($request->all(), [
+            'user_id_seller' => ['required'],
+            'holder_type' => ['required'],
+            'holder_name' => ['required'],
+            'routing_number' => ['required'],
+            'account_number' => ['required'],
+        ]);
+
+        if($validator->fails())
+            return response()->json(['result' => 'failed', 'message' => $validator->messages()], 422);
+        /* VALIDATOR */
+
+        /* GTE CONNECT ACCCOUNT */
+        $user = User::where('id', $request->user_id_seller)
+                    ->first();
+        
+        if(!$user)
+            return response()->json(['result' => 'failed', 'message' => 'User Not Found'], 422);
+        else if(empty($user->connect_account_id)) 
+            return response()->json(['result' => 'failed', 'message' => 'Your Connected Not Exists, Please Connect Your Stripe'], 422);
+        /* GTE CONNECT ACCCOUNT */
+
+        /* SETUP STRIPE */
+        $secret_key = config('stripe.secret.key');
+        $stripe = new StripeClient($secret_key);
+        /* SETUP STRIPE */
+
+        /* DELETE BANK ACCOUNT */
+        try
+        {
+            /* DELETE ACH */
+            $deleteSource = $stripe->customers->deleteSource(
+                $user->topup_payment_id,
+                $user->topup_ach_id,
+                [],
+                ['stripe_account' => $user->connect_account_id]
+            );
+            /* DELETE ACH */
+        }
+        catch (\Exception $e)
+        {
+            Log::info(['result1' => 'failed', 'message' => $e->getMessage()]);
+            return response()->json(['result' => 'failed', 'message' => $e->getMessage()], 400);
+        }
+        /* DELETE BANK ACCOUNT */
+
+        /* CREATE BANK ACCOUNT */
+        try
+        {
+            /* CREATE TOKEN */
+            $token = $stripe->tokens->create([
+                "bank_account" => [
+                    "country" => "US",
+                    "currency" => "USD",
+                    "account_holder_name" => $request->holder_name,
+                    "account_holder_type" => $request->holder_type,
+                    "routing_number" => $request->routing_number,
+                    "account_number" => $request->account_number,
+                ]
+            ]);
+            $token_id = $token->id;
+            /* CREATE TOKEN */
+
+            /* ADD BANK CUSTOMER */
+            $customerCreate = $stripe->customers->createSource(
+                $user->topup_payment_id,
+                ['source' => $token_id],
+                ['stripe_account' => $user->connect_account_id]
+            );
+
+            $user->topup_ach_id = $customerCreate->id ?? "";
+            /* ADD BANK CUSTOMER */
+
+            /* SAVE BANK CUSTOMER TO DATABASE */
+            $user->verification_status_ach = 'pending';
+            $user->save();
+            /* SAVE BANK CUSTOMER TO DATABASE */
+
+            /* GET CARD INFO */
+            $customerRetreive = $stripe->customers->retrieveSource(
+                $user->topup_payment_id,
+                $user->topup_ach_id,
+                [],
+                ['stripe_account' => $user->connect_account_id]
+            );
+            return response()->json(['result' => 'success', 'message' => 'Create Bank Acccount Success', 'params_ach' => $customerRetreive]);
+            /* GET CARD INFO */
+        }
+        catch (\Exception $e)
+        {
+            Log::info(['result1' => 'failed', 'message' => $e->getMessage()]);
+            return response()->json(['result' => 'failed', 'message' => $e->getMessage()], 400);
+        }
+        /* CREATE BANK ACCOUNT */
+    }
+
+    public function deleteAch(Request $request)
+    {
+        /* VALIDATOR */
+        $validator = Validator::make($request->all(), [
+            'user_id_seller' => ['required'],
+        ]);
+
+        if($validator->fails())
+            return response()->json(['result' => 'failed', 'message' => $validator->messages()], 422);
+        /* VALIDATOR */
+
+        /* CHECK PAYMENT METHOD AND ACH EXISTS */
+        $user = User::where('id', $request->user_id_seller)
+                    ->first();
+
+        if(!$user)
+            return response()->json(['result' => 'failed', 'message' => 'User Not Found'], 422);
+        else if(empty($user->connect_account_id) || empty($user->topup_payment_id) || empty($user->topup_ach_id))
+            return response()->json(['result' => 'failed', 'message' => 'You Not Have Payment Method Ach'], 422);
+        /* CHECK PAYMENT METHOD AND ACH EXISTS */
+
+        /* SETUP STRIPE */
+        $secret_key = config('stripe.secret.key');
+        $stripe = new StripeClient($secret_key);
+        /* SETUP STRIPE */
+
+        try
+        {
+            /* DELETE ACH */
+            $deleteSource = $stripe->customers->deleteSource(
+                $user->topup_payment_id,
+                $user->topup_ach_id,
+                [],
+                ['stripe_account' => $user->connect_account_id]
+            );
+            /* DELETE ACH */
+
+            /* UPDATE TO DATABASE */
+            $user->topup_ach_id = '';
+            $user->verification_status_ach = '';
+            $user->save();
+            /* UPDATE TO DATABASE */
+
+            return response()->json(['result' => 'success', 'message' => 'Delete Bank Account Success']);
+        }
+        catch (\Exception $e)
+        {
+            return response()->json(['result' => 'failed', 'message' => $e->getMessage()], 400);
+        }
+    }
+
+    public function verifyAch(Request $request)
+    {
+        /* VALIDATOR */
+        $validator = Validator::make($request->all(), [
+            'user_id_seller' => ['required'],
+            'micro_deposite_1' => ['required', 'numeric'],
+            'micro_deposite_2' => ['required', 'numeric'], 
+        ]);
+
+        if($validator->fails())
+            return response()->json(['result' => 'failed', 'message' => $validator->messages()], 422);
+        /* VALIDATOR */
+
+        /* CHECK PAYMENT METHOD AND ACH EXISTS */
+        $user = User::where('id', $request->user_id_seller)
+                    ->first();
+
+        if(!$user)
+            return response()->json(['result' => 'failed', 'message' => 'User Not Found', 'params_ach' => ''], 422);
+        else if(empty($user->connect_account_id) || empty($user->topup_payment_id) || empty($user->topup_ach_id))
+            return response()->json(['result' => 'failed', 'message' => 'You Not Have Payment Method Ach', 'params_ach' => ''], 422);
+        /* CHECK PAYMENT METHOD AND ACH EXISTS */
+
+        /* SETUP STRIPE */
+        $secret_key = config('stripe.secret.key');
+        $stripe = new StripeClient($secret_key);
+        /* SETUP STRIPE */
+
+        $micro_deposite_1 = round($request->micro_deposite_1 * 100, 2);
+        $micro_deposite_2 = round($request->micro_deposite_2 * 100, 2);
+        
+        try
+        {
+            /* VERIF MICRO DEPOSITE */
+            $bank_account = $stripe->customers->retrieveSource(
+                $user->topup_payment_id,
+                $user->topup_ach_id,
+                [],
+                ['stripe_account' => $user->connect_account_id]
+            );
+            $bank_account = $bank_account->verify(['amounts' => [$micro_deposite_1, $micro_deposite_2]]);
+            /* VERIF MICRO DEPOSITE */
+
+            /* UPDATE TO DATABASE */
+            $user->verification_status_ach = 'verify';
+            $user->save();
+            /* UPDATE TO DATABASE */
+
+            return response()->json(['result' => 'success', 'message' => 'Verification Micro Deposite Success', 'params_ach' => $bank_account]);
+        }
+        catch (\Exception $e)
+        {
+            try 
+            {
+                /* GET INFO */
+                $customer = $stripe->customers->retrieveSource(
+                    $user->topup_payment_id,
+                    $user->topup_ach_id,
+                    [],
+                    ['stripe_account' => $user->connect_account_id]
+                );
+                /* GET INFO */
+
+                Log::info([
+                    'customer' => $customer
+                ]);
+
+                return response()->json(['result' => 'failed', 'message' => $e->getMessage(), 'params_ach' => $customer], 400);
+            }
+            catch (\Exception $e)
+            {
+                return response()->json(['result' => 'failed', 'message' => $e->getMessage(), 'params_ach' => ''], 400);
+            }
+        }
+    }
+
+    public function createAch(Request $request)
+    {
+        /* VALIDATOR */
+        $validator = Validator::make($request->all(), [
+            'user_id_seller' => ['required'],
+            'holder_type' => ['required'],
+            'holder_name' => ['required'], 
+            'routing_number' => ['required'],
+            'account_number' => ['required'],
+        ]);
+
+        if($validator->fails())
+            return response()->json(['result' => 'failed', 'message' => $validator->messages()], 422);
+        /* VALIDATOR */
+
+        /* CHECK PAYMENT METHOD AND CC EXISTS */
+        $user = User::where('id', $request->user_id_seller)
+                    ->first();
+
+        if(!$user)
+            return response()->json(['result' => 'failed', 'message' => 'User Not Found', 'params' => ''], 422);
+        else if(empty($user->connect_account_id))
+            return response()->json(['result' => 'failed', 'message' => 'Your Connected Not Exists, Please Connect Your Stripe'], 422);
+        /* CHECK PAYMENT METHOD AND CC EXISTS */
+
+        /* SETUP STRIPE */
+        $secret_key = config('stripe.secret.key');
+        $stripe = new StripeClient($secret_key);
+        /* SETUP STRIPE */
+
+        /* ADD BANK ACCOUNT ACH */
+        try
+        {
+            /* CREATE TOKEN */
+            $token = $stripe->tokens->create([
+                "bank_account" => [
+                    "country" => "US",
+                    "currency" => "USD",
+                    "account_holder_name" => $request->holder_name,
+                    "account_holder_type" => $request->holder_type,
+                    "routing_number" => $request->routing_number,
+                    "account_number" => $request->account_number,
+                ]
+            ]);
+            $token_id = $token->id;
+            /* CREATE TOKEN */
+
+            /* CHECK APAKAH CUTOMER ALREADY EXISTS */
+            if(empty($user->topup_payment_id))
+            {
+                /* ADD BANK CUSTOMER */
+                $customerCreate = $stripe->customers->create([
+                    "name" => $user->name,
+                    "email" => $user->email,
+                    "source" => $token_id,
+                ],['stripe_account' => $user->connect_account_id]);
+
+                $user->topup_payment_id = $customerCreate->id;
+                $user->topup_ach_id = $customerCreate->default_source ?? "";
+                /* ADD BANK CUSTOMER */
+
+                Log::info("1", ['customerCreate' => $customerCreate]);
+            }
+            else 
+            {
+                /* ADD BANK CUSTOMER */
+                $customerCreate = $stripe->customers->createSource(
+                    $user->topup_payment_id,
+                    ['source' => $token_id],
+                    ['stripe_account' => $user->connect_account_id]
+                );
+
+                $user->topup_ach_id = $customerCreate->id ?? "";
+                /* ADD BANK CUSTOMER */
+
+                Log::info("2", ['customerCreate' => $customerCreate]);
+            }
+            /* CHECK APAKAH CUTOMER ALREADY EXISTS */
+
+            /* SAVE BANK CUSTOMER TO DATABASE */
+            $user->verification_status_ach = 'pending';
+            $user->save();
+            /* SAVE BANK CUSTOMER TO DATABASE */
+
+            /* GET CARD INFO */
+            $customerRetreive = $stripe->customers->retrieveSource(
+                $user->topup_payment_id,
+                $user->topup_ach_id,
+                [],
+                ['stripe_account' => $user->connect_account_id]
+            );
+            return response()->json(['result' => 'success', 'message' => 'Create Bank Acccount Success', 'params_ach' => $customerRetreive]);
+            /* GET CARD INFO */
+        }
+        catch (\Exception $e)
+        {
+            return response()->json(['result' => 'failed', 'message' => $e->getMessage()], 400);
+        }
+        /* ADD BANK ACCOUNT ACH */
+    }
+
+    public function getInfoPaymentMethod(Request $request)
+    {
+        /* VALIDATOR */
+        $validator = Validator::make($request->all(), [
+            'user_id_seller' => ['required']
+        ]);
+
+        if($validator->fails())
+            return response()->json(['result' => 'failed', 'message' => $validator->messages(), 'params_cc' => '', 'params_ach' => ''], 422);
+        /* VALIDATOR */
+
+        /* CHECK PAYMENT METHOD AND CC EXISTS */
+        $user = User::where('id', $request->user_id_seller)
+                    ->first();
+
+        if(!$user)
+            return response()->json(['result' => 'failed', 'message' => 'User Not Found', 'params_cc' => '', 'params_ach' => ''], 422);
+        else if(empty($user->connect_account_id) || (empty($user->topup_payment_id)) || (empty($user->topup_payment_id) && empty($user->topup_card_id)) || (empty($user->topup_payment_id) && empty($user->topup_ach_id)))
+            return response()->json(['result' => 'success', 'message' => '', 'params_cc' => '', 'params_ach' => '']);
+        /* CHECK PAYMENT METHOD AND CC EXISTS */
+
+        /* SETUP STRIPE */
+        $secret_key = config('stripe.secret.key');
+        $stripe = new StripeClient($secret_key);
+        /* SETUP STRIPE */
+
+        $params_cc = [];
+        $params_ach = [];
+
+        /* GET CREDIT CARD INFO */
+        if(!empty($user->topup_card_id))
+        {
+            try
+            {
+                Log::info([
+                    $user->topup_payment_id,
+                    $user->topup_card_id,
+                    [],
+                    $user->connect_account_id
+                ]);
+                $customer_cc = $stripe->customers->retrieveSource(
+                    $user->topup_payment_id,
+                    $user->topup_card_id,
+                    [],
+                    ['stripe_account' => $user->connect_account_id]
+                );
+    
+                Log::info(['customer_cc' => $customer_cc->toArray()]);
+
+                $params_cc = $customer_cc->toArray();
+            }
+            catch (\Exception $e) 
+            {
+                Log::info("error = {$e->getMessage()}");
+                return response()->json(['result' => 'failed', 'message' => $e->getMessage(), 'params_cc' => '', 'params_ach' => ''], 400);
+            }
+        }
+        /* GET CREDIT CARD INFO */
+
+        /* GET BANK ACCOUNT INFO */
+        if(!empty($user->topup_ach_id))
+        {
+            try
+            {
+                Log::info([
+                    $user->topup_payment_id,
+                    $user->topup_ach_id,
+                    [],
+                    $user->connect_account_id
+                ]);
+                $customer_ach = $stripe->customers->retrieveSource(
+                    $user->topup_payment_id,
+                    $user->topup_ach_id,
+                    [],
+                    ['stripe_account' => $user->connect_account_id]
+                );
+    
+                Log::info(['customer_ach' => $customer_ach->toArray()]);
+
+                $params_ach = $customer_ach->toArray();
+            }
+            catch (\Exception $e)
+            {
+                Log::info("error = {$e->getMessage()}");
+                return response()->json(['result' => 'failed', 'message' => $e->getMessage(), 'params_cc' => '', 'params_ach' => ''], 400);
+            }
+        }
+        /* GET BANK ACCOUNT INFO */
+        return response()->json(['result' => 'success', 'message' => '', 'params_cc' => $params_cc, 'params_ach' => $params_ach]);
+    }
+
+    public function createCreditCard(Request $request)
+    {
+        /* VALIDATOR */
+        $validator = Validator::make($request->all(), [
+            'user_id_seller' => ['required'],
+            'zip' => ['required'],
+            'token' => ['required'],
+            'email' => ['required', 'email'],
+            'card_holder_name' => ['required'],
+            'address' => ['required'],
+            'country' => ['required'],
+            'state' => ['required'],
+            'city' => ['required'],
+        ]);
+
+        if($validator->fails())
+            return response()->json(['result' => 'failed', 'message' => $validator->messages()], 422);
+        /* VALIDATOR */
+
+        /* GTE CONNECT ACCCOUNT */
+        $user = User::where('id', $request->user_id_seller)
+                    ->where('email', $request->email)
+                    ->first();
+        
+        if(!$user)
+            return response()->json(['result' => 'failed', 'message' => 'User Not Found'], 422);
+        else if(empty($user->connect_account_id)) 
+            return response()->json(['result' => 'failed', 'message' => 'Your Connected Not Exists, Please Connect Your Stripe'], 422);
+        /* GTE CONNECT ACCCOUNT */
+
+        /* SETUP STRIPE */
+        $secret_key = config('stripe.secret.key');
+        $stripe = new StripeClient($secret_key);
+        /* SETUP STRIPE */
+        
+        /* CREATE CUSTOMER AND CREDIT CARD */
+        try 
+        {
+            /* CHECK APAKAH CUTOMER ALREADY EXISTS */
+            if(empty($user->topup_payment_id))
+            {
+                $customerCreate = $stripe->customers->create([
+                    'name' => $user->name, // Nama pemegang kartu
+                    'email' => $user->email, // Ganti dengan email yang valid
+                    'source' => $request->token, // Menggunakan token yang didapat dari Stripe.js
+                ], ['stripe_account' => $user->connect_account_id]);
+                
+                Log::info('1', ['customerCreate' => $customerCreate]);
+
+                $user->topup_payment_id = $customerCreate->id ?? "";
+                $user->topup_card_id = $customerCreate->default_source ?? "";
+            }
+            else 
+            {
+                $customerCreate = $stripe->customers->createSource(
+                    $user->topup_payment_id, // ID customer yang sudah ada
+                    ['source' => $request->token],
+                    ['stripe_account' => $user->connect_account_id] // Menggunakan connected account
+                );
+
+                Log::info("2", ['customerCreate' => $customerCreate]);
+
+                $user->topup_card_id = $customerCreate->id ?? "";
+            }
+            /* CHECK APAKAH CUTOMER ALREADY EXISTS */
+
+            $user->save();
+        }
+        catch (\Exception $e)
+        {
+            return response()->json(['result' => 'failed', 'message' => $e->getMessage()], 400);
+        }
+        /* CREATE CUSTOMER AND CREDIT CARD */
+
+        /* UPDATE PAYMENT METHOD */
+        try
+        {
+            $customerUpdate = $stripe->customers->updateSource(
+                $user->topup_payment_id,
+                $user->topup_card_id,
+                [
+                    'name' => $request->card_holder_name,
+                    'address_line1' => $request->address,
+                    'address_city' => $request->city,
+                    'address_state' => $request->state,
+                    'address_country' => $request->country,
+                    'address_zip' => $request->zip,
+                ], 
+                ['stripe_account' => $user->connect_account_id]
+            );
+
+            Log::info('', ['customerUpdate' => $customerUpdate]);
+
+        }
+        catch (\Exception $e)
+        {
+            return response()->json(['result' => 'failed', 'message' => $e->getMessage()], 400);
+        }
+        /* UPDATE PAYMENT METHOD */
+
+        /* GET CARD INFO */
+        try 
+        {
+            $customerRetreive = $stripe->customers->retrieveSource(
+                $user->topup_payment_id,
+                $user->topup_card_id,
+                [],
+                ['stripe_account' => $user->connect_account_id]
+            );
+
+            return response()->json(['result' => 'success', 'params' => $customerRetreive]);
+        }
+        catch (\Exception $e)
+        {
+            return response()->json(['result' => 'failed', 'message' => $e->getMessage()], 400);
+        }
+        /* GET CARD INFO */
+    }
+
+    public function replaceCreditCard(Request $request)
+    {
+        Log::info('start replaceCreditCard');
+        /* VALIDATOR */
+        $validator = Validator::make($request->all(), [
+            'user_id_seller' => ['required'],
+            'zip' => ['required'],
+            'token' => ['required'],
+            'email' => ['required', 'email'],
+            'card_holder_name' => ['required'],
+            'address' => ['required'],
+            'country' => ['required'],
+            'state' => ['required'],
+            'city' => ['required'],
+        ]);
+
+        if($validator->fails())
+            return response()->json(['result' => 'failed', 'message' => $validator->messages()], 422);
+        /* VALIDATOR */
+
+        /* GTE CONNECT ACCCOUNT */
+        $user = User::where('id', $request->user_id_seller)
+                    ->where('email', $request->email)
+                    ->first();
+        
+        if(!$user)
+            return response()->json(['result' => 'failed', 'message' => 'User Not Found'], 422);
+        else if(empty($user->connect_account_id)) 
+            return response()->json(['result' => 'failed', 'message' => 'Your Connected Not Exists, Please Connect Your Stripe'], 422);
+        /* GTE CONNECT ACCCOUNT */
+
+        /* SETUP STRIPE */
+        $secret_key = config('stripe.secret.key');
+        $stripe = new StripeClient($secret_key);
+        /* SETUP STRIPE */
+
+        /* DELETE CREDIT CARD */
+        try
+        {
+            $customerDelete = $stripe->customers->deleteSource(
+                $user->topup_payment_id,
+                $user->topup_card_id,
+                [],
+                ['stripe_account' => $user->connect_account_id]
+            );
+
+            Log::info('', ['customerDelete' => $customerDelete]);
+        }
+        catch (\Exception $e)
+        {
+            Log::info(['result1' => 'failed', 'message' => $e->getMessage()]);
+            return response()->json(['result' => 'failed', 'message' => $e->getMessage()], 400);
+        }
+        /* DELETE CREDIT CARD */
+        
+        /* CREATE CREDIT CARD */
+        try 
+        {
+            $customerCreate = $stripe->customers->createSource(
+                $user->topup_payment_id,
+                ['source' => $request->token], // Menggunakan token yang didapat dari Stripe.js 
+                ['stripe_account' => $user->connect_account_id]
+            );
+
+            Log::info('', ['customerCreate' => $customerCreate]);
+        }
+        catch (\Exception $e)
+        {
+            Log::info(['result2' => 'failed', 'message' => $e->getMessage()]);
+            return response()->json(['result' => 'failed', 'message' => $e->getMessage()], 400);
+        }
+        /* CREATE CREDIT CARD */
+
+        $user->topup_card_id = $customerCreate->id;
+        $user->save();
+
+        /* UPDATE PAYMENT METHOD */
+        try
+        {
+            Log::info([
+                $user->topup_payment_id,
+                $user->topup_card_id,
+                [
+                    'name' => $request->card_holder_name,
+                    'address_line1' => $request->address,
+                    'address_city' => $request->city,
+                    'address_state' => $request->state,
+                    'address_country' => $request->country,
+                    'address_zip' => $request->zip,
+                ], 
+                ['stripe_account' => $user->connect_account_id]
+            ]);
+            $customerUpdate = $stripe->customers->updateSource(
+                $user->topup_payment_id,
+                $user->topup_card_id,
+                [
+                    'name' => $request->card_holder_name,
+                    'address_line1' => $request->address,
+                    'address_city' => $request->city,
+                    'address_state' => $request->state,
+                    'address_country' => $request->country,
+                    'address_zip' => $request->zip,
+                ], 
+                ['stripe_account' => $user->connect_account_id]
+            );
+
+            Log::info('', ['customerUpdate' => $customerUpdate]);
+
+        }
+        catch (\Exception $e)
+        {
+            Log::info(['result3' => 'failed', 'message' => $e->getMessage()]);
+            return response()->json(['result' => 'failed', 'message' => $e->getMessage()], 400);
+        }
+        /* UPDATE PAYMENT METHOD */
+
+        /* GET CARD UINFO */
+        try 
+        {
+            $customerRetreive = $stripe->customers->retrieveSource(
+                $user->topup_payment_id,
+                $user->topup_card_id,
+                [],
+                ['stripe_account' => $user->connect_account_id]
+            );
+
+            return response()->json(['result' => 'success', 'params' => $customerRetreive]);
+        }
+        catch (\Exception $e)
+        {
+            return response()->json(['result' => 'failed', 'message' => $e->getMessage()], 400);
+            
+        }
+    }
+
     public function checkConnectAccountStripe(Request $request)
     {
         /* VALIDATOR */

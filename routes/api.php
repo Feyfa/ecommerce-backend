@@ -85,6 +85,13 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 Route::middleware('auth:sanctum')->group(function () {
+    Route::put('/stripe/replace-ach', [PaymentController::class, 'replaceAch']);
+    Route::delete('/stripe/delete-ach', [PaymentController::class, 'deleteAch']);
+    Route::post('/stripe/verify-ach', [PaymentController::class, 'verifyAch']);
+    Route::post('/stripe/create-ach', [PaymentController::class, 'createAch']);
+    Route::get('/stripe/get-info-payment-method', [PaymentController::class, 'getInfoPaymentMethod']);
+    Route::post('/stripe/create-credit-card', [PaymentController::class, 'createCreditCard']);
+    Route::put('/stripe/replace-credit-card', [PaymentController::class, 'replaceCreditCard']);
     Route::get('/stripe/check-connect-account', [PaymentController::class, 'checkConnectAccountStripe']);
     Route::post('/stripe/connect-account', [PaymentController::class, 'connectAccountStripe']);
 });
