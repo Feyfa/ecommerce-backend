@@ -7,6 +7,7 @@ use App\Http\Controllers\KeranjangController;
 use App\Http\Controllers\MessendController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\TopupController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\UserController;
 use Illuminate\Http\Request;
@@ -94,6 +95,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/stripe/replace-credit-card', [PaymentController::class, 'replaceCreditCard']);
     Route::get('/stripe/check-connect-account', [PaymentController::class, 'checkConnectAccountStripe']);
     Route::post('/stripe/connect-account', [PaymentController::class, 'connectAccountStripe']);
+});
+
+Route::middleware('auth:sanctum')->group(function() {
+    Route::get('/topup/get-topup-history', [TopupController::class, 'getTopupHistory']);
+    Route::get('/topup/get-payment-list', [TopupController::class, 'getPaymentList']);
+    Route::post('/topup/store', [TopupController::class, 'storeTopup']);
 });
 
 /* MIDTRANS WEBHOOK */
