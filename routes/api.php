@@ -98,6 +98,7 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 Route::middleware('auth:sanctum')->group(function() {
+    Route::get('/topup/get-balance', [TopupController::class, 'getBalance']);
     Route::get('/topup/get-topup-history', [TopupController::class, 'getTopupHistory']);
     Route::get('/topup/get-payment-list', [TopupController::class, 'getPaymentList']);
     Route::post('/topup/store', [TopupController::class, 'storeTopup']);

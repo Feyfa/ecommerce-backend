@@ -15,6 +15,7 @@ class TopupHistory extends Model
         'user_id_seller',
         'payment',
         'amount',
+        'stripe_process_fee',
         'last_number',
         'status',
         'message_error'

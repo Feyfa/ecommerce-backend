@@ -12,6 +12,47 @@ use Stripe\StripeClient;
 
 class TopupController extends Controller
 {   
+    public function getBalance(Request $request)
+    {
+        /* VALIDATOR */
+        $validator = Validator::make($request->all(), [
+            'user_id_seller' => ['required'],
+        ]);
+
+        if($validator->fails())
+            return response()->json(['result' => 'failed', 'message' => $validator->messages()], 422);
+        /* VALIDATOR */
+
+        /* GET CONNECT ACCCOUNT */
+        $user = User::where('id', $request->user_id_seller)
+                    ->first();
+
+        if(!$user)
+            return response()->json(['result' => 'failed', 'message' => 'User Not Found'], 422);
+        else if(empty($user->connect_account_id)) 
+            return response()->json(['result' => 'failed', 'message' => 'Your Connected Not Exists, Please Connect Your Stripe'], 422);
+        /* GET CONNECT ACCCOUNT */
+
+        /* SETUP STRIPE */
+        $secret_key = config('stripe.secret.key');
+        $stripe = new StripeClient($secret_key);
+        /* SETUP STRIPE */
+
+        try
+        {
+            /* RETREIVE BALANCE */
+            $balance = $stripe->balance->retrieve([], ['stripe_account' => $user->connect_account_id]);
+            $balance = round($balance->pending[0]->amount / 100, 2);
+            /* RETREIVE BALANCE */
+
+            return response()->json(['result' => 'success', 'message' => '', 'balance' => $balance]);
+        }
+        catch(\Exception $e)
+        {
+            return response()->json(['result' => 'failed', 'message' => $validator->messages()], 400);
+        }
+    }
+
     public function getTopupHistory(Request $request)
     {
         /* VALIDATOR */
@@ -40,6 +81,8 @@ class TopupController extends Controller
             'user_id_seller' => ['required'],
             'select_payment' => ['required'],
             'amount' => ['required'],
+            'stripe_process_fee' => ['required'],
+            'total_amount' => ['required'],
         ]);
 
         if($validator->fails())
@@ -60,7 +103,7 @@ class TopupController extends Controller
             return response()->json(['result' => 'failed', 'message' => 'Please Select Payment'], 422);
         else if(($request->select_payment == 'credit_card' && empty($user->topup_card_id)) || ($request->select_payment == 'bank_account' && empty($user->topup_ach_id)))
             return response()->json(['result' => 'failed', 'message' => 'Your Payment Not Exists, Please Create Payment'], 422);
-        else if(empty($request->amount) || $request->amount < 0.5)
+        else if(empty($request->total_amount) || $request->total_amount < 0.5)
             return response()->json(['result' => 'failed', 'message' => 'Amount Is Not Empty And Amount Greater Than 0.5'], 422);
         /* GET CONNECT ACCCOUNT */
 
@@ -73,12 +116,16 @@ class TopupController extends Controller
         $last_number = "";
 
         $select_payment = $request->select_payment == 'credit_card' ? 'Credit Card' : 'Bank Account';
-        
+
         $amount = round($request->amount, 2);
-        $topup_amount = round($amount * 100, 2);
+        $stripe_process_fee = round($request->stripe_process_fee, 2);
+
+
+        $total_amount = round($request->total_amount, 2);
+        $topup_amount = round($total_amount * 100, 2);
 
         $now = Carbon::now()->format('Y-m-d H:i:s');
-        $description = "Topup \$amount $now";
+        $description = "Topup \$$amount $now";
 
         try
         {
@@ -115,6 +162,7 @@ class TopupController extends Controller
                     TopupHistory::create([
                         'user_id_seller' => $request->user_id_seller,
                         'amount' => $amount,
+                        'stripe_process_fee' => $stripe_process_fee,
                         'payment' => $select_payment,
                         'last_number' => $last_number,
                         'status' => 'error',
@@ -128,6 +176,7 @@ class TopupController extends Controller
                     TopupHistory::create([
                         'user_id_seller' => $request->user_id_seller,
                         'amount' => $amount,
+                        'stripe_process_fee' => $stripe_process_fee,
                         'payment' => $select_payment,
                         'last_number' => $last_number,
                         'status' => 'success',
@@ -184,6 +233,7 @@ class TopupController extends Controller
                 TopupHistory::create([
                     'user_id_seller' => $request->user_id_seller,
                     'amount' => $amount,
+                    'stripe_process_fee' => $stripe_process_fee,
                     'payment' => $select_payment,
                     'last_number' => $last_number,
                     'status' => 'pending',
@@ -206,6 +256,7 @@ class TopupController extends Controller
             TopupHistory::create([
                 'user_id_seller' => $request->user_id_seller,
                 'amount' => $amount,
+                'stripe_process_fee' => $stripe_process_fee,
                 'payment' => $select_payment,
                 'last_number' => $last_number,
                 'status' => 'error',
