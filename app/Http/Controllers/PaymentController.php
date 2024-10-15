@@ -762,12 +762,12 @@ class PaymentController extends Controller
             {
                 /* CREATE ACCOUNT CONNECT */
                 $accountCreate = $stripe->accounts->create([
-                    'type' => 'standard',
-                    'business_type' => 'non_profit',
-                    'business_profile' => [
-                        'mcc' => 8661,
-                        'url' => 'https://ecommerce-frontend-delta-seven.vercel.app',
-                    ]
+                    'country' => 'US',
+                    'type' => 'custom',
+                    'capabilities' => [
+                        'card_payments' => ['requested' => true],
+                        'transfers' => ['requested' => true],
+                    ],
                 ]);
                 /* CREATE ACCOUNT CONNECT */
 
