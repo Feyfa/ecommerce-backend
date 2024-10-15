@@ -29,7 +29,6 @@ class User extends Authenticatable
         'connect_account_id',
         'topup_payment_id',
         'topup_card_id',
-        'balance',
     ];
 
     /**

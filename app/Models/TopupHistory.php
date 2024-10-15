@@ -13,6 +13,7 @@ class TopupHistory extends Model
 
     protected $fillable = [
         'user_id_seller',
+        'payment_intent_id',
         'payment',
         'amount',
         'stripe_process_fee',

@@ -10,6 +10,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\TopupController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\WebhookStripeController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -103,6 +104,10 @@ Route::middleware('auth:sanctum')->group(function() {
     Route::get('/topup/get-payment-list', [TopupController::class, 'getPaymentList']);
     Route::post('/topup/store', [TopupController::class, 'storeTopup']);
 });
+
+/* STRIPE WEBHOOK */
+Route::post('/webhook/stripe', [WebhookStripeController::class, 'stripe']);
+/* STRIPE WEBHOOK */
 
 /* MIDTRANS WEBHOOK */
 Route::prefix('invoice')->group(function () {

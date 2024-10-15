@@ -42,10 +42,11 @@ class TopupController extends Controller
         {
             /* RETREIVE BALANCE */
             $balance = $stripe->balance->retrieve([], ['stripe_account' => $user->connect_account_id]);
-            $balance = round($balance->pending[0]->amount / 100, 2);
+            $balance_pending = round($balance->pending[0]->amount / 100, 2);
+            $balance_available = round($balance->available[0]->amount / 100, 2);
             /* RETREIVE BALANCE */
 
-            return response()->json(['result' => 'success', 'message' => '', 'balance' => $balance]);
+            return response()->json(['result' => 'success', 'message' => '', 'balance_available' => $balance_available, 'balance_pending' => $balance_pending]);
         }
         catch(\Exception $e)
         {
@@ -113,13 +114,13 @@ class TopupController extends Controller
         /* SETUP STRIPE */
         
         $payment_intent = "";
+        $payment_intend_id = "";
         $last_number = "";
 
         $select_payment = $request->select_payment == 'credit_card' ? 'Credit Card' : 'Bank Account';
 
         $amount = round($request->amount, 2);
         $stripe_process_fee = round($request->stripe_process_fee, 2);
-
 
         $total_amount = round($request->total_amount, 2);
         $topup_amount = round($total_amount * 100, 2);
@@ -141,6 +142,7 @@ class TopupController extends Controller
                     'confirm' => true,
                     'description' => $description,
                 ],['stripe_account' => $user->connect_account_id]);
+                $payment_intend_id = $payment_intent->id ?? "";
                 /* PROCESS TOPUP */
 
                 /* RETREIVE CREDITR CARD */
@@ -161,6 +163,7 @@ class TopupController extends Controller
 
                     TopupHistory::create([
                         'user_id_seller' => $request->user_id_seller,
+                        'payment_intent_id' => $payment_intend_id,
                         'amount' => $amount,
                         'stripe_process_fee' => $stripe_process_fee,
                         'payment' => $select_payment,
@@ -175,6 +178,7 @@ class TopupController extends Controller
                 {
                     TopupHistory::create([
                         'user_id_seller' => $request->user_id_seller,
+                        'payment_intent_id' => $payment_intend_id,
                         'amount' => $amount,
                         'stripe_process_fee' => $stripe_process_fee,
                         'payment' => $select_payment,
@@ -218,6 +222,7 @@ class TopupController extends Controller
                         ],
                     ],
                 ],['stripe_account' => $user->connect_account_id]);
+                $payment_intend_id = $payment_intent->id ?? "";
                 /* PROCESS TOPUP */
 
                 /* RETREIVE CREDITR CARD */
@@ -230,8 +235,9 @@ class TopupController extends Controller
                 $last_number = $params_ach->last4;
                 /* RETREIVE CREDITR CARD */
 
-                TopupHistory::create([
+                $topupHistory = TopupHistory::create([
                     'user_id_seller' => $request->user_id_seller,
+                    'payment_intent_id' => $payment_intend_id,
                     'amount' => $amount,
                     'stripe_process_fee' => $stripe_process_fee,
                     'payment' => $select_payment,
@@ -239,6 +245,19 @@ class TopupController extends Controller
                     'status' => 'pending',
                     'message_error' => '',
                 ]);
+
+                /* UPDATE METADATA */
+                $stripe->paymentIntents->update(
+                    $payment_intend_id, // Menggunakan ID Payment Intent yang baru dibuat
+                    [
+                        'metadata' => [
+                            'topup_id' => $topupHistory->id, // Menyimpan ID top-up yang kamu miliki,
+                            'function' => 'storeTopup'
+                        ]
+                    ],
+                    ['stripe_account' => $user->connect_account_id] // Pastikan connected account juga dimasukkan jika ada
+                );
+                /* UPDATE METADATA */
 
                 /* GET TOPUP HISTORY */
                 $topup_history_request = new Request(['user_id_seller' => $request->user_id_seller]);
@@ -255,6 +274,7 @@ class TopupController extends Controller
 
             TopupHistory::create([
                 'user_id_seller' => $request->user_id_seller,
+                'payment_intent_id' => $payment_intend_id,
                 'amount' => $amount,
                 'stripe_process_fee' => $stripe_process_fee,
                 'payment' => $select_payment,
