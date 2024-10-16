@@ -12,7 +12,7 @@ use Stripe\StripeClient;
 
 class TopupController extends Controller
 {   
-    public function getBalance(Request $request)
+    public function getTopupBalance(Request $request)
     {
         /* VALIDATOR */
         $validator = Validator::make($request->all(), [
@@ -40,39 +40,24 @@ class TopupController extends Controller
 
         try
         {
+            /* GET TOPUP HISTORY */
+            $topup_history = TopupHistory::where('user_id_seller', $request->user_id_seller)
+                                        ->orderBy('id', 'DESC')
+                                        ->get();
+            /* GET TOPUP HISTORY */
+
             /* RETREIVE BALANCE */
             $balance = $stripe->balance->retrieve([], ['stripe_account' => $user->connect_account_id]);
             $balance_pending = round($balance->pending[0]->amount / 100, 2);
             $balance_available = round($balance->available[0]->amount / 100, 2);
             /* RETREIVE BALANCE */
 
-            return response()->json(['result' => 'success', 'message' => '', 'balance_available' => $balance_available, 'balance_pending' => $balance_pending]);
+            return response()->json(['result' => 'success', 'message' => '', 'balance_available' => $balance_available, 'balance_pending' => $balance_pending, 'topup_history' => $topup_history]);
         }
         catch(\Exception $e)
         {
             return response()->json(['result' => 'failed', 'message' => $validator->messages()], 400);
         }
-    }
-
-    public function getTopupHistory(Request $request)
-    {
-        /* VALIDATOR */
-        $validator = Validator::make($request->all(), [
-            'user_id_seller' => ['required'],
-        ]);
-
-        if($validator->fails())
-            return response()->json(['result' => 'failed', 'message' => $validator->messages()], 422);
-        /* VALIDATOR */
-
-        /* GET TOPUP HISTORY */
-        $topupHistory = TopupHistory::where('user_id_seller', $request->user_id_seller)
-                                    ->orderBy('id', 'DESC')
-                                    ->get();
-
-
-        return response()->json(['result' => 'success', 'topup_history' => $topupHistory]);
-        /* GET TOPUP HISTORY */
     }
 
     public function storeTopup(Request $request)
@@ -168,11 +153,17 @@ class TopupController extends Controller
                         'stripe_process_fee' => $stripe_process_fee,
                         'payment' => $select_payment,
                         'last_number' => $last_number,
-                        'status' => 'error',
+                        'status' => 'failed',
                         'message_error' => $message_error,
                     ]);
 
-                    return response()->json(['result' => 'failed', 'message' => $message_error], 400);
+                    /* GET TOPUP HISTORY */
+                    $topup_history = TopupHistory::where('user_id_seller', $request->user_id_seller)
+                                                 ->orderBy('id', 'DESC')
+                                                 ->get();
+                    /* GET TOPUP HISTORY */
+
+                    return response()->json(['result' => 'failed', 'message' => $message_error, 'topup_history' => $topup_history], 400);
                 }
                 else 
                 {
@@ -188,9 +179,9 @@ class TopupController extends Controller
                     ]);
 
                     /* GET TOPUP HISTORY */
-                    $topup_history_request = new Request(['user_id_seller' => $request->user_id_seller]);
-                    $topup_history = $this->getTopupHistory($topup_history_request);
-                    $topup_history = $topup_history->getData()->topup_history;
+                    $topup_history = TopupHistory::where('user_id_seller', $request->user_id_seller)
+                                                 ->orderBy('id', 'DESC')
+                                                 ->get();
                     /* GET TOPUP HISTORY */
 
                     return response()->json(['result' => 'success', 'message' => "Topup \$$amount With $select_payment Successfully", 'topup_history' => $topup_history]);
@@ -260,9 +251,9 @@ class TopupController extends Controller
                 /* UPDATE METADATA */
 
                 /* GET TOPUP HISTORY */
-                $topup_history_request = new Request(['user_id_seller' => $request->user_id_seller]);
-                $topup_history = $this->getTopupHistory($topup_history_request);
-                $topup_history = $topup_history->getData()->topup_history;
+                $topup_history = TopupHistory::where('user_id_seller', $request->user_id_seller)
+                                             ->orderBy('id', 'DESC')
+                                             ->get();
                 /* GET TOPUP HISTORY */
 
                 return response()->json(['result' => 'success', 'message' => "Topup \$$amount With $select_payment Pending, Please Check Status Topup Periodically", 'topup_history' => $topup_history]);
@@ -279,11 +270,17 @@ class TopupController extends Controller
                 'stripe_process_fee' => $stripe_process_fee,
                 'payment' => $select_payment,
                 'last_number' => $last_number,
-                'status' => 'error',
+                'status' => 'failed',
                 'message_error' => $e->getMessage(),
             ]);
 
-            return response()->json(['result' => 'failed', 'message' => "Payment unsuccessful: {$validator->messages()}"], 400);
+            /* GET TOPUP HISTORY */
+            $topup_history = TopupHistory::where('user_id_seller', $request->user_id_seller)
+                                         ->orderBy('id', 'DESC')
+                                         ->get();
+            /* GET TOPUP HISTORY */
+
+            return response()->json(['result' => 'failed', 'message' => "Payment unsuccessful: {$validator->messages()}", 'topup_history' => $topup_history], 400);
         }
     }
 
