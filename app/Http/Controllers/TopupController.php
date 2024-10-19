@@ -212,6 +212,9 @@ class TopupController extends Controller
                             ],
                         ],
                     ],
+                    'metadata' => [
+                        'app_name' => 'jidan-ecommerce',
+                    ]
                 ],['stripe_account' => $user->connect_account_id]);
                 $payment_intend_id = $payment_intent->id ?? "";
                 /* PROCESS TOPUP */

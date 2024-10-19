@@ -112,7 +112,9 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 /* STRIPE WEBHOOK */
-Route::post('/webhook/stripe', [WebhookStripeController::class, 'stripe']);
+Route::middleware('auth.webhook.stripe')->group(function () {
+    Route::post('/webhook/stripe', [WebhookStripeController::class, 'stripe']);
+});
 /* STRIPE WEBHOOK */
 
 /* MIDTRANS WEBHOOK */
