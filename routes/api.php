@@ -4,6 +4,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BelanjaController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\KeranjangController;
+use App\Http\Controllers\LocationController;
 use App\Http\Controllers\MessendController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
@@ -102,6 +103,12 @@ Route::middleware('auth:sanctum')->group(function() {
     Route::get('/topup/get-topup-balance', [TopupController::class, 'getTopupBalance']);
     Route::get('/topup/get-payment-list', [TopupController::class, 'getPaymentList']);
     Route::post('/topup/store', [TopupController::class, 'storeTopup']);
+});
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/countries', [LocationController::class, 'countries']);
+    Route::get('/states', [LocationController::class, 'states']);
+    Route::get('/cities', [LocationController::class, 'cities']);
 });
 
 /* STRIPE WEBHOOK */
