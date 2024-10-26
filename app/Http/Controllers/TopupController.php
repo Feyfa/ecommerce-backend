@@ -17,6 +17,7 @@ class TopupController extends Controller
         /* VALIDATOR */
         $validator = Validator::make($request->all(), [
             'user_id_seller' => ['required'],
+            'page' => ['required']
         ]);
 
         if($validator->fails())
@@ -41,10 +42,18 @@ class TopupController extends Controller
         try
         {
             /* GET TOPUP HISTORY */
+            $page = !empty($request->page) ? (5 * $request->page) : 0;
             $topup_history = TopupHistory::where('user_id_seller', $request->user_id_seller)
                                         ->orderBy('id', 'DESC')
+                                        ->limit(5)
+                                        ->offset($page)
                                         ->get();
             /* GET TOPUP HISTORY */
+
+            /* TOTAL TOPUP HISTORY */
+            $total_topup_history = TopupHistory::where('user_id_seller', $request->user_id_seller)
+                                         ->count();
+            /* TOTAL TOPUP HISTORY */
 
             /* RETREIVE BALANCE */
             $balance = $stripe->balance->retrieve([], ['stripe_account' => $user->connect_account_id]);
@@ -52,7 +61,7 @@ class TopupController extends Controller
             $balance_available = round($balance->available[0]->amount / 100, 2);
             /* RETREIVE BALANCE */
 
-            return response()->json(['result' => 'success', 'message' => '', 'balance_available' => $balance_available, 'balance_pending' => $balance_pending, 'topup_history' => $topup_history]);
+            return response()->json(['result' => 'success', 'message' => '', 'balance_available' => $balance_available, 'balance_pending' => $balance_pending, 'topup_history' => $topup_history, 'total_topup_history' => $total_topup_history]);
         }
         catch(\Exception $e)
         {
