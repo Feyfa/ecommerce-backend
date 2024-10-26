@@ -17,7 +17,7 @@ class TopupController extends Controller
         /* VALIDATOR */
         $validator = Validator::make($request->all(), [
             'user_id_seller' => ['required'],
-            'page' => ['required']
+            'offset' => ['required']
         ]);
 
         if($validator->fails())
@@ -42,11 +42,11 @@ class TopupController extends Controller
         try
         {
             /* GET TOPUP HISTORY */
-            $page = !empty($request->page) ? (5 * $request->page) : 0;
+            $offset = !empty($request->offset) ? ($request->offset) : 0;
             $topup_history = TopupHistory::where('user_id_seller', $request->user_id_seller)
                                         ->orderBy('id', 'DESC')
                                         ->limit(5)
-                                        ->offset($page)
+                                        ->offset($offset)
                                         ->get();
             /* GET TOPUP HISTORY */
 
@@ -155,7 +155,7 @@ class TopupController extends Controller
                 {
                     $message_error = "Payment unsuccessful: Stripe status '$payment_intent_status' indicates further user action is needed.";
 
-                    TopupHistory::create([
+                    $topupHistory = TopupHistory::create([
                         'user_id_seller' => $request->user_id_seller,
                         'payment_intent_id' => $payment_intend_id,
                         'amount' => $amount,
@@ -166,17 +166,14 @@ class TopupController extends Controller
                         'message_error' => $message_error,
                     ]);
 
-                    /* GET TOPUP HISTORY */
-                    $topup_history = TopupHistory::where('user_id_seller', $request->user_id_seller)
-                                                 ->orderBy('id', 'DESC')
-                                                 ->get();
-                    /* GET TOPUP HISTORY */
+                    $totalTopupHistory = TopupHistory::where('user_id_seller', $request->user_id_seller)
+                                                     ->count();
 
-                    return response()->json(['result' => 'failed', 'message' => $message_error, 'topup_history' => $topup_history], 400);
+                    return response()->json(['result' => 'failed', 'message' => $message_error, 'topup_history' => $topupHistory, 'total_topup_history' => $totalTopupHistory], 400);
                 }
                 else 
                 {
-                    TopupHistory::create([
+                    $topupHistory = TopupHistory::create([
                         'user_id_seller' => $request->user_id_seller,
                         'payment_intent_id' => $payment_intend_id,
                         'amount' => $amount,
@@ -187,13 +184,10 @@ class TopupController extends Controller
                         'message_error' => '',
                     ]);
 
-                    /* GET TOPUP HISTORY */
-                    $topup_history = TopupHistory::where('user_id_seller', $request->user_id_seller)
-                                                 ->orderBy('id', 'DESC')
-                                                 ->get();
-                    /* GET TOPUP HISTORY */
+                    $totalTopupHistory = TopupHistory::where('user_id_seller', $request->user_id_seller)
+                                                     ->count();
 
-                    return response()->json(['result' => 'success', 'message' => "Topup \$$amount With $select_payment Successfully", 'topup_history' => $topup_history]);
+                    return response()->json(['result' => 'success', 'message' => "Topup \$$amount With $select_payment Successfully", 'topup_history' => $topupHistory, 'total_topup_history' => $totalTopupHistory]);
                 }
                 /* CHECK STATUS */
             }
@@ -249,6 +243,9 @@ class TopupController extends Controller
                     'message_error' => '',
                 ]);
 
+                $totalTopupHistory = TopupHistory::where('user_id_seller', $request->user_id_seller)
+                                                 ->count();
+
                 /* UPDATE METADATA */
                 $stripe->paymentIntents->update(
                     $payment_intend_id, // Menggunakan ID Payment Intent yang baru dibuat
@@ -262,20 +259,14 @@ class TopupController extends Controller
                 );
                 /* UPDATE METADATA */
 
-                /* GET TOPUP HISTORY */
-                $topup_history = TopupHistory::where('user_id_seller', $request->user_id_seller)
-                                             ->orderBy('id', 'DESC')
-                                             ->get();
-                /* GET TOPUP HISTORY */
-
-                return response()->json(['result' => 'success', 'message' => "Topup \$$amount With $select_payment Pending, Please Check Status Topup Periodically", 'topup_history' => $topup_history]);
+                return response()->json(['result' => 'success', 'message' => "Topup \$$amount With $select_payment Pending, Please Check Status Topup Periodically", 'topup_history' => $topupHistory, 'total_topup_history' => $totalTopupHistory]);
             }
         }
         catch(\Exception $e)
         {
             Log::info(['error' => $e->getMessage()]);
 
-            TopupHistory::create([
+            $topupHistory = TopupHistory::create([
                 'user_id_seller' => $request->user_id_seller,
                 'payment_intent_id' => $payment_intend_id,
                 'amount' => $amount,
@@ -286,13 +277,10 @@ class TopupController extends Controller
                 'message_error' => $e->getMessage(),
             ]);
 
-            /* GET TOPUP HISTORY */
-            $topup_history = TopupHistory::where('user_id_seller', $request->user_id_seller)
-                                         ->orderBy('id', 'DESC')
-                                         ->get();
-            /* GET TOPUP HISTORY */
+            $totalTopupHistory = TopupHistory::where('user_id_seller', $request->user_id_seller)
+                                             ->count();
 
-            return response()->json(['result' => 'failed', 'message' => "Payment unsuccessful: {$validator->messages()}", 'topup_history' => $topup_history], 400);
+            return response()->json(['result' => 'failed', 'message' => "Payment unsuccessful: {$validator->messages()}", 'topup_history' => $topupHistory, 'total_topup_history' => $totalTopupHistory], 400);
         }
     }
 
