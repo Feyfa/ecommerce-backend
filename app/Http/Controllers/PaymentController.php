@@ -710,7 +710,7 @@ class PaymentController extends Controller
 
         /* IF USER NOT YET REGISTERED */
         if(empty($user->connect_account_id)) 
-            return response()->json(['result' => 'success', 'account' => '', 'message' => 'User Has Not Registered a Connected Account, Please Connect Your Account Before Transaction']);
+            return response()->json(['result' => 'warning', 'account' => '', 'message' => 'User Has Not Registered a Connected Account, Please Connect Your Account Before Transaction'], 400);
         /* IF USER NOT YET REGISTERED */
 
         /* SETUP STRIPE */
@@ -726,7 +726,7 @@ class PaymentController extends Controller
         }
         catch (\Exception $e)
         {
-            return response()->json(['result' => 'success', 'account' => '', 'message' => "Something Error : {$e->getMessage()}"], 400);
+            return response()->json(['result' => 'failed', 'account' => '', 'message' => "Something Error : {$e->getMessage()}"], 400);
         }
     }
 

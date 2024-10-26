@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Validator;
 
 class ProductController extends Controller
 {
-    public function index(string $user_id_seller)
+    public function index(string $user_id_seller, PaymentController $paymentController)
     {
         /* VALIDATOR AND GET */
         $validator = Validator::make(
@@ -28,6 +28,20 @@ class ProductController extends Controller
 
         $validate = $validator->validate();
         /* VALIDATOR AND GET */
+
+        /* CHECK USER HAS BEN CONNECTED IN STRIPE */
+        $data_request = new Request(['user_id_seller' => $user_id_seller]);
+        $checkConnected = $paymentController->checkConnectAccountStripe($data_request)->getData();
+
+        if($checkConnected->result == 'failed' || $checkConnected->result == 'warning')
+        {
+            return response()->json(['status' => 402 , 'message' => $checkConnected->message], 402);
+        }
+        else if(($checkConnected->result == 'success') && (count($checkConnected->account->requirements->currently_due) > 0 || count($checkConnected->account->requirements->past_due) > 0))
+        {
+            return response()->json(['status' => 402 , 'message' => 'Please Continue Connect Your Account'], 402);
+        }
+        /* CHECK USER HAS BEN CONNECTED IN STRIPE */
 
         /* GET PRODUCT */
         $products = Product::where('user_id_seller', $validate['user_id_seller'])
