@@ -45,6 +45,7 @@ class ProductController extends Controller
 
         /* GET PRODUCT */
         $products = Product::where('user_id_seller', $validate['user_id_seller'])
+                           ->orderBy('updated_at', 'DESC')
                            ->get();
         /* GET PRODUCT */
 
@@ -100,15 +101,10 @@ class ProductController extends Controller
         /* CREATE PRODUCT AND STORE IMG */
         $validate['img'] = $request->file('img')->store('product-imgs');
 
-        Product::create($validate);
+        $product = Product::create($validate);
         /* CREATE PRODUCT AND STORE IMG */
-        
-        /* GET PRODUCT */
-        $products = Product::where('user_id_seller', $validate['user_id_seller'])
-                           ->get();
-        /* GET PRODUCT */
 
-        return response()->json(['status' => 200, 'message' => 'Add Product Success', 'products' => $products], 200);
+        return response()->json(['status' => 200, 'message' => 'Add Product Success', 'product' => $product], 200);
     }
 
     public function update(string $id, Request $request)
@@ -205,11 +201,6 @@ class ProductController extends Controller
         $product->delete();
         /* DELETE */
 
-        /* GET PRODUCT */
-        $products = Product::where('user_id_seller', $validate['user_id_seller'])
-                           ->get();
-        /* GET PRODUCT */
-
-        return response()->json(['status' => 200, 'message' => 'Delete Product Success', 'products' => $products], 200);
+        return response()->json(['status' => 200, 'message' => 'Delete Product Success'], 200);
     }
 }
