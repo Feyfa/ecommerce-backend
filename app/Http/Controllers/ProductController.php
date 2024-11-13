@@ -6,20 +6,23 @@ use App\Models\Keranjang;
 use App\Models\Product;
 use Illuminate\Http\Client\ResponseSequence;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
 class ProductController extends Controller
 {
-    public function index(string $user_id_seller, PaymentController $paymentController)
+    public function index(string $user_id_seller, Request $request, PaymentController $paymentController)
     {
         /* VALIDATOR AND GET */
         $validator = Validator::make(
             [
-                'user_id_seller' => $user_id_seller
+                'user_id_seller' => $user_id_seller,
+                'products_current_id' => $request->products_current_id
             ],
             [
                 'user_id_seller' => ['required', 'integer'],
+                'products_current_id' => ['required']
             ]
         );
 
@@ -44,8 +47,12 @@ class ProductController extends Controller
         /* CHECK USER HAS BEN CONNECTED IN STRIPE */
 
         /* GET PRODUCT */
+        $products_current_id = json_decode($request->products_current_id, true);
+
         $products = Product::where('user_id_seller', $validate['user_id_seller'])
+                           ->whereNotIn('id', $products_current_id)
                            ->orderBy('updated_at', 'DESC')
+                           ->limit(50)
                            ->get();
         /* GET PRODUCT */
 
