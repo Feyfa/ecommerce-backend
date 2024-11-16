@@ -48,9 +48,11 @@ class ProductController extends Controller
 
         /* GET PRODUCT */
         $products_current_id = json_decode($request->products_current_id, true);
+        $search_product = (isset($request->search_product)) ? trim($request->search_product) : '';
 
         $products = Product::where('user_id_seller', $validate['user_id_seller'])
                            ->whereNotIn('id', $products_current_id)
+                           ->where('name', 'LIKE', "%$search_product%")
                            ->orderBy('updated_at', 'DESC')
                            ->limit(50)
                            ->get();
