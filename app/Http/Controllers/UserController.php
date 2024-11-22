@@ -5,12 +5,59 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
+    public function changePassword(Request $request)
+    {
+        /* VALIDATION REQUEST AND GET */
+        $validator = Validator::make($request->all(), [
+            'id' => ['required', 'integer'],
+            'oldPassword' => ['required'],
+            'newPassword' => ['required'],
+        ]);
+
+        if($validator->fails())
+            return response()->json(['status' => 422, 'message' => $validator->messages()], 422);
+
+        $validate = $validator->validate();
+        /* VALIDATION REQUEST AND GET */
+
+        /* GET USER AND COMPARE PASSWORD */
+        $user = User::where('id', $request->id)
+                    ->first();
+
+        if(empty($user))
+            return response()->json([
+                'result' => 'error',
+                'error_type' => '',
+                'message' => 'User Not Found'
+            ], 404);
+
+        if(!Hash::check($request->oldPassword, $user->password))
+            return response()->json([
+                'result' => 'error',
+                'error_type' => 'old_password_invalid',
+                'message' => 'Old Password Invalid'
+            ], 404);
+        /* GET USER AND COMPARE PASSWORD */
+
+        /* UPDATE PASSWORD */
+        $user->password = Hash::make($request->newPassword);
+        $user->save();
+        /* UPDATE PASSWORD */
+
+        return response()->json([
+            'result' => 'success',
+            'message' => 'Change Password Successfully'
+        ]);
+    }
+
     public function deleteImage(Request $request) 
     {
         /* VALIDATION REQUEST AND GET */
