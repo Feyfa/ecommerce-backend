@@ -32,6 +32,7 @@ class KeranjangController extends Controller
         /* GET ITEM IN BASKET */
         $keranjangs = Keranjang::selectRaw('
                                     keranjangs.id as k_id,
+                                    keranjangs.user_id_seller as k_user_id_seller,
                                     keranjangs.checked as k_checked,
                                     keranjangs.total as k_total,
                                     (keranjangs.total * products.price) as k_total_price,
@@ -58,8 +59,13 @@ class KeranjangController extends Controller
             }
         }
         /* CALCULATION PRICE */
+        
+        /* GROUP KERANJANG */
+        $groupKeranjangs = $keranjangs->groupBy('k_user_id_seller');
+        // Log::info('', ['groupKeranjangs' => $groupKeranjangs]);
+        /* GROUP KERANJANG */
 
-        return response()->json(['status' => 200, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 200);
+        return response()->json(['status' => 200, 'keranjangs' => $groupKeranjangs, 'totalPrice' => $totalPrice], 200);
     }
 
     public function store(Request $request)
@@ -147,6 +153,7 @@ class KeranjangController extends Controller
         /* GET ITEM IN BASKET */
         $keranjangs = Keranjang::selectRaw('
                                     keranjangs.id as k_id,
+                                    keranjangs.user_id_seller as k_user_id_seller,
                                     keranjangs.checked as k_checked,
                                     keranjangs.total as k_total,
                                     (keranjangs.total * products.price) as k_total_price,
@@ -174,7 +181,12 @@ class KeranjangController extends Controller
         }
         /* CALCULATION PRICE */
 
-        return response()->json(['status' => 200, 'message' => 'Item In Basket Has Been Delete', 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 200);
+        /* GROUP KERANJANG */
+        $groupKeranjangs = $keranjangs->groupBy('k_user_id_seller');
+        // Log::info('', ['groupKeranjangs' => $groupKeranjangs]);
+        /* GROUP KERANJANG */
+
+        return response()->json(['status' => 200, 'message' => 'Item In Basket Has Been Delete', 'keranjangs' => $groupKeranjangs, 'totalPrice' => $totalPrice], 200);
     }
 
     public function checked(Request $request)
@@ -205,6 +217,7 @@ class KeranjangController extends Controller
         /* GET ITEM IN BASKET */
         $keranjangs = Keranjang::selectRaw('
                                     keranjangs.id as k_id,
+                                    keranjangs.user_id_seller as k_user_id_seller,
                                     keranjangs.checked as k_checked,
                                     keranjangs.total as k_total,
                                     (keranjangs.total * products.price) as k_total_price,
@@ -232,7 +245,74 @@ class KeranjangController extends Controller
         }
         /* CALCULATION PRICE */
 
-        return response()->json(['status' => 200, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 200);
+        /* GROUP KERANJANG */
+        $groupKeranjangs = $keranjangs->groupBy('k_user_id_seller');
+        // Log::info('', ['groupKeranjangs' => $groupKeranjangs]);
+        /* GROUP KERANJANG */
+
+        return response()->json(['status' => 200, 'keranjangs' => $groupKeranjangs, 'totalPrice' => $totalPrice], 200);
+    }
+
+    public function checkedGroup(Request $request)
+    {
+        /* VALIDATOR AND GET */
+        $validator = Validator::make($request->all(),
+            [
+                'user_id_buyer' => ['required', 'integer'],
+                'checked' => ['required', 'boolean'],
+                'user_id_seller' => ['required', 'integer'],
+            ]
+        );
+
+        if($validator->fails())
+            return response()->json(['status' => 422, 'message' => $validator->messages()], 422);
+
+        $validate = $validator->validate();
+        /* VALIDATOR AND GET */
+
+        /* CHANGE CHECKED */
+        $keranjangs = Keranjang::where('user_id_seller', $validate['user_id_seller'])
+                              ->where('user_id_buyer', $validate['user_id_buyer'])
+                              ->update(['checked' => $validate['checked']]);
+        /* CHANGE CHECKED */
+
+        /* GET ITEM IN BASKET */
+        $keranjangs = Keranjang::selectRaw('
+                                    keranjangs.id as k_id,
+                                    keranjangs.user_id_seller as k_user_id_seller,
+                                    keranjangs.checked as k_checked,
+                                    keranjangs.total as k_total,
+                                    (keranjangs.total * products.price) as k_total_price,
+                                    users.name as u_seller_name,
+                                    products.id as p_id,
+                                    products.name as p_name,
+                                    products.price as p_price,
+                                    products.stock as p_stock,
+                                    products.img as p_img
+                                ')
+                                ->join('users', 'keranjangs.user_id_seller', '=', 'users.id')
+                                ->join('products', 'keranjangs.product_id', '=', 'products.id')
+                                ->where('keranjangs.user_id_buyer', $validate['user_id_buyer'])
+                                ->orderBy('k_id', 'DESC')
+                                ->get();
+        /* GET ITEM IN BASKET */
+        
+        /* CALCULATION PRICE */
+        $totalPrice = 0;
+        foreach($keranjangs as $keranjang)
+        {
+            if($keranjang->k_checked == 1) {
+                $totalPrice += $keranjang->k_total_price;
+            }
+        }
+        /* CALCULATION PRICE */
+
+        /* GROUP KERANJANG */
+        $groupKeranjangs = $keranjangs->groupBy('k_user_id_seller');
+        // Log::info('', ['groupKeranjangs' => $groupKeranjangs]);
+        /* GROUP KERANJANG */
+
+        return response()->json(['status' => 200, 'keranjangs' => $groupKeranjangs, 'totalPrice' => $totalPrice], 200);
     }
 
     public function plusTotalKeranjang(Request $request)
@@ -274,6 +354,7 @@ class KeranjangController extends Controller
         /* GET ITEM IN BASKET */
         $keranjangs = Keranjang::selectRaw('
                                     keranjangs.id as k_id,
+                                    keranjangs.user_id_seller as k_user_id_seller,
                                     keranjangs.checked as k_checked,
                                     keranjangs.total as k_total,
                                     (keranjangs.total * products.price) as k_total_price,
@@ -301,7 +382,12 @@ class KeranjangController extends Controller
         }
         /* CALCULATION PRICE */
 
-        return response()->json(['status' => 200, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 200);
+        /* GROUP KERANJANG */
+        $groupKeranjangs = $keranjangs->groupBy('k_user_id_seller');
+        // Log::info('', ['groupKeranjangs' => $groupKeranjangs]);
+        /* GROUP KERANJANG */
+
+        return response()->json(['status' => 200, 'keranjangs' => $groupKeranjangs, 'totalPrice' => $totalPrice], 200);
     }
 
     public function minusTotalKeranjang(Request $request)
@@ -333,6 +419,7 @@ class KeranjangController extends Controller
         /* GET ITEM IN BASKET */
         $keranjangs = Keranjang::selectRaw('
                                     keranjangs.id as k_id,
+                                    keranjangs.user_id_seller as k_user_id_seller,
                                     keranjangs.checked as k_checked,
                                     keranjangs.total as k_total,
                                     (keranjangs.total * products.price) as k_total_price,
@@ -360,7 +447,12 @@ class KeranjangController extends Controller
         }
         /* CALCULATION PRICE */
 
-        return response()->json(['status' => 200, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 200);
+        /* GROUP KERANJANG */
+        $groupKeranjangs = $keranjangs->groupBy('k_user_id_seller');
+        // Log::info('', ['groupKeranjangs' => $groupKeranjangs]);
+        /* GROUP KERANJANG */
+
+        return response()->json(['status' => 200, 'keranjangs' => $groupKeranjangs, 'totalPrice' => $totalPrice], 200);
     }
 
     public function changeTotalKeranjang(Request $request)
@@ -394,6 +486,7 @@ class KeranjangController extends Controller
             /* GET ITEM IN BASKET */
                 $keranjangs = Keranjang::selectRaw('
                                             keranjangs.id as k_id,
+                                            keranjangs.user_id_seller as k_user_id_seller,
                                             keranjangs.checked as k_checked,
                                             keranjangs.total as k_total,
                                             (keranjangs.total * products.price) as k_total_price,
@@ -421,7 +514,12 @@ class KeranjangController extends Controller
             }
             /* CALCULATION PRICE */
 
-            return response()->json(['status' => 422, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice, 'message' => ['stock_maximum' => ["This product stock is a maximum of {$product->stock}"]]], 422);
+            /* GROUP KERANJANG */
+            $groupKeranjangs = $keranjangs->groupBy('k_user_id_seller');
+            // Log::info('', ['groupKeranjangs' => $groupKeranjangs]);
+            /* GROUP KERANJANG */
+
+            return response()->json(['status' => 422, 'keranjangs' => $groupKeranjangs, 'totalPrice' => $totalPrice, 'message' => ['stock_maximum' => ["This product stock is a maximum of {$product->stock}"]]], 422);
         }  
         /* VALIDATES IF TOTAL KERANJANG > STOCK PRODUCT */
 
@@ -433,6 +531,7 @@ class KeranjangController extends Controller
         /* GET ITEM IN BASKET */
         $keranjangs = Keranjang::selectRaw('
                                     keranjangs.id as k_id,
+                                    keranjangs.user_id_seller as k_user_id_seller,
                                     keranjangs.checked as k_checked,
                                     keranjangs.total as k_total,
                                     (keranjangs.total * products.price) as k_total_price,
@@ -460,6 +559,11 @@ class KeranjangController extends Controller
         }
         /* CALCULATION PRICE */
 
-        return response()->json(['status' => 200, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 200);
+        /* GROUP KERANJANG */
+        $groupKeranjangs = $keranjangs->groupBy('k_user_id_seller');
+        // Log::info('', ['groupKeranjangs' => $groupKeranjangs]);
+        /* GROUP KERANJANG */
+
+        return response()->json(['status' => 200, 'keranjangs' => $groupKeranjangs, 'totalPrice' => $totalPrice], 200);
     }
 }
