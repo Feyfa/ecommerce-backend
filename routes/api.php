@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| API Routes Jidan
+| API Routes Jidan Ganteng
 |--------------------------------------------------------------------------
 |
 | Here is where you can register API routes for your application. These
