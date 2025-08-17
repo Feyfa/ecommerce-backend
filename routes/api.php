@@ -1,13 +1,17 @@
 <?php
 
+use App\Http\Controllers\AlamatController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BelanjaController;
+use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\KeranjangController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\MessendController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\SaldoController;
 use App\Http\Controllers\TopupController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\UserController;
@@ -25,7 +29,6 @@ use Illuminate\Support\Facades\Route;
 | be assigned to the "api" middleware group. Make something great!
 |
 */
-
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
@@ -39,11 +42,36 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/user/{id}', [UserController::class, 'show']);
+    Route::get('/user', [UserController::class, 'show']);
     Route::put('/user/{id}', [UserController::class, 'updateUser']);
     Route::put('/user/change/password', [UserController::class, 'changePassword']);
+    Route::put('/user/account/type', [UserController::class, 'changeAccountType']);
     Route::post('/user/image', [UserController::class, 'uploadImage']);
     Route::delete('/user/image', [UserController::class, 'deleteImage']);
+});
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/company', [CompanyController::class, 'show']);
+    Route::put('/company', [CompanyController::class, 'updateCompany']);
+    Route::post('/company/image', [CompanyController::class, 'uploadImage']);
+    Route::delete('/company/image', [CompanyController::class, 'deleteImage']);
+});
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/alamat/buyer', [AlamatController::class, 'getAlamatBuyer']);
+    Route::post('/alamat/buyer', [AlamatController::class, 'addAlamatBuyer']);
+    Route::put('/alamat-enable/buyer/{id}', [ALamatController::class, 'setEnableAlamatBuyer']);
+    Route::put('/alamat/buyer/{id}', [AlamatController::class, 'updateAlamatBuyer']);
+    Route::delete('/alamat/buyer/{id}', [AlamatController::class, 'deleteAlamatBuyer']);
+});
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/payment', [PaymentController::class, 'getPayment']);
+    Route::get('/payment/list', [PaymentController::class, 'getPaymentList']);
+    Route::post('/payment/account/validate', [PaymentController::class, 'validatePaymentAccount']);
+    Route::post('/payment', [PaymentController::class, 'addPayment']);
+    Route::delete('/payment/{id}', [PaymentController::class, 'deletePayment']);
+    Route::post('/payment/simulate/charge-virtual-account', [PaymentController::class, 'simulateChargeVirtualAccount']);
 });
 
 Route::middleware('auth:sanctum')->group(function () {
@@ -63,6 +91,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/keranjang/total/plus', [KeranjangController::class, 'plusTotalKeranjang']);
     Route::post('/keranjang/total/minus', [KeranjangController::class, 'minusTotalKeranjang']);
     Route::post('/keranjang/total/change', [KeranjangController::class, 'changeTotalKeranjang']);
+    Route::post('/keranjang/validate/checkout', [KeranjangController::class, 'validateCheckout']);
 });
 
 Route::middleware('auth:sanctum')->group(function () {
@@ -70,57 +99,18 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 Route::middleware('auth:sanctum')->group(function () {
-    Route::post("/payment/createtokenmidtrans", [PaymentController::class, 'createTokenMidtrans']);
+    Route::get('/invoice', [InvoiceController::class, 'show']); // sudah tidak dipakai
+    Route::get('/transaction', [TransactionController::class, 'getTransaction']);
+    Route::post('/transaction/approved', [TransactionController::class, 'approvedTransaction']);
 });
 
 Route::middleware('auth:sanctum')->group(function () {
-    Route::post("/messend/gmail/send", [MessendController::class, 'sendEmail']);
+    Route::get('/checkout/data', [CheckoutController::class, 'getDataCheckout']);
+    Route::post('/checkout/process', [CheckoutController::class, 'processCheckout']);
 });
 
 Route::middleware('auth:sanctum')->group(function () {
-    Route::delete('/transaction/{user_id_buyer}/{order_id}', [TransactionController::class, 'deleteTransaction']);
+    Route::get('/saldo', [SaldoController::class, 'getSaldo']);
+    Route::get('/saldo-history', [SaldoController::class, 'getSaldoHistory']);
+    Route::post('/saldo-withdraw', [SaldoController::class, 'withdrawSaldo']);
 });
-
-Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/invoice', [InvoiceController::class, 'show']);
-});
-
-Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/invoice/order-id-exists', [InvoiceController::class, 'checkOrderId']);
-});
-
-Route::middleware('auth:sanctum')->group(function () {
-    Route::put('/stripe/replace-ach', [PaymentController::class, 'replaceAch']);
-    Route::delete('/stripe/delete-ach', [PaymentController::class, 'deleteAch']);
-    Route::post('/stripe/verify-ach', [PaymentController::class, 'verifyAch']);
-    Route::post('/stripe/create-ach', [PaymentController::class, 'createAch']);
-    Route::get('/stripe/get-info-payment-method', [PaymentController::class, 'getInfoPaymentMethod']);
-    Route::post('/stripe/create-credit-card', [PaymentController::class, 'createCreditCard']);
-    Route::put('/stripe/replace-credit-card', [PaymentController::class, 'replaceCreditCard']);
-    Route::get('/stripe/check-connect-account', [PaymentController::class, 'checkConnectAccountStripe']);
-    Route::post('/stripe/connect-account', [PaymentController::class, 'connectAccountStripe']);
-});
-
-Route::middleware('auth:sanctum')->group(function() {
-    Route::get('/topup/get-topup-balance', [TopupController::class, 'getTopupBalance']);
-    Route::get('/topup/get-payment-list', [TopupController::class, 'getPaymentList']);
-    Route::post('/topup/store', [TopupController::class, 'storeTopup']);
-});
-
-Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/countries', [LocationController::class, 'countries']);
-    Route::get('/states', [LocationController::class, 'states']);
-    Route::get('/cities', [LocationController::class, 'cities']);
-});
-
-/* STRIPE WEBHOOK */
-Route::middleware('auth.webhook.stripe')->group(function () {
-    Route::post('/webhook/stripe', [WebhookStripeController::class, 'stripe']);
-});
-/* STRIPE WEBHOOK */
-
-/* MIDTRANS WEBHOOK */
-Route::prefix('invoice')->group(function () {
-    Route::post('/', [InvoiceController::class, 'createInvoice']);
-});
-/* MIDTRANS WEBHOOK */

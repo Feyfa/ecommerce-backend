@@ -24,11 +24,9 @@ class User extends Authenticatable
         'jenis_kelamin',
         'tanggal_lahir',
         'tfa',
-        'alamat',
+        // 'alamat',
         'password',
-        'connect_account_id',
-        'topup_payment_id',
-        'topup_card_id',
+        'account_type',
     ];
 
     /**

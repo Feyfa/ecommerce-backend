@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Mail\OtpLoginMail;
+use App\Models\Company;
 use App\Models\OtpLogin;
 use App\Models\User;
+use App\Services\CompanyService;
 use Carbon\Carbon;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
@@ -21,11 +23,13 @@ class AuthController extends Controller
 {
     protected Client $client;
     protected Messend $messend;
+    protected CompanyService $companyService;
 
-    public function __construct(Client $client, Messend $messend) 
+    public function __construct(Client $client, Messend $messend, CompanyService $companyService) 
     {
         $this->client = $client;
         $this->messend = $messend;
+        $this->companyService = $companyService;
     }
 
     public function tokenValidation()
@@ -49,6 +53,7 @@ class AuthController extends Controller
         /* VALIDATE AND GET */
 
         $validate['password'] = Hash::make($validate['password']);
+        $validate['account_type'] = 'buyer';
 
         User::create($validate);
 
@@ -76,8 +81,10 @@ class AuthController extends Controller
                     ->first();
         /* CHECK EMAIL CASE SENSITIVE */
 
+        /* VALIDATION USER INVALID EMAIL OR PASSWORD */
         if(empty($user) || !Auth::attempt(['email' => $validate['email'], 'password' => $validate['password']]))
             return response()->json(['status' => 401, 'message' => 'invalid login details'], 401);
+        /* VALIDATION USER INVALID EMAIL OR PASSWORD */
 
         /* VERIFICATION OTP */
         if($type === 'verification_otp')
@@ -96,14 +103,22 @@ class AuthController extends Controller
                 'now' => $now
             ]);
 
-            if($responseMatchOtp->status === 'error') {
+            if($responseMatchOtp->status === 'error') 
+            {
                 return response()->json(['status' => 422, 'message' => $responseMatchOtp->message], 422);
             }
-            else if($responseMatchOtp->status === 'success') {
+            else if($responseMatchOtp->status === 'success') 
+            {
+                /* GET COMPANY */
+                $getCompany = $this->companyService->getCompany($user->id);
+                $company = $getCompany['company'];
+                /* GET COMPANY */
+
                 $token = $request->user()->createToken('authToken')->plainTextToken;
-                return response()->json(['status' => 200, 'message' => 'login success', 'token' => $token, 'user' => $user], 200);
+                return response()->json(['status' => 200, 'message' => 'login success', 'token' => $token, 'user' => $user, 'company' => $company], 200);
             }
-            else {
+            else 
+            {
                 return response()->json(['status' => 422, 'message' => ['messend_other' => ['something went wrong']]], 422);
             }
             /* MATCH OTP */
@@ -158,13 +173,28 @@ class AuthController extends Controller
         }
         /* CREATE OTP WHEN USER USE TFA */
 
+        /* FORCE ACCOUNT TYPE BUYER */
+        $user->account_type = 'buyer';
+        $user->save();
+        /* FORCE ACCOUNT TYPE BUYER */
+
+        /* GET COMPANY */
+        $getCompany = $this->companyService->getCompany($user->id);
+        $company = $getCompany['company'];
+        /* GET COMPANY */
+
         $token = $request->user()->createToken('authToken')->plainTextToken;
 
-        return response()->json(['status' => 200, 'message' => 'login success', 'token' => $token, 'user' => $user], 200);
+        return response()->json(['status' => 200, 'message' => 'login success', 'token' => $token, 'user' => $user, 'company' => $company], 200);
     }
 
     public function logout(Request $request)
     {
+        /* RESET USER TO BUYER */
+        $user_id = optional(auth()->user())->id;
+        User::where('id', $user_id)->update(['account_type' => 'buyer']);
+        /* RESET USER TO BUYER */
+
         $request->user()->tokens()->delete();
 
         return response()->json(['status' => 200, 'message' => 'logout success'], 200);

@@ -4,9 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Keranjang;
 use App\Models\Product;
-use Illuminate\Http\Client\ResponseSequence;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
@@ -31,20 +29,6 @@ class ProductController extends Controller
 
         $validate = $validator->validate();
         /* VALIDATOR AND GET */
-
-        /* CHECK USER HAS BEN CONNECTED IN STRIPE */
-        $data_request = new Request(['user_id_seller' => $user_id_seller]);
-        $checkConnected = $paymentController->checkConnectAccountStripe($data_request)->getData();
-
-        if($checkConnected->result == 'failed' || $checkConnected->result == 'warning')
-        {
-            return response()->json(['status' => 402 , 'message' => $checkConnected->message], 402);
-        }
-        else if(($checkConnected->result == 'success') && (count($checkConnected->account->requirements->currently_due) > 0 || count($checkConnected->account->requirements->past_due) > 0))
-        {
-            return response()->json(['status' => 402 , 'message' => 'Please Continue Connect Your Account'], 402);
-        }
-        /* CHECK USER HAS BEN CONNECTED IN STRIPE */
 
         /* GET PRODUCT */
         $products_current_id = json_decode($request->products_current_id, true);
@@ -131,7 +115,7 @@ class ProductController extends Controller
             'oldImg' => ['required'],
             'name' => ['required', 'min:3'],
             'price' => ['required', 'integer', 'min:1'],
-            'stock' => ['required', 'integer', 'min:1']
+            'stock' => ['required', 'integer']
         ];
 
         if($request->file('img')) {

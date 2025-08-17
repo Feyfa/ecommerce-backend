@@ -5,14 +5,16 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class State extends Model
+class PaymentList extends Model
 {
     use HasFactory;
 
-    protected $table = 'states';
+    protected $table = 'payment_lists';
 
     protected $fillable = [
-        'name',
-        'country_id'
+        'type',
+        'method',
+        'slug',
+        'name'
     ];
 }

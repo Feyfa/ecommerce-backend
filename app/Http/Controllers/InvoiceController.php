@@ -2,14 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Invoice;
-use App\Models\Keranjang;
-use App\Models\Transaction;
+use App\Models\TransactionInvoice;
+use App\Models\TransactionProduct;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
-use Midtrans\Config as MidtransConfig;
-use Midtrans\Transaction as MidtransTransaction;
 
 class InvoiceController extends Controller
 {
@@ -27,7 +23,7 @@ class InvoiceController extends Controller
         /* VALIDATOR */
 
         /* GET INVOICE AND CUSTOM FORMAT */
-        $invoices = Invoice::where('user_id_buyer', $request->user_id_buyer);
+        $invoices = TransactionInvoice::where('user_id_buyer', $request->user_id_buyer);
         
         if($request->filter == '' || $request->filter == null) 
         {
@@ -66,29 +62,25 @@ class InvoiceController extends Controller
         $invoices = $invoices->get();
                            
         $invoiceFormat = [];
-        foreach($invoices as $invoice)
+        foreach($invoices as $transactionInvoice)
         {
-            $transactions = Transaction::select('users.name as u_name', 'products.name as p_name', 'products.price as p_price', 'transactions.total as t_total', 'products.img as p_img')
+            $transactionProducts = TransactionProduct::select('users.name as u_name', 'products.name as p_name', 'products.price as p_price', 'transactions.total as t_total', 'products.img as p_img')
                                        ->join('users', 'users.id', '=', 'transactions.user_id_seller')
                                        ->join('products', 'products.id', '=', 'transactions.product_id')
-                                       ->where('order_id', $invoice->order_id)
+                                       ->where('order_id', $transactionInvoice->order_id)
                                        ->get();
-
-            // Log::info([
-            //     'transactions' => $transactions->toArray()
-            // ]);
 
             /* FORMAT PAYMENT TYPE */
             $payment_type = "";
-            if(!empty($invoice->va_number) && !empty($invoice->va_bank))
+            if(!empty($transactionInvoice->va_number) && !empty($transactionInvoice->va_bank))
             {
-                $payment_type = "Virtual Account " . strtoupper($invoice->va_bank);
+                $payment_type = "Virtual Account " . strtoupper($transactionInvoice->va_bank);
             }
             /* FORMAT PAYMENT TYPE */
 
             /* FORMAT TRANSACTION STATUS */
-            $transactionStatus = $invoice->transaction_status;
-            if($invoice->transaction_status == 'settlement') 
+            $transactionStatus = $transactionInvoice->transaction_status;
+            if($transactionInvoice->transaction_status == 'settlement') 
             {
                 $transactionStatus = "done";
             }
@@ -96,156 +88,17 @@ class InvoiceController extends Controller
 
             $invoiceFormat[] = [
                 'payment_type' => $payment_type,
-                'transaction_time' => $invoice->transaction_time,
+                'transaction_time' => $transactionInvoice->transaction_time,
                 'transaction_status' => $transactionStatus,
-                'expiry_time' => $invoice->expiry_time,
-                'va_biller_code' => $invoice->va_biller_code,
-                'va_number' => $invoice->va_number,
-                'gross_amount' => $invoice->gross_amount,
-                'transactions' => $transactions
+                'expiry_time' => $transactionInvoice->expiry_time,
+                'va_biller_code' => $transactionInvoice->va_biller_code,
+                'va_number' => $transactionInvoice->va_number,
+                'gross_amount' => $transactionInvoice->gross_amount,
+                'transactions_products' => $transactionProducts
             ];
         }
         /* GET INVOICE AND CUSTOM FORMAT */
 
         return response()->json(['status' => 'success', 'invoices' => $invoiceFormat]);
-    }
-
-    public function checkOrderId(Request $request, KeranjangController $keranjangController)
-    {
-        /* VALIDATOR */
-        $Validator = Validator::make($request->all(), [
-            'order_id' => ['required'],
-            'user_id_buyer' => ['required']
-        ]);
-
-        if($Validator->fails())
-        {
-            return response()->json(['status' => 'error', 'message' => $Validator->messages()], 422);
-        }
-        /* VALIDATOR */
-
-        /* CHECK ORDER_ID EXISTS */
-        $order_id = $request->order_id;
-        for($i = 1; $i <= 8; $i++)
-        {
-            $orderIdExists = Invoice::where('order_id', $order_id) 
-                                    ->exists();
-
-            if($orderIdExists) 
-            {
-                break;
-            }
-
-            if($i == 5) 
-            {
-                return response()->json(['status' => 'error', 'message' => 'Order ID Not Found']); exit; die();
-            }
-
-            sleep(1);
-        }
-        /* CHECK ORDER_ID EXISTS */
-        
-        /* GET KERANJANG */
-        $user_id_buyer = $request->user_id_buyer;
-        $keranjangsIndex = $keranjangController->index($user_id_buyer);
-        $keranjangsData = $keranjangsIndex->getData();
-
-        $keranjangs = $keranjangsData->keranjangs;
-        $totalPrice = $keranjangsData->totalPrice;
-        /* GET KERANJANG */
-
-        return response()->json(['status' => 'success', 'message' => 'checkout successfully', 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice]);
-    }
-
-    public function createInvoice(Request $request)
-    {   
-        /* VALIDATE */
-        $Validator = Validator::make($request->all(), [
-            'order_id' => [
-                'required',
-                function($attribute, $value, $fail) {
-                    $transactionExists = Transaction::where('order_id', $value)
-                                                    ->exists();
-                    if(!$transactionExists) 
-                        $fail("The $attribute does not exist");
-                }
-            ]
-        ]);
-
-        if($Validator->fails())
-        {
-            // Log::info("", ['message' => $Validator->messages()]);
-            return response()->json(['status' => 'error', 'message' => $Validator->messages()], 422);
-        }
-        /* VALIDATE */
-
-        if($request->transaction_status != 'deny') 
-        {
-            /* DELETE DATA KERANJANG YANG ADA DI TRANSACTION AND INVOICE */
-            $transactions = Transaction::where('order_id', $request->order_id)
-                                       ->get();
-
-            $product_ids = $transactions->pluck('product_id')->toArray();
-
-            Keranjang::where('user_id_buyer', $transactions[0]->user_id_buyer)
-                     ->whereIn('product_id', $product_ids)
-                     ->delete();
-            /* DELETE DATA KERANJANG YANG ADA DI TRANSACTION AND INVOICE */
-
-            /* IF HAS BEEN UPDATE, IF HAS NOT BEEN CREATE */
-            $invoiceExists = Invoice::where('order_id', $request->order_id)
-                                    ->exists();
-            if($invoiceExists)
-            {
-                Invoice::where('order_id', $request->order_id)
-                       ->update(['transaction_status' => $request->transaction_status]);
-            }
-            else 
-            {
-                /* VALIDATE FORMAT MIDTRANS */
-                $va_biller_code = "";
-                $va_number = "";
-                $va_bank = "";
-
-                // untuk mandiri
-                if(isset($request->biller_code) && $request->biller_code == '70012')
-                {
-                    $va_biller_code = $request->biller_code ?? "";
-                    $va_number = $request->bill_key ?? "";
-                    $va_bank = "MANDIRI";
-                }
-                // untuk permata
-                else if(isset($request->permata_va_number) && $request->permata_va_number != "") 
-                {
-                    $va_number = $request->permata_va_number ?? "";
-                    $va_bank = "PERMATA";
-                }
-                // selain mandiri dan permata
-                else 
-                {
-                    $va_number = $request->va_numbers[0]['va_number'] ?? "";
-                    $va_bank = $request->va_numbers[0]['bank'] ?? "";
-                }
-                /* VALIDATE FORMAT MIDTRANS */
-
-                Invoice::create([
-                    'user_id_buyer' => $transactions[0]->user_id_buyer,
-                    'order_id' => $request->order_id ?? "",
-                    'payment_type' => $request->payment_type ?? "",
-                    'gross_amount' => $request->gross_amount ?? "",
-                    'currency' => $request->currency ?? "",
-                    'va_biller_code' => $va_biller_code,
-                    'va_number' => $va_number,
-                    'va_bank' => $va_bank,
-                    'transaction_status' => $request->transaction_status ?? "",
-                    'transaction_time' => $request->transaction_time ?? "",
-                    'settlement_time' => $request->settlement_time ?? "",
-                    'expiry_time' => $request->expiry_time ?? "",
-                ]);
-            }
-            /* IF HAS BEEN UPDATE, IF HAS NOT BEEN CREATE */
-        }
-        
-        // Log::info(['all' => $request->all()]);
     }
 }

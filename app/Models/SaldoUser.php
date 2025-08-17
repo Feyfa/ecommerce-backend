@@ -5,16 +5,15 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class Keranjang extends Model
+class SaldoUser extends Model
 {
     use HasFactory;
 
+    protected $table = 'saldo_users';
+
     protected $fillable = [
-        'product_id',
-        'user_id_seller',
-        'user_id_buyer',
-        'checked',
-        'checkout',
-        'total',
+        'user_id',
+        'saldo_income',
+        'saldo_refund',
     ];
 }

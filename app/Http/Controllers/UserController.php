@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\CompanyService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -13,6 +14,36 @@ use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
+    protected CompanyService $companyService;
+
+    public function __construct(CompanyService $companyService)
+    {
+        $this->companyService = $companyService;
+    }
+
+    public function changeAccountType(Request $request)
+    {
+        /* VALIDATION USER */
+        $user_id = optional(auth()->user())->id;
+        $user = User::where('id', $user_id)->first();
+
+        if(!$user)
+            return response()->json(['result' => 'error', 'message' => 'Unauthorized'], 401);
+        /* VALIDATION USER */
+
+        /* CHANGE ACCOUNT TYPE */
+        $user->account_type = ($user->account_type == 'buyer') ? 'seller' : 'buyer';
+        $user->save();
+        /* CHANGE ACCOUNT TYPE */
+
+        /* GET COMPANY */
+        $getCompany = $this->companyService->getCompany($user_id);
+        $company = $getCompany['company'];
+        /* GET COMPANY */
+    
+        return response()->json(['status' => 'success', 'user' => $user, 'company' => $company, 'message' => 'Switch Account Successfully']);
+    }
+
     public function changePassword(Request $request)
     {
         /* VALIDATION REQUEST AND GET */
@@ -132,8 +163,10 @@ class UserController extends Controller
         return response()->json(['status' => 200, 'message' => 'Upload Image Successfully', 'user' => $user], 200);
     }
     
-    public function show(string $id)
+    public function show()
     {
+        $id = auth()->user()->id;
+
         $user = User::where('id', $id)
                     ->first();
 
@@ -181,7 +214,7 @@ class UserController extends Controller
         $user->tanggal_lahir = $request->tanggal_lahir;
         $user->phone = $validate['phone'];
         $user->tfa = $request->tfa;
-        $user->alamat = $request->alamat;
+        // $user->alamat = $request->alamat;
         $user->save();
         /* UPDATE USER */
 
