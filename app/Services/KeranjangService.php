@@ -31,7 +31,7 @@ class KeranjangService
                                 ->join('users', 'keranjangs.user_id_seller', '=', 'users.id')
                                 ->join('products', 'keranjangs.product_id', '=', 'products.id')
                                 ->where('keranjangs.user_id_buyer', $user_id_buyer)
-                                ->orderBy('k_id', 'DESC')
+                                ->orderBy('keranjangs.created_at', 'DESC')
                                 ->get();
         /* GET ITEM IN BASKET */
         

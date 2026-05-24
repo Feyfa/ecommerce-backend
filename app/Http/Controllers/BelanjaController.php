@@ -17,7 +17,7 @@ class BelanjaController extends Controller
                 'products_current_id' => $request->products_current_id
             ],
             [
-                'user_id_seller' => ['required', 'integer'],
+                'user_id_seller' => ['required', 'uuid'],
                 'products_current_id' => ['required']
             ]
         );
@@ -45,8 +45,8 @@ class BelanjaController extends Controller
                            ->where('products.user_id_seller', '<>', $user_id_seller)
                            ->whereNotIn('products.id', $products_current_id)
                            ->where(function ($query) use ($search_product) {
-                                $query->where('products.name', 'LIKE', "%$search_product%")
-                                      ->orWhere('users.name', 'LIKE', "%$search_product%");
+                                $query->where('products.name', 'ILIKE', "%$search_product%")
+                                      ->orWhere('users.name', 'ILIKE', "%$search_product%");
                            })
                            ->orderBy('products.updated_at', 'DESC')
                            ->limit(200)

@@ -48,7 +48,7 @@ class UserController extends Controller
     {
         /* VALIDATION REQUEST AND GET */
         $validator = Validator::make($request->all(), [
-            'id' => ['required', 'integer'],
+            'id' => ['required', 'uuid'],
             'oldPassword' => ['required'],
             'newPassword' => ['required'],
         ]);
@@ -128,7 +128,7 @@ class UserController extends Controller
     {
         /* VALIDATION REQUEST */     
         $validator = Validator::make($request->all(), [
-            'id' => ['required', 'integer'],
+            'id' => ['required', 'uuid'],
             'file' => ['required', 'image', 'mimes:jpeg,png,jpg,gif,svg', 'max:1024']
         ]);
 
@@ -186,7 +186,7 @@ class UserController extends Controller
                 'phone' => $request->phone,
             ], 
             [
-                'id' => ['required', 'integer'],
+                'id' => ['required', 'uuid'],
                 'name' => ['required', 'string'],
                 'email' => ['required', 'string', 'max:255', 'email', Rule::unique('users')->ignore($id)],
                 'phone' => ['required', 'string', 'max:15', Rule::unique('users')->ignore($id)],

@@ -73,7 +73,7 @@ class SaldoService
             $saldoHistory->whereNotIn('sh.id', $saldo_history_current_ids);
         }
 
-        $saldoHistory = $saldoHistory->orderBy('sh.id', 'desc')
+        $saldoHistory = $saldoHistory->orderBy('sh.created_at', 'desc')
                                      ->limit(30)
                                      ->get()
                                      ->map(function ($item, $index) {

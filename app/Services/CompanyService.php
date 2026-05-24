@@ -23,7 +23,7 @@ class CompanyService
         /* GET ALAMAT */
         $alamat = Alamat::where('user_id', $user_id)
                         ->where('type', 'seller')
-                        ->orderBy('id', 'DESC')
+                        ->orderBy('created_at', 'DESC')
                         ->first();
         $companyFormat['alamat'] = $alamat->alamat ?? "";
         /* GET ALAMAT */

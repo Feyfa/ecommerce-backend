@@ -25,7 +25,7 @@ class KeranjangController extends Controller
                 'user_id_buyer' => $user_id_buyer
             ],
             [
-                'user_id_buyer' => ['required'],
+                'user_id_buyer' => ['required', 'uuid'],
             ]
         );
 
@@ -47,9 +47,9 @@ class KeranjangController extends Controller
         /* VALIDATOR AND GET */
         $validator = Validator::make($request->all(),
             [
-                'user_id_seller' => ['required', 'integer'],
-                'user_id_buyer' => ['required', 'integer'],
-                'product_id' => ['required', 'integer'],
+                'user_id_seller' => ['required', 'uuid'],
+                'user_id_buyer' => ['required', 'uuid'],
+                'product_id' => ['required', 'uuid'],
             ]
         );
 
@@ -107,8 +107,8 @@ class KeranjangController extends Controller
                 'product_id' => $product_id,
             ],
             [
-                'user_id_buyer' => ['required', 'integer'],
-                'product_id' => ['required', 'integer'],
+                'user_id_buyer' => ['required', 'uuid'],
+                'product_id' => ['required', 'uuid'],
             ]
         );
 
@@ -136,8 +136,8 @@ class KeranjangController extends Controller
         /* VALIDATOR AND GET */
         $validator = Validator::make($request->all(),
             [
-                'user_id_buyer' => ['required', 'integer'],
-                'product_id' => ['required', 'integer'],
+                'user_id_buyer' => ['required', 'uuid'],
+                'product_id' => ['required', 'uuid'],
                 'checked' => ['required', 'boolean']
             ]
         );
@@ -170,9 +170,9 @@ class KeranjangController extends Controller
         /* VALIDATOR AND GET */
         $validator = Validator::make($request->all(),
             [
-                'user_id_buyer' => ['required', 'integer'],
+                'user_id_buyer' => ['required', 'uuid'],
                 'checked' => ['required', 'boolean'],
-                'user_id_seller' => ['required', 'integer'],
+                'user_id_seller' => ['required', 'uuid'],
             ]
         );
 
@@ -211,8 +211,8 @@ class KeranjangController extends Controller
         /* VALIDATOR AND GET */
         $validator = Validator::make($request->all(),
             [
-                'user_id_buyer' => ['required', 'integer'],
-                'product_id' => ['required', 'integer'],
+                'user_id_buyer' => ['required', 'uuid'],
+                'product_id' => ['required', 'uuid'],
             ]
         );
 
@@ -256,8 +256,8 @@ class KeranjangController extends Controller
         /* VALIDATOR AND GET */
         $validator = Validator::make($request->all(),
             [
-                'user_id_buyer' => ['required', 'integer'],
-                'product_id' => ['required', 'integer'],
+                'user_id_buyer' => ['required', 'uuid'],
+                'product_id' => ['required', 'uuid'],
             ]
         );
 
@@ -291,8 +291,8 @@ class KeranjangController extends Controller
         /* VALIDATOR AND GET */
         $validator = Validator::make($request->all(),
             [
-                'user_id_buyer' => ['required', 'integer'],
-                'product_id' => ['required', 'integer'],
+                'user_id_buyer' => ['required', 'uuid'],
+                'product_id' => ['required', 'uuid'],
                 'total' => ['required', 'integer'],
             ]
         );
@@ -343,7 +343,8 @@ class KeranjangController extends Controller
         /* VALIDATOR AND GET */
         $validator = Validator::make($request->all(),[
             'product_ids' => ['required', 'array'],
-            'user_id_buyer' => ['required']
+            'product_ids.*' => ['uuid'],
+            'user_id_buyer' => ['required', 'uuid']
         ]);
 
         if($validator->fails())

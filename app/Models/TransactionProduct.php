@@ -3,11 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 
 class TransactionProduct extends Model
 {
-    use HasFactory;
+    use HasFactory, HasUuids;
 
     protected $table = "transaction_products";
 
@@ -19,4 +20,14 @@ class TransactionProduct extends Model
         'price',
         'total',
     ];  
+
+    public function transactionUser()
+    {
+        return $this->belongsTo(TransactionUser::class, 'transaction_user_id');
+    }
+
+    public function product()
+    {
+        return $this->belongsTo(Product::class, 'product_id');
+    }
 }

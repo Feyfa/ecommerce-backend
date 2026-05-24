@@ -21,7 +21,7 @@ class KeranjangServiceTest extends TestCase
 
     public function test_getKeranjangs(): void 
     {
-        $user_id_buyer = 1;
+        $user_id_buyer = '00000000-0000-0000-0000-000000000001';
         $getKeranjangs = $this->keranjangService->getKeranjangs($user_id_buyer);
 
         info([
@@ -34,7 +34,7 @@ class KeranjangServiceTest extends TestCase
 
     public function test_checkProductSoldOutByIds(): void 
     {
-        $product_ids = [1863];
+        $product_ids = ['00000000-0000-0000-0000-000000001863'];
         $checkProductSoldOutByIds = $this->keranjangService->checkProductSoldOutByIds($product_ids);
 
         info([

@@ -13,7 +13,7 @@ class InvoiceController extends Controller
     {
         /* VALIDATOR */
         $Validator = Validator::make($request->all(), [
-            'user_id_buyer' => ['required']
+            'user_id_buyer' => ['required', 'uuid']
         ]);
 
         if($Validator->fails())

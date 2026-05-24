@@ -41,14 +41,14 @@ class PaymentService
         if(!empty($search) && trim($search) != '')
         {
             $payments->where(function ($query) use ($search) {
-                $query->where('payment_lists.slug', 'LIKE', "%{$search}%")
-                      ->orWhere('payment_lists.name', 'LIKE', "%{$search}%")
-                      ->orWhere('payment_users.name', 'LIKE', "%{$search}%")
-                      ->orWhere('payment_users.account', 'LIKE', "%{$search}%");
+                $query->where('payment_lists.slug', 'ILIKE', "%{$search}%")
+                      ->orWhere('payment_lists.name', 'ILIKE', "%{$search}%")
+                      ->orWhere('payment_users.name', 'ILIKE', "%{$search}%")
+                      ->orWhere('payment_users.account', 'ILIKE', "%{$search}%");
             });
         }
         
-        $payments = $payments->orderBy('payment_users.id', 'desc')
+        $payments = $payments->orderBy('payment_users.created_at', 'desc')
                             //  ->limit(5)
                              ->get();
         /* GET PAYMENT */

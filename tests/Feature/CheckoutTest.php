@@ -20,7 +20,7 @@ class CheckoutTest extends TestCase
 
     public function test_satu()
     {
-        $this->checkoutService->getKeranjangCheckout(2);
+        $this->checkoutService->getKeranjangCheckout('00000000-0000-0000-0000-000000000002');
         $this->assertTrue(true);
     }
 }

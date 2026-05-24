@@ -3,11 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 
 class TransactionUser extends Model
 {
-    use HasFactory;
+    use HasFactory, HasUuids;
 
     protected $table = 'transaction_users';
 
@@ -24,4 +25,24 @@ class TransactionUser extends Model
         'noted',
         'status'
     ];
+
+    public function invoice()
+    {
+        return $this->belongsTo(TransactionInvoice::class, 'transaction_invoice_id');
+    }
+
+    public function seller()
+    {
+        return $this->belongsTo(User::class, 'user_id_seller');
+    }
+
+    public function buyer()
+    {
+        return $this->belongsTo(User::class, 'user_id_buyer');
+    }
+
+    public function products()
+    {
+        return $this->hasMany(TransactionProduct::class, 'transaction_user_id');
+    }
 }

@@ -27,10 +27,10 @@ class AlamatController extends Controller
         {
             $searchAlamat = $request->searchAlamat;
             $alamats->where(function ($query) use ($searchAlamat) {
-                $query->where('place', 'LIKE', "%{$searchAlamat}%")
-                      ->orWhere('name', 'LIKE', "%{$searchAlamat}%")
-                      ->orWhere('phone', 'LIKE', "%{$searchAlamat}%")
-                      ->orWhere('alamat', 'LIKE', "%{$searchAlamat}%");
+                $query->where('place', 'ILIKE', "%{$searchAlamat}%")
+                      ->orWhere('name', 'ILIKE', "%{$searchAlamat}%")
+                      ->orWhere('phone', 'ILIKE', "%{$searchAlamat}%")
+                      ->orWhere('alamat', 'ILIKE', "%{$searchAlamat}%");
             });
         }
 
@@ -103,10 +103,10 @@ class AlamatController extends Controller
        {
            $searchAlamat = $request->searchAlamat;
            $alamats->where(function ($query) use ($searchAlamat) {
-               $query->where('place', 'LIKE', "%{$searchAlamat}%")
-                     ->orWhere('name', 'LIKE', "%{$searchAlamat}%")
-                     ->orWhere('phone', 'LIKE', "%{$searchAlamat}%")
-                     ->orWhere('alamat', 'LIKE', "%{$searchAlamat}%");
+               $query->where('place', 'ILIKE', "%{$searchAlamat}%")
+                     ->orWhere('name', 'ILIKE', "%{$searchAlamat}%")
+                     ->orWhere('phone', 'ILIKE', "%{$searchAlamat}%")
+                     ->orWhere('alamat', 'ILIKE', "%{$searchAlamat}%");
            });
        }
 
@@ -141,7 +141,7 @@ class AlamatController extends Controller
         {
             Alamat::where('user_id', $user_id)
                   ->where('type', 'buyer')
-                  ->orderBy('id', 'DESC')  
+                  ->orderBy('created_at', 'DESC')
                   ->first()?->update(['enable' => 1]);  
         }
         /* FORCE ENABLE 1 WHEN TOTAL ALAMAT 1 */
@@ -154,10 +154,10 @@ class AlamatController extends Controller
        {
            $searchAlamat = $request->searchAlamat;
            $alamats->where(function ($query) use ($searchAlamat) {
-               $query->where('place', 'LIKE', "%{$searchAlamat}%")
-                     ->orWhere('name', 'LIKE', "%{$searchAlamat}%")
-                     ->orWhere('phone', 'LIKE', "%{$searchAlamat}%")
-                     ->orWhere('alamat', 'LIKE', "%{$searchAlamat}%");
+               $query->where('place', 'ILIKE', "%{$searchAlamat}%")
+                     ->orWhere('name', 'ILIKE', "%{$searchAlamat}%")
+                     ->orWhere('phone', 'ILIKE', "%{$searchAlamat}%")
+                     ->orWhere('alamat', 'ILIKE', "%{$searchAlamat}%");
            });
        }
 
@@ -210,10 +210,10 @@ class AlamatController extends Controller
        {
            $searchAlamat = $request->searchAlamat;
            $alamats->where(function ($query) use ($searchAlamat) {
-               $query->where('place', 'LIKE', "%{$searchAlamat}%")
-                     ->orWhere('name', 'LIKE', "%{$searchAlamat}%")
-                     ->orWhere('phone', 'LIKE', "%{$searchAlamat}%")
-                     ->orWhere('alamat', 'LIKE', "%{$searchAlamat}%");
+               $query->where('place', 'ILIKE', "%{$searchAlamat}%")
+                     ->orWhere('name', 'ILIKE', "%{$searchAlamat}%")
+                     ->orWhere('phone', 'ILIKE', "%{$searchAlamat}%")
+                     ->orWhere('alamat', 'ILIKE', "%{$searchAlamat}%");
            });
        }
 
@@ -279,10 +279,10 @@ class AlamatController extends Controller
         {
             $searchAlamat = $request->searchAlamat;
             $alamats->where(function ($query) use ($searchAlamat) {
-                $query->where('place', 'LIKE', "%{$searchAlamat}%")
-                        ->orWhere('name', 'LIKE', "%{$searchAlamat}%")
-                        ->orWhere('phone', 'LIKE', "%{$searchAlamat}%")
-                        ->orWhere('alamat', 'LIKE', "%{$searchAlamat}%");
+                $query->where('place', 'ILIKE', "%{$searchAlamat}%")
+                        ->orWhere('name', 'ILIKE', "%{$searchAlamat}%")
+                        ->orWhere('phone', 'ILIKE', "%{$searchAlamat}%")
+                        ->orWhere('alamat', 'ILIKE', "%{$searchAlamat}%");
             });
         }
 

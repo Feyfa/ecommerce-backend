@@ -3,11 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 
 class SaldoUser extends Model
 {
-    use HasFactory;
+    use HasFactory, HasUuids;
 
     protected $table = 'saldo_users';
 
@@ -16,4 +17,9 @@ class SaldoUser extends Model
         'saldo_income',
         'saldo_refund',
     ];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
 }

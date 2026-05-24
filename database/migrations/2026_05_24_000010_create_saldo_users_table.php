@@ -11,16 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('products', function (Blueprint $table) {
+        Schema::create('saldo_users', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->uuid('user_id_seller')->nullable()->index('products_user_id_seller_index');
-            $table->string('img')->nullable();
-            $table->string('name')->nullable();
-            $table->double('price')->nullable();
-            $table->bigInteger('stock')->nullable();
+            $table->uuid('user_id')->nullable()->unique();
+            $table->double('saldo_income')->nullable();
+            $table->double('saldo_refund')->nullable();
             $table->timestamps();
-
-            $table->index('updated_at');
         });
     }
 
@@ -29,6 +25,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('products');
+        Schema::dropIfExists('saldo_users');
     }
 };

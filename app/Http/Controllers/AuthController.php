@@ -77,7 +77,7 @@ class AuthController extends Controller
         /* VALIDATOR */
 
         /* CHECK EMAIL CASE SENSITIVE */
-        $user = User::whereRaw('BINARY email = ?', $validate['email'])
+        $user = User::where('email', $validate['email'])
                     ->first();
         /* CHECK EMAIL CASE SENSITIVE */
 

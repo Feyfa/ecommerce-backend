@@ -19,7 +19,7 @@ class ProductController extends Controller
                 'products_current_id' => $request->products_current_id
             ],
             [
-                'user_id_seller' => ['required', 'integer'],
+                'user_id_seller' => ['required', 'uuid'],
                 'products_current_id' => ['required']
             ]
         );
@@ -36,7 +36,7 @@ class ProductController extends Controller
 
         $products = Product::where('user_id_seller', $validate['user_id_seller'])
                            ->whereNotIn('id', $products_current_id)
-                           ->where('name', 'LIKE', "%$search_product%")
+                           ->where('name', 'ILIKE', "%$search_product%")
                            ->orderBy('updated_at', 'DESC')
                            ->limit(50)
                            ->get();
@@ -54,8 +54,8 @@ class ProductController extends Controller
                 'id' => $id
             ],
             [
-                'user_id_seller' => ['required', 'integer'],
-                'id' => ['required', 'integer'],
+                'user_id_seller' => ['required', 'uuid'],
+                'id' => ['required', 'uuid'],
             ]
         );
 
@@ -78,7 +78,7 @@ class ProductController extends Controller
     {
         /* VALIDATE AND GET */
         $validator = Validator::make($request->all(), [
-            'user_id_seller' => ['required', 'integer'],
+            'user_id_seller' => ['required', 'uuid'],
             'img' => ['image', 'file', 'max:1024', 'required'],
             'name' => ['required', 'min:3'],
             'price' => ['required', 'integer', 'min:1'],
@@ -111,7 +111,7 @@ class ProductController extends Controller
             'stock' => $request->stock
         ];
         $rule = [
-            'id' => ['required', 'integer'],
+            'id' => ['required', 'uuid'],
             'oldImg' => ['required'],
             'name' => ['required', 'min:3'],
             'price' => ['required', 'integer', 'min:1'],
@@ -171,8 +171,8 @@ class ProductController extends Controller
                 'id' => $id
             ],
             [
-                'user_id_seller' => ['required', 'integer'],
-                'id' => ['required', 'integer'],
+                'user_id_seller' => ['required', 'uuid'],
+                'id' => ['required', 'uuid'],
             ]
         );
 
