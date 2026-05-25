@@ -63,6 +63,7 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $type = $request->type ?? "";
+        $legacyTfaEnabled = false;
 
         /* VALIDATOR */
         $validator = Validator::make($request->all(), [
@@ -87,7 +88,7 @@ class AuthController extends Controller
         /* VALIDATION USER INVALID EMAIL OR PASSWORD */
 
         /* VERIFICATION OTP */
-        if($type === 'verification_otp')
+        if($legacyTfaEnabled && $type === 'verification_otp')
         {
             /* MATCH OTP */
             $otp_secret_key = $request->otpSecretKey ?? "";
@@ -126,7 +127,7 @@ class AuthController extends Controller
         /* VERIFICATION OTP */
 
         /* CREATE OTP WHEN USER USE TFA */
-        if($user->tfa !== 'F' && $user->tfa !== 'Phone')
+        if($legacyTfaEnabled && $user->tfa !== 'F' && $user->tfa !== 'Phone')
         {
             /* GENERATE OTP */
             $expired = $request->expired ?? "";

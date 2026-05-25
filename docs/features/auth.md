@@ -12,13 +12,13 @@ The normal login flow is:
 
 1. The frontend sends email and password to `POST /api/login`.
 2. The backend validates the credentials.
-3. If the user does not use TFA, the backend creates a Sanctum token.
+3. The backend creates a Sanctum token.
 4. The frontend stores the token, user data, and company data in local storage.
 5. Authenticated requests use the Sanctum bearer token.
 
-This flow still works when the user has TFA disabled.
+This flow currently works even when the user's `tfa` value is not `F`, because the legacy Messend-based TFA branch is disabled in the backend.
 
-## Current TFA Flow
+## Legacy TFA Flow
 
 The user table has a `tfa` column.
 
@@ -28,9 +28,11 @@ Current known values:
 - `Email`: TFA should send an OTP to the user's email.
 - `Phone`: currently excluded from the email OTP flow.
 
-When `tfa` is set to `Email`, the backend does not generate and verify OTP locally. Instead, it delegates the OTP work to the old Messend package.
+The legacy TFA code is still present in `AuthController`, but it is intentionally disabled for now.
 
-The current backend TFA flow is:
+When the legacy TFA branch was active and `tfa` was set to `Email`, the backend did not generate and verify OTP locally. Instead, it delegated the OTP work to the old Messend package.
+
+The old backend TFA flow was:
 
 1. The frontend calculates an expiration timestamp.
 2. The backend sends the email, expiration timestamp, and secret key to Messend.
@@ -54,17 +56,17 @@ The observed error is a cURL connection failure while calling the hosted OTP end
 - The failure happens after the backend tries to generate the OTP.
 - The application depends on an external service that is no longer maintained.
 
-This is why TFA should not be used for local testing right now.
+This is why the backend currently bypasses the legacy TFA branch and lets valid credentials log in normally.
 
-## Temporary Local Workaround
+## Temporary Backend Behavior
 
-For current PostgreSQL migration testing, keep TFA disabled.
+For current development and PostgreSQL migration testing, the backend ignores the legacy TFA branch.
 
-Use:
+This means:
 
-```text
-tfa = F
-```
+- A user can still have `tfa = Email` in the database.
+- The login endpoint will not call Messend.
+- The login endpoint will return a Sanctum token after valid email and password credentials.
 
 This keeps the normal login flow working while database, product, cart, checkout, and payment flows are tested.
 
@@ -96,7 +98,7 @@ For that reason, TFA repair is intentionally pending.
 The preferred future direction is:
 
 1. Finish the PostgreSQL and UUID migration validation first.
-2. Keep TFA disabled during local testing.
+2. Keep the legacy TFA branch disabled during local testing.
 3. Migrate authentication to Clerk in a dedicated task.
 4. Remove the old Messend dependency after Clerk replaces the current login/TFA behavior.
 5. Revisit email OTP only if the application still needs a custom OTP flow after Clerk integration.
