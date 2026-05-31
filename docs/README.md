@@ -17,6 +17,9 @@ Frontend-specific documentation should live in the frontend repository.
 - [Authentication Notes](features/auth.md)
   Documents the current login flow, the pending TFA/Messend issue, and the future direction toward Clerk.
 
+- [Seller Product](features/seller/01-product.md)
+  Documents the seller product API routes, validation, request behavior, and data side effects.
+
 ## Documentation Rules
 
 Use English for every Markdown document in this folder.
@@ -59,13 +62,17 @@ docs/
   features/
     _template.md
     auth.md
-    buyer-mode.md
-    seller-mode.md
-    product-management.md
-    cart.md
-    checkout.md
-    order.md
-    payment-xendit.md
+    seller/
+      01-product.md
+      02-transaction.md
+      03-company-profile.md
+    buyer/
+      01-product-browsing.md
+      02-cart.md
+      03-checkout.md
+      04-order.md
+    shared/
+      01-payment-xendit.md
 
   adr/
     0001-database-postgresql-uuid.md
