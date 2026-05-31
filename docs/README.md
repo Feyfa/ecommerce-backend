@@ -20,6 +20,9 @@ Frontend-specific documentation should live in the frontend repository.
 - [Seller Product](features/seller/01-product.md)
   Documents the seller product API routes, validation, request behavior, and data side effects.
 
+- [Buyer Belanja](features/buyer/01-belanja.md)
+  Documents the buyer shopping API routes, search behavior, add-to-cart behavior, and data notes.
+
 ## Documentation Rules
 
 Use English for every Markdown document in this folder.
@@ -67,7 +70,7 @@ docs/
       02-transaction.md
       03-company-profile.md
     buyer/
-      01-product-browsing.md
+      01-belanja.md
       02-cart.md
       03-checkout.md
       04-order.md
