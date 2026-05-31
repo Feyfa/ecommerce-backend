@@ -62,6 +62,20 @@ class KeranjangController extends Controller
         $validate['checked'] = 0;
         $validate['total'] = 1;
 
+        $product = Product::select('id', 'stock')
+                          ->where('id', $validate['product_id'])
+                          ->first();
+
+        /* VALIDATE PRODUCT */
+        if(!$product) {
+            return response()->json(['status' => 404, 'message' => 'Produk tidak ditemukan'], 404);
+        }
+
+        if($product->stock < 1) {
+            return response()->json(['status' => 422, 'message' => ['stock_maximum' => ["This product stock is a maximum of {$product->stock}"]]], 422);
+        }
+        /* VALIDATE PRODUCT */
+
         /* GET KERANJANG */
         $keranjang = Keranjang::where('user_id_seller', $validate['user_id_seller'])
                               ->where('user_id_buyer', $validate['user_id_buyer'])
@@ -72,10 +86,6 @@ class KeranjangController extends Controller
         /* WHEN KERANJANG ALREADY EXISTS */
         if(!empty($keranjang)) 
         {
-            $product = Product::select('stock')
-                              ->where('id', $keranjang->product_id)
-                              ->first();
-
             /* VALIDATES IF TOTAL KERANJANG >= STOCK PRODUCT */
             if($keranjang->total >= $product->stock) {
                 return response()->json(['status' => 422, 'message' => ['stock_maximum' => ["This product stock is a maximum of {$product->stock}"]]], 422);
@@ -152,6 +162,15 @@ class KeranjangController extends Controller
         $keranjang = Keranjang::where('product_id', $validate['product_id'])
                               ->where('user_id_buyer', $validate['user_id_buyer'])
                               ->first();
+
+        if(!$keranjang) {
+            $getKeranjangs = $this->keranjangService->getKeranjangs($validate['user_id_buyer']);
+            $keranjangs = $getKeranjangs['keranjangs'] ?? [];
+            $totalPrice = $getKeranjangs['totalPrice'] ?? 0;
+
+            return response()->json(['status' => 404, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice, 'message' => 'Keranjang tidak ditemukan'], 404);
+        }
+
         $productSoldOutIds = $this->keranjangService->checkProductSoldOutByIds([$validate['product_id']]);
         
         $keranjang->checked = ($validate['checked']) && empty($productSoldOutIds['ids']) ? true : false;
@@ -206,6 +225,44 @@ class KeranjangController extends Controller
         return response()->json(['status' => 200, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 200);
     }
 
+    public function checkedAll(Request $request)
+    {
+        /* VALIDATOR AND GET */
+        $validator = Validator::make($request->all(),
+            [
+                'user_id_buyer' => ['required', 'uuid'],
+                'checked' => ['required', 'boolean'],
+            ]
+        );
+
+        if($validator->fails())
+            return response()->json(['status' => 422, 'message' => $validator->messages()], 422);
+
+        $validate = $validator->validate();
+        /* VALIDATOR AND GET */
+
+        /* RESET CHECKED KERANJANG */
+        Keranjang::where('user_id_buyer', $validate['user_id_buyer'])
+                 ->update(['checked' => 0]);
+        /* RESET CHECKED KERANJANG */
+
+        /* CHECK ALL AVAILABLE KERANJANG */
+        if($validate['checked']) {
+            Keranjang::where('user_id_buyer', $validate['user_id_buyer'])
+                     ->whereIn('product_id', Product::select('id')->where('stock', '>', 0))
+                     ->update(['checked' => 1]);
+        }
+        /* CHECK ALL AVAILABLE KERANJANG */
+
+        /* GET KERANJANGS */
+        $getKeranjangs = $this->keranjangService->getKeranjangs($validate['user_id_buyer']);
+        $keranjangs = $getKeranjangs['keranjangs'] ?? [];
+        $totalPrice = $getKeranjangs['totalPrice'] ?? 0;
+        /* GET KERANJANGS */
+
+        return response()->json(['status' => 200, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 200);
+    }
+
     public function plusTotalKeranjang(Request $request)
     {
         /* VALIDATOR AND GET */
@@ -227,9 +284,25 @@ class KeranjangController extends Controller
                               ->where('product_id', $validate['product_id'])
                               ->first();
 
+        if(!$keranjang) {
+            $getKeranjangs = $this->keranjangService->getKeranjangs($validate['user_id_buyer']);
+            $keranjangs = $getKeranjangs['keranjangs'] ?? [];
+            $totalPrice = $getKeranjangs['totalPrice'] ?? 0;
+
+            return response()->json(['status' => 404, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice, 'message' => 'Keranjang tidak ditemukan'], 404);
+        }
+
         $product = Product::select('stock')
                           ->where('id', $keranjang->product_id)
                           ->first();
+
+        if(!$product) {
+            $getKeranjangs = $this->keranjangService->getKeranjangs($validate['user_id_buyer']);
+            $keranjangs = $getKeranjangs['keranjangs'] ?? [];
+            $totalPrice = $getKeranjangs['totalPrice'] ?? 0;
+
+            return response()->json(['status' => 404, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice, 'message' => 'Produk tidak ditemukan'], 404);
+        }
 
         /* VALIDATES IF TOTAL KERANJANG >= STOCK PRODUCT */
         if($keranjang->total >= $product->stock) {
@@ -273,6 +346,18 @@ class KeranjangController extends Controller
                               ->where('product_id', $validate['product_id'])
                               ->first();
 
+        if(!$keranjang) {
+            $getKeranjangs = $this->keranjangService->getKeranjangs($validate['user_id_buyer']);
+            $keranjangs = $getKeranjangs['keranjangs'] ?? [];
+            $totalPrice = $getKeranjangs['totalPrice'] ?? 0;
+
+            return response()->json(['status' => 404, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice, 'message' => 'Keranjang tidak ditemukan'], 404);
+        }
+
+        if($keranjang->total <= 1) {
+            return response()->json(['status' => 422, 'message' => ['total_minimum' => ['This product total is a minimum of 1']]], 422);
+        }
+
         $keranjang->total -= 1;
         $keranjang->save();
         /* ADD ONE TOTAL KERANJANG */
@@ -293,7 +378,7 @@ class KeranjangController extends Controller
             [
                 'user_id_buyer' => ['required', 'uuid'],
                 'product_id' => ['required', 'uuid'],
-                'total' => ['required', 'integer'],
+                'total' => ['required', 'integer', 'min:1'],
             ]
         );
 
@@ -308,9 +393,25 @@ class KeranjangController extends Controller
                               ->where('product_id', $validate['product_id'])
                               ->first();
 
+        if(!$keranjang) {
+            $getKeranjangs = $this->keranjangService->getKeranjangs($validate['user_id_buyer']);
+            $keranjangs = $getKeranjangs['keranjangs'] ?? [];
+            $totalPrice = $getKeranjangs['totalPrice'] ?? 0;
+
+            return response()->json(['status' => 404, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice, 'message' => 'Keranjang tidak ditemukan'], 404);
+        }
+
         $product = Product::select('stock')
                           ->where('id', $keranjang->product_id)
                           ->first();
+
+        if(!$product) {
+            $getKeranjangs = $this->keranjangService->getKeranjangs($validate['user_id_buyer']);
+            $keranjangs = $getKeranjangs['keranjangs'] ?? [];
+            $totalPrice = $getKeranjangs['totalPrice'] ?? 0;
+
+            return response()->json(['status' => 404, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice, 'message' => 'Produk tidak ditemukan'], 404);
+        }
 
         /* VALIDATES IF TOTAL KERANJANG > STOCK PRODUCT */
         if($validate['total'] > $product->stock) {
@@ -361,9 +462,35 @@ class KeranjangController extends Controller
         /* VALIDATION KERANJANG NOT CHECKED */
         $keranjangNotChecked = $this->keranjangService->checkKeranjangNotChecked($request->user_id_buyer);
         
-        if(!$keranjangNotChecked['checked'])
-            return response()->json(['status' => 'error', 'message' => 'Keranjang belum ada yang di checked'], 400);
+        if(!$keranjangNotChecked['checked']) {
+            $getKeranjangs = $this->keranjangService->getKeranjangs($request->user_id_buyer);
+            $keranjangs = $getKeranjangs['keranjangs'] ?? [];
+            $totalPrice = $getKeranjangs['totalPrice'] ?? 0;
+
+            return response()->json(['status' => 'error', 'message' => 'Keranjang belum ada yang di checked', 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 400);
+        }
         /* VALIDATION KERANJANG NOT CHECKED */
+
+        /* VALIDATION STALE KERANJANG STATE */
+        $checkedProductIds = Keranjang::where('user_id_buyer', $request->user_id_buyer)
+                                      ->where('checked', 1)
+                                      ->where('total', '>', 0)
+                                      ->pluck('product_id')
+                                      ->toArray();
+
+        $requestProductIds = array_values(array_unique($request->product_ids));
+        $checkedProductIds = array_values(array_unique($checkedProductIds));
+        sort($requestProductIds);
+        sort($checkedProductIds);
+
+        if($requestProductIds !== $checkedProductIds) {
+            $getKeranjangs = $this->keranjangService->getKeranjangs($request->user_id_buyer);
+            $keranjangs = $getKeranjangs['keranjangs'] ?? [];
+            $totalPrice = $getKeranjangs['totalPrice'] ?? 0;
+
+            return response()->json(['status' => 'error', 'message' => 'Keranjang berubah, silakan cek ulang sebelum checkout', 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 409);
+        }
+        /* VALIDATION STALE KERANJANG STATE */
 
         /* CHECK IF THE PRODUCT WITH THAT ID HAS MORE THAN 0 STOCK */
         $productSoldOutIds = $this->keranjangService->checkProductSoldOutByIds($request->product_ids);
@@ -372,7 +499,7 @@ class KeranjangController extends Controller
 
         if(!empty($productSoldOutIds['ids']))
         {
-            Keranjang::whereIn('product_id', $productSoldOutIds)
+            Keranjang::whereIn('product_id', $productSoldOutIds['ids'])
                      ->where('user_id_buyer', $request->user_id_buyer)
                      ->update([
                         'checked' => 0,
@@ -386,6 +513,26 @@ class KeranjangController extends Controller
             return response()->json(['status' => 'error', 'message' => 'There is a problem because the item is out of stock, please select again', 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 400);
         }
         /* CHECK IF THE PRODUCT WITH THAT ID HAS MORE THAN 0 STOCK */
+
+        /* VALIDATION CHECKOUT QUANTITY */
+        $invalidCheckoutKeranjangExists = Keranjang::leftJoin('products', 'keranjangs.product_id', '=', 'products.id')
+                                                   ->where('keranjangs.user_id_buyer', $request->user_id_buyer)
+                                                   ->where('keranjangs.checked', 1)
+                                                   ->where(function($query) {
+                                                       $query->whereNull('products.id')
+                                                             ->orWhere('keranjangs.total', '<', 1)
+                                                             ->orWhereColumn('keranjangs.total', '>', 'products.stock');
+                                                   })
+                                                   ->exists();
+
+        if($invalidCheckoutKeranjangExists) {
+            $getKeranjangs = $this->keranjangService->getKeranjangs($request->user_id_buyer);
+            $keranjangs = $getKeranjangs['keranjangs'] ?? [];
+            $totalPrice = $getKeranjangs['totalPrice'] ?? 0;
+
+            return response()->json(['status' => 'error', 'message' => 'Jumlah produk di keranjang berubah, silakan cek ulang sebelum checkout', 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 409);
+        }
+        /* VALIDATION CHECKOUT QUANTITY */
 
         /* UPDATE CHECKOUT PRODUCT */
         $this->keranjangService->updateCheckoutKeranjang($request->user_id_buyer);

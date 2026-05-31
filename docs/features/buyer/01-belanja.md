@@ -138,5 +138,5 @@ Stock failures return `422` with `message.stock_maximum`.
 - Buyer belanja intentionally excludes the current user's seller products.
 - Product list returns a maximum of 200 products per request.
 - Search covers both product name and seller name.
-- Add-to-cart does not reject a new cart row for stock `0` directly in `store`; the frontend hides the cart action for sold-out products.
+- Add-to-cart rejects missing products and products with stock lower than `1`; the frontend also hides the cart action for sold-out products.
 - The backend docs file name matches the frontend docs file name so the same feature can be compared across both repositories.

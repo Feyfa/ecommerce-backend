@@ -23,6 +23,9 @@ Frontend-specific documentation should live in the frontend repository.
 - [Buyer Belanja](features/buyer/01-belanja.md)
   Documents the buyer shopping API routes, search behavior, add-to-cart behavior, and data notes.
 
+- [Buyer Cart](features/buyer/02-cart.md)
+  Documents the buyer cart API routes, checked-state behavior, quantity validation, checkout validation, and stale-state recovery.
+
 ## Documentation Rules
 
 Use English for every Markdown document in this folder.
