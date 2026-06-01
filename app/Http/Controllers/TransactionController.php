@@ -28,15 +28,31 @@ class TransactionController extends Controller
         /* VALIDATION USER */
 
         /* GET TRANSACTION AS SELLER */
-        $getTransaction = $this->transactionService->getTransaction($user_id, $user_type);
+        $filters = [
+            'status' => $request->status_filter ?? 'all',
+            'search' => $request->search ?? '',
+            'sort' => $request->sort ?? 'newest',
+            'page' => $request->page ?? 1,
+            'per_page' => $request->per_page ?? 5,
+            'date_from' => $request->date_from ?? '',
+            'date_to' => $request->date_to ?? '',
+        ];
+        $getTransaction = $this->transactionService->getTransaction($user_id, $user_type, $filters);
         $status = $getTransaction['status'] ?? '';
         $message = $getTransaction['message'] ?? '';
         $transactions = $getTransaction['transactions'] ?? [];
+        $counts = $getTransaction['counts'] ?? [];
+        $pagination = $getTransaction['pagination'] ?? [];
         if($status == 'error')
             return response()->json(['status' => $status, 'message' => $message], 400);
         /* GET TRANSACTION AS SELLER */
 
-        return response()->json(['status' => 'success', 'transactions' => $transactions]);
+        return response()->json([
+            'status' => 'success',
+            'transactions' => $transactions,
+            'counts' => $counts,
+            'pagination' => $pagination
+        ]);
     }
 
     public function approvedTransaction(Request $request)
@@ -84,8 +100,15 @@ class TransactionController extends Controller
         /* GET TRANSACTION */
         $getTransaction = $this->transactionService->getTransaction($user_id, $user_type);
         $transactions = $getTransaction['transactions'] ?? [];
+        $counts = $getTransaction['counts'] ?? [];
+        $pagination = $getTransaction['pagination'] ?? [];
         /* GET TRANSACTION */
 
-        return response()->json(['status' => 'success', 'transactions' => $transactions]);
+        return response()->json([
+            'status' => 'success',
+            'transactions' => $transactions,
+            'counts' => $counts,
+            'pagination' => $pagination
+        ]);
     }
 }

@@ -29,6 +29,12 @@ Frontend-specific documentation should live in the frontend repository.
 - [Buyer Checkout](features/buyer/03-checkout.md)
   Documents the buyer checkout API routes, backend snapshot validation, payment processing, idempotency, and checkout data side effects.
 
+- [Transaction](features/transaction.md)
+  Documents the shared buyer and seller transaction API, filters, status mapping, pagination, seller approval, and display-name rules.
+
+- [Xendit Integration](integrations/xendit.md)
+  Documents the current Xendit payment, disbursement, webhook gap, and future integration notes.
+
 ## Documentation Rules
 
 Use English for every Markdown document in this folder.
@@ -68,20 +74,21 @@ docs/
     database.md
     payment-xendit.md
 
+  integrations/
+    xendit.md
+
   features/
     _template.md
     auth.md
+    transaction.md
     seller/
       01-product.md
-      02-transaction.md
       03-company-profile.md
     buyer/
       01-belanja.md
       02-cart.md
       03-checkout.md
       04-order.md
-    shared/
-      01-payment-xendit.md
 
   adr/
     0001-database-postgresql-uuid.md
