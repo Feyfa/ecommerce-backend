@@ -14,6 +14,7 @@ class TransactionInvoice extends Model
 
     protected $fillable = [
         'user_id_buyer',
+        'checkout_key',
         'alamat_buyer',
         'payment_slug',
         'payment_name',

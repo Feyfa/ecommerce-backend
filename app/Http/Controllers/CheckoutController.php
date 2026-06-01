@@ -129,95 +129,114 @@ class CheckoutController extends Controller
         }
         /* BUILD BACKEND CHECKOUT SNAPSHOT */
 
-        /* CREATE PAYMENT IN XENDIT */
-        $resultXendit = [];
-        $now = Carbon::now()->timestamp;
-        $uniqid = uniqid();
-        $external_id = "";
-        $bank_code = "";
-        $name = $user->name ?? "";
-        $country = "ID";
-        $currency = "IDR";
-        $is_single_use = true;
-        $is_closed = true;
-        $expected_amount = intval($checkoutSnapshot['clientComparable']['total_all'] ?? 0);
-        
-        $expired_at = Carbon::now()->addDay()->setMinutes(0)->setSeconds(0)->setMicroseconds(0);
-        $expired_at_xendit = $expired_at->toIso8601String();
-        $expired_at_transaction = $expired_at->format('Y-m-d H:i:s');
+        $checkoutKey = $this->checkoutService->generateCheckoutKey(
+            user_id_buyer: $user_id_buyer,
+            checkoutSnapshot: $checkoutSnapshot,
+        );
 
-        if(($checkoutSnapshot['data']['payment']['method'] ?? "") == 'va' && ($checkoutSnapshot['data']['payment']['slug'] ?? "") == 'bca' && ($checkoutSnapshot['data']['payment']['name'] ?? "") == 'BCA Virtual Account')
-        {
-            $external_id = "{$checkoutSnapshot['data']['payment']['method']}-{$checkoutSnapshot['data']['payment']['slug']}-{$user_id_buyer}-{$now}-{$uniqid}";
-            $bank_code = "BCA";
-            
-            $resultXendit = $this->xenditService->createVirtualAccount(
-                external_id: $external_id,
-                bank_code: $bank_code,
-                name: $name,
-                country: $country,
-                currency: $currency,
-                is_single_use: $is_single_use,
-                is_closed: $is_closed,
-                expected_amount: $expected_amount,
-                expiration_date: $expired_at_xendit
-            );
-        }
-        else 
-        {
-            return response()->json(['status' => 'error', 'message' => 'Pembayaran Harus Menggunakan BCA Virtual Account'], 400);
-        }
+        $this->checkoutService->lockCheckoutKey($checkoutKey);
 
-        if($resultXendit['status'] == 'error') 
-        {
-            return response()->json(['status' => $resultXendit['status'], 'message' => $resultXendit['message']], 400);
-        }
-        /* CREATE PAYMENT IN XENDIT */
-    
-        /* SAVE CHECKOUT TO DATABASE */
         try {
-            DB::transaction(function () use ($user_id_buyer, $checkoutSnapshot, $expired_at_transaction, $resultXendit) {
-                $saveCheckoutToDatabase = $this->checkoutService->saveCheckoutToDatabase(
-                    user_id_buyer: $user_id_buyer,
-                    checkouts: $checkoutSnapshot['data']['checkouts'] ?? [],
-                    kurirs: $checkoutSnapshot['data']['kurirs'] ?? [],
-                    noteds: $checkoutSnapshot['data']['noteds'] ?? [],
-                    alamat: $checkoutSnapshot['data']['alamat']['alamat'] ?? "",
-                    payment_method: $checkoutSnapshot['data']['payment']['method'] ?? "",
-                    payment_slug: $checkoutSnapshot['data']['payment']['slug'] ?? "",
-                    payment_name: $checkoutSnapshot['data']['payment']['name'] ?? "",
-                    expired_at: $expired_at_transaction,
-                    price: intval($checkoutSnapshot['clientComparable']['total_all'] ?? 0),
-                    dataXendit: $resultXendit['data'] ?? []
+            $existingCheckoutInvoice = $this->checkoutService->getExistingCheckoutInvoice(
+                user_id_buyer: $user_id_buyer,
+                checkout_key: $checkoutKey,
+            );
+
+            if(!empty($existingCheckoutInvoice)) {
+                return response()->json([
+                    'status' => 'error',
+                    'code' => 'CHECKOUT_ALREADY_PROCESSED',
+                    'message' => 'Checkout ini sudah diproses, silakan cek transaksi Anda',
+                ], 409);
+            }
+
+            /* CREATE PAYMENT IN XENDIT */
+            $resultXendit = [];
+            $now = Carbon::now()->timestamp;
+            $uniqid = uniqid();
+            $external_id = "";
+            $bank_code = "";
+            $name = $user->name ?? "";
+            $country = "ID";
+            $currency = "IDR";
+            $is_single_use = true;
+            $is_closed = true;
+            $expected_amount = intval($checkoutSnapshot['clientComparable']['total_all'] ?? 0);
+
+            $expired_at = Carbon::now()->addDay()->setMinutes(0)->setSeconds(0)->setMicroseconds(0);
+            $expired_at_xendit = $expired_at->toIso8601String();
+            $expired_at_transaction = $expired_at->format('Y-m-d H:i:s');
+
+            if (($checkoutSnapshot['data']['payment']['method'] ?? "") == 'va' && ($checkoutSnapshot['data']['payment']['slug'] ?? "") == 'bca' && ($checkoutSnapshot['data']['payment']['name'] ?? "") == 'BCA Virtual Account') {
+                $external_id = "{$checkoutSnapshot['data']['payment']['method']}-{$checkoutSnapshot['data']['payment']['slug']}-{$user_id_buyer}-{$now}-{$uniqid}";
+                $bank_code = "BCA";
+
+                $resultXendit = $this->xenditService->createVirtualAccount(
+                    external_id: $external_id,
+                    bank_code: $bank_code,
+                    name: $name,
+                    country: $country,
+                    currency: $currency,
+                    is_single_use: $is_single_use,
+                    is_closed: $is_closed,
+                    expected_amount: $expected_amount,
+                    expiration_date: $expired_at_xendit
                 );
+            } else {
+                return response()->json(['status' => 'error', 'message' => 'Pembayaran Harus Menggunakan BCA Virtual Account'], 400);
+            }
 
-                if($saveCheckoutToDatabase['status'] == 'error') {
-                    throw new \RuntimeException($saveCheckoutToDatabase['message'] ?? 'Save checkout failed');
-                }
+            if ($resultXendit['status'] == 'error') {
+                return response()->json(['status' => $resultXendit['status'], 'message' => $resultXendit['message']], 400);
+            }
+            /* CREATE PAYMENT IN XENDIT */
 
-                $deleteKeranjangAfterCheckout = $this->checkoutService->deleteKeranjangAfterCheckoutForBuyer(
-                    user_id_buyer: $user_id_buyer,
-                    checkouts: $checkoutSnapshot['data']['checkouts'] ?? []
-                );
+            /* SAVE CHECKOUT TO DATABASE */
+            try {
+                DB::transaction(function () use ($user_id_buyer, $checkoutSnapshot, $expired_at_transaction, $resultXendit, $checkoutKey) {
+                    $saveCheckoutToDatabase = $this->checkoutService->saveCheckoutToDatabase(
+                        user_id_buyer: $user_id_buyer,
+                        checkouts: $checkoutSnapshot['data']['checkouts'] ?? [],
+                        kurirs: $checkoutSnapshot['data']['kurirs'] ?? [],
+                        noteds: $checkoutSnapshot['data']['noteds'] ?? [],
+                        alamat: $checkoutSnapshot['data']['alamat']['alamat'] ?? "",
+                        payment_method: $checkoutSnapshot['data']['payment']['method'] ?? "",
+                        payment_slug: $checkoutSnapshot['data']['payment']['slug'] ?? "",
+                        payment_name: $checkoutSnapshot['data']['payment']['name'] ?? "",
+                        expired_at: $expired_at_transaction,
+                        price: intval($checkoutSnapshot['clientComparable']['total_all'] ?? 0),
+                        checkout_key: $checkoutKey,
+                        dataXendit: $resultXendit['data'] ?? []
+                    );
 
-                if($deleteKeranjangAfterCheckout['status'] == 'error') {
-                    throw new \RuntimeException($deleteKeranjangAfterCheckout['message'] ?? 'Delete keranjang failed');
-                }
+                    if($saveCheckoutToDatabase['status'] == 'error') {
+                        throw new \RuntimeException($saveCheckoutToDatabase['message'] ?? 'Save checkout failed');
+                    }
 
-                $changeStockProductAfterCheckout = $this->checkoutService->changeStockProductAfterCheckout(
-                    checkouts: $checkoutSnapshot['data']['checkouts'] ?? []
-                );
+                    $deleteKeranjangAfterCheckout = $this->checkoutService->deleteKeranjangAfterCheckoutForBuyer(
+                        user_id_buyer: $user_id_buyer,
+                        checkouts: $checkoutSnapshot['data']['checkouts'] ?? []
+                    );
 
-                if($changeStockProductAfterCheckout['status'] == 'error') {
-                    throw new \RuntimeException($changeStockProductAfterCheckout['message'] ?? 'Change stock product failed');
-                }
-            });
+                    if($deleteKeranjangAfterCheckout['status'] == 'error') {
+                        throw new \RuntimeException($deleteKeranjangAfterCheckout['message'] ?? 'Delete keranjang failed');
+                    }
+
+                    $changeStockProductAfterCheckout = $this->checkoutService->changeStockProductAfterCheckout(
+                        checkouts: $checkoutSnapshot['data']['checkouts'] ?? []
+                    );
+
+                    if($changeStockProductAfterCheckout['status'] == 'error') {
+                        throw new \RuntimeException($changeStockProductAfterCheckout['message'] ?? 'Change stock product failed');
+                    }
+                });
+            } catch (\RuntimeException $e) {
+                return response()->json(['status' => 'error', 'message' => $e->getMessage()], 400);
+            }
+            /* SAVE CHECKOUT TO DATABASE */
+        } finally {
+            $this->checkoutService->unlockCheckoutKey($checkoutKey);
         }
-        catch(\RuntimeException $e)
-        {
-            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 400);
-        }
-        /* SAVE CHECKOUT TO DATABASE */
 
         return response()->json(['status' => 'success', 'message' => 'Pembayaran Berhasil']);
     }

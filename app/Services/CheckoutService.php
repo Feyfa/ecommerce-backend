@@ -10,6 +10,7 @@ use App\Models\Product;
 use App\Models\TransactionProduct;
 use App\Models\TransactionUser;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class CheckoutService
 {
@@ -375,12 +376,65 @@ class CheckoutService
     }
 
     /**
+     * membuat key idempotency dari buyer dan baris keranjang checkout yang sama.
+     */
+    public function generateCheckoutKey(string $user_id_buyer = "", array $checkoutSnapshot = []) : string
+    {
+        $cartItemIds = $checkoutSnapshot['clientComparable']['cart_item_ids'] ?? [];
+        sort($cartItemIds);
+
+        return hash('sha256', json_encode([
+            'buyer_id' => $user_id_buyer,
+            'cart_item_ids' => $cartItemIds,
+        ]));
+    }
+
+    /**
+     * mengunci checkout key supaya request checkout yang sama tidak diproses paralel.
+     */
+    public function lockCheckoutKey(string $checkout_key = "") : void
+    {
+        if(config('database.default') != 'pgsql' || $checkout_key == "") {
+            return;
+        }
+
+        DB::select('select pg_advisory_lock(hashtext(?))', [$checkout_key]);
+    }
+
+    /**
+     * melepas lock checkout key setelah proses checkout selesai atau gagal.
+     */
+    public function unlockCheckoutKey(string $checkout_key = "") : void
+    {
+        if(config('database.default') != 'pgsql' || $checkout_key == "") {
+            return;
+        }
+
+        DB::select('select pg_advisory_unlock(hashtext(?))', [$checkout_key]);
+    }
+
+    /**
+     * mencari invoice yang sudah dibuat untuk checkout key yang sama.
+     */
+    public function getExistingCheckoutInvoice(string $user_id_buyer = "", string $checkout_key = "")
+    {
+        if($user_id_buyer == "" || $checkout_key == "") {
+            return null;
+        }
+
+        return TransactionInvoice::where('user_id_buyer', $user_id_buyer)
+                                 ->where('checkout_key', $checkout_key)
+                                 ->whereIn('status', ['pending', 'done'])
+                                 ->first();
+    }
+
+    /**
      * process save to database in function createVirtualAccount
      */
-    public function saveCheckoutToDatabase(string $user_id_buyer = "", array $checkouts = [], array $kurirs = [], array $noteds = [], string $alamat = "", string $payment_method = "", string $payment_slug = "", string $payment_name = "", string $expired_at = "", int $price = 0, array $dataXendit = [])
+    public function saveCheckoutToDatabase(string $user_id_buyer = "", array $checkouts = [], array $kurirs = [], array $noteds = [], string $alamat = "", string $payment_method = "", string $payment_slug = "", string $payment_name = "", string $expired_at = "", int $price = 0, string $checkout_key = "", array $dataXendit = [])
     {
         /* VALIDATION */
-        if(!$user_id_buyer || !$checkouts || !$kurirs || !$noteds || !$alamat || !$payment_method || !$payment_slug || !$payment_name || !$expired_at || !$price || !$dataXendit)
+        if(!$user_id_buyer || !$checkouts || !$kurirs || !$noteds || !$alamat || !$payment_method || !$payment_slug || !$payment_name || !$expired_at || !$price || !$checkout_key || !$dataXendit)
         {
             $message = "";
 
@@ -420,6 +474,10 @@ class CheckoutService
             {
                 $message = "Data Price Empty";
             }
+            else if(!$checkout_key)
+            {
+                $message = "Data Checkout Key Empty";
+            }
             else if(!$dataXendit)
             {
                 $message = "Data Xendit Empty";
@@ -436,6 +494,7 @@ class CheckoutService
         // info(['action' => 'invoice create','user_id_buyer' => $user_id_buyer,'alamat_buyer' => $alamat,'payment_method' => $payment_method,'payment_slug' => $payment_slug,'payment_name' => $payment_name,'payment_account' => $dataXendit['account_number'] ?? "",'payment_reference' => $dataXendit['external_id'] ?? "",'price' => $price,'expired_at' => $expired_at,]);
         $transactionInvoice = TransactionInvoice::create([
             'user_id_buyer' => $user_id_buyer,
+            'checkout_key' => $checkout_key,
             'alamat_buyer' => $alamat,
             'payment_method' => $payment_method,
             'payment_slug' => $payment_slug,
@@ -587,15 +646,26 @@ class CheckoutService
         {
             foreach(($checkout['keranjangs'] ?? []) as $keranjang)
             {
-                $product = Product::where('id', ($keranjang['p_id'] ?? ""))
-                                  ->first();
-                if(!$product)
-                {
-                    continue;
+                $productId = $keranjang['p_id'] ?? "";
+                $qty = intval($keranjang['k_total'] ?? 0);
+
+                if($productId == "" || $qty < 1) {
+                    return [
+                        'status' => 'error',
+                        'message' => 'Data produk checkout tidak valid'
+                    ];
                 }
 
-                $product->stock = max(0, $product->stock - intval($keranjang['k_total'] ?? 0));
-                $product->save();
+                $updated = Product::where('id', $productId)
+                                  ->where('stock', '>=', $qty)
+                                  ->decrement('stock', $qty);
+
+                if($updated == 0) {
+                    return [
+                        'status' => 'error',
+                        'message' => 'Stok produk berubah, silakan cek ulang'
+                    ];
+                }
             }
         }
         /* PROCESS CHANGE STOCK PRODUCT */
