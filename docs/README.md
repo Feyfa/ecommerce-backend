@@ -26,6 +26,9 @@ Frontend-specific documentation should live in the frontend repository.
 - [Buyer Cart](features/buyer/02-cart.md)
   Documents the buyer cart API routes, checked-state behavior, quantity validation, checkout validation, and stale-state recovery.
 
+- [Buyer Checkout](features/buyer/03-checkout.md)
+  Documents the buyer checkout API routes, backend snapshot validation, payment processing, idempotency, and checkout data side effects.
+
 ## Documentation Rules
 
 Use English for every Markdown document in this folder.
