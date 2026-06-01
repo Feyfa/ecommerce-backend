@@ -9,7 +9,6 @@ use App\Models\PaymentList;
 use App\Models\Product;
 use App\Models\TransactionProduct;
 use App\Models\TransactionUser;
-use App\Models\User;
 use Carbon\Carbon;
 
 class CheckoutService
@@ -122,24 +121,27 @@ class CheckoutService
         $now = Carbon::now('Asia/Jakarta');
         $startDate = $now->translatedFormat('d F Y');
 
-        $randomDay = 1;
         $kurirsFormat = [];
-        $kurirslists = ['JNT', 'Anter Aja', 'Si Cepat Halu'];
+        $kurirslists = [
+            ['name' => 'JNT', 'day' => 1],
+            ['name' => 'Anter Aja', 'day' => 2],
+            ['name' => 'Si Cepat Halu', 'day' => 3],
+        ];
 
         foreach($kurirslists as $kurir)
         {
-            $randomDay = mt_rand(1, 3);
+            $day = $kurir['day'];
 
             /* SETTING TANGGAL */
-            $endDate = $now->copy()->addDays($randomDay)->translatedFormat('d F Y');
+            $endDate = $now->copy()->addDays($day)->translatedFormat('d F Y');
             /* SETTING TANGGAL */
 
             /* SETTING HARGA */
-            $price = (-5000 * $randomDay) + 20000;
+            $price = (-5000 * $day) + 20000;
             /* SETTING HARGA */
 
             $kurirsFormat[] = [
-                'name' => $kurir,
+                'name' => $kurir['name'],
                 'price' => $price,
                 'estimation' => "{$startDate} - {$endDate}"
             ];
@@ -151,9 +153,231 @@ class CheckoutService
     }
 
     /**
+     * membuat snapshot checkout dari database sebagai sumber kebenaran backend.
+     */
+    public function buildCheckoutSnapshot(string $user_id_buyer = "", array $shippingOptions = [], array $noteds = [], string $paymentSlug = "") : array
+    {
+        /* VALIDATE ACTIVE BUYER ADDRESS */
+        $getAlamatBuyer = $this->getAlamatBuyer($user_id_buyer);
+        $alamat = $getAlamatBuyer['alamat'];
+
+        if(empty($alamat)) {
+            return [
+                'status' => 'invalid',
+                'code' => 'CHECKOUT_INVALID',
+                'message' => 'Alamat belum ditambahkan',
+            ];
+        }
+        /* VALIDATE ACTIVE BUYER ADDRESS */
+
+        /* LOAD CHECKOUT CART FROM DATABASE */
+        $getKeranjangCheckout = $this->getKeranjangCheckout($user_id_buyer);
+        $checkouts = $getKeranjangCheckout['checkouts'];
+
+        if(count($checkouts) == 0) {
+            return [
+                'status' => 'invalid',
+                'code' => 'CHECKOUT_INVALID',
+                'message' => 'Keranjang Not Checked',
+            ];
+        }
+        /* LOAD CHECKOUT CART FROM DATABASE */
+
+        /* VALIDATE CHECKOUT CART STILL PAYABLE */
+        $invalidCheckoutKeranjangExists = Keranjang::leftJoin('products', 'keranjangs.product_id', '=', 'products.id')
+                                                   ->where('keranjangs.user_id_buyer', $user_id_buyer)
+                                                   ->where('keranjangs.checkout', 1)
+                                                   ->where(function($query) {
+                                                       $query->whereNull('products.id')
+                                                             ->orWhere('keranjangs.total', '<', 1)
+                                                             ->orWhereColumn('keranjangs.total', '>', 'products.stock');
+                                                   })
+                                                   ->exists();
+
+        if($invalidCheckoutKeranjangExists) {
+            return [
+                'status' => 'invalid',
+                'code' => 'CHECKOUT_INVALID',
+                'message' => 'Keranjang berubah, silakan cek ulang',
+            ];
+        }
+        /* VALIDATE CHECKOUT CART STILL PAYABLE */
+
+        /* VALIDATE PAYMENT METHOD */
+        $payment = PaymentList::select('slug', 'method', 'name')
+                              ->where('type', 'incoming')
+                              ->where('method', 'va')
+                              ->where('slug', $paymentSlug)
+                              ->first();
+
+        if(empty($payment)) {
+            return [
+                'status' => 'error',
+                'message' => 'Metode pembayaran tidak tersedia',
+            ];
+        }
+
+        if($payment->slug != 'bca' || $payment->name != 'BCA Virtual Account') {
+            return [
+                'status' => 'error',
+                'message' => 'Pembayaran Harus Menggunakan BCA Virtual Account',
+            ];
+        }
+        /* VALIDATE PAYMENT METHOD */
+
+        /* INDEX FRONTEND USER CHOICES BY SELLER */
+        $shippingOptionsBySeller = [];
+        foreach($shippingOptions as $shippingOption) {
+            $sellerId = $shippingOption['user_id_seller'] ?? "";
+            if($sellerId != "") {
+                $shippingOptionsBySeller[$sellerId] = $shippingOption['kurir_name'] ?? "";
+            }
+        }
+
+        $notedsBySeller = [];
+        foreach($noteds as $noted) {
+            $sellerId = $noted['user_id_seller'] ?? "";
+            if($sellerId != "") {
+                $notedsBySeller[$sellerId] = $noted['noted'] ?? "";
+            }
+        }
+        /* INDEX FRONTEND USER CHOICES BY SELLER */
+
+        /* BUILD BACKEND SNAPSHOT TOTALS */
+        $totalProduct = 0;
+        $totalShipping = 0;
+        $selectedKurirs = [];
+        $selectedNoteds = [];
+        $cartItemIds = [];
+
+        foreach($checkouts as $checkout) {
+            // get seller shipping choice
+            $sellerId = $checkout['user_id_seller'] ?? "";
+            $selectedKurirName = $shippingOptionsBySeller[$sellerId] ?? "";
+
+            if($selectedKurirName == "") {
+                return [
+                    'status' => 'error',
+                    'message' => 'Kurir harus dipilih',
+                ];
+            }
+            // get seller shipping choice
+
+            // validate selected shipping option
+            $selectedKurir = null;
+            foreach(($checkout['kurirs'] ?? []) as $kurir) {
+                if(($kurir['name'] ?? "") == $selectedKurirName) {
+                    $selectedKurir = $kurir;
+                    break;
+                }
+            }
+
+            if(empty($selectedKurir)) {
+                return [
+                    'status' => 'error',
+                    'message' => 'Kurir tidak tersedia',
+                ];
+            }
+            // validate selected shipping option
+
+            // append selected seller shipping
+            $selectedKurirs[] = [
+                'user_id_seller' => $sellerId,
+                'name' => $selectedKurir['name'],
+                'price' => $selectedKurir['price'],
+                'estimation' => $selectedKurir['estimation'],
+            ];
+            $totalShipping += $selectedKurir['price'];
+            // append selected seller shipping
+
+            // append selected seller note
+            $selectedNoteds[] = [
+                'user_id_seller' => $sellerId,
+                'noted' => substr($notedsBySeller[$sellerId] ?? "", 0, 200),
+            ];
+            // append selected seller note
+
+            // collect product totals and cart ids
+            foreach(($checkout['keranjangs'] ?? []) as $keranjang) {
+                $totalProduct += $keranjang['k_total_price'];
+                $cartItemIds[] = $keranjang['k_id'];
+            }
+            // collect product totals and cart ids
+        }
+
+        sort($cartItemIds);
+        /* BUILD BACKEND SNAPSHOT TOTALS */
+
+        /* RETURN SNAPSHOT FOR BACKEND PROCESSING AND STALE UI COMPARISON */
+        return [
+            'status' => 'success',
+            'data' => [
+                'alamat' => $alamat,
+                'checkouts' => $checkouts,
+                'kurirs' => $selectedKurirs,
+                'noteds' => $selectedNoteds,
+                'payment' => [
+                    'method' => $payment->method,
+                    'slug' => $payment->slug,
+                    'name' => $payment->name,
+                ],
+                'totals' => [
+                    'product' => $totalProduct,
+                    'shipping' => $totalShipping,
+                    'all' => $totalProduct + $totalShipping,
+                ],
+            ],
+            'clientComparable' => [
+                'cart_item_ids' => $cartItemIds,
+                'total_product' => $totalProduct,
+                'total_shipping' => $totalShipping,
+                'total_all' => $totalProduct + $totalShipping,
+            ],
+        ];
+        /* RETURN SNAPSHOT FOR BACKEND PROCESSING AND STALE UI COMPARISON */
+    }
+
+    /**
+     * mengubah snapshot backend menjadi bentuk data yang bisa dipakai frontend untuk refresh checkout.
+     */
+    public function formatCheckoutSnapshotForFrontend(array $checkoutSnapshot = []) : array
+    {
+        $data = $checkoutSnapshot['data'] ?? [];
+        $totals = $data['totals'] ?? [];
+
+        return [
+            'alamat' => $data['alamat'] ?? null,
+            'checkouts' => $data['checkouts'] ?? [],
+            'kurirs' => $data['kurirs'] ?? [],
+            'noteds' => $data['noteds'] ?? [],
+            'totalPrice' => $totals['product'] ?? 0,
+            'totalShipping' => $totals['shipping'] ?? 0,
+            'totalAll' => $totals['all'] ?? 0,
+        ];
+    }
+
+    /**
+     * membandingkan snapshot backend dan snapshot yang terakhir dilihat user di frontend.
+     */
+    public function checkoutSnapshotChanged(array $backendSnapshot = [], array $clientSnapshot = []) : bool
+    {
+        $backendComparable = $backendSnapshot['clientComparable'] ?? [];
+
+        $backendCartItemIds = $backendComparable['cart_item_ids'] ?? [];
+        $clientCartItemIds = $clientSnapshot['cart_item_ids'] ?? [];
+        sort($backendCartItemIds);
+        sort($clientCartItemIds);
+
+        return $backendCartItemIds !== $clientCartItemIds
+            || intval($backendComparable['total_product'] ?? 0) !== intval($clientSnapshot['total_product'] ?? 0)
+            || intval($backendComparable['total_shipping'] ?? 0) !== intval($clientSnapshot['total_shipping'] ?? 0)
+            || intval($backendComparable['total_all'] ?? 0) !== intval($clientSnapshot['total_all'] ?? 0);
+    }
+
+    /**
      * process save to database in function createVirtualAccount
      */
-    public function saveCheckoutToDatabase(string $user_id_buyer = "", array $checkouts = [], array $kurirs = [], array $noteds = [], string $alamat = "", string $payment_method = "", string $payment_slug = "", string $payment_name = "", string $expired_at = "", int $price, array $dataXendit = [])
+    public function saveCheckoutToDatabase(string $user_id_buyer = "", array $checkouts = [], array $kurirs = [], array $noteds = [], string $alamat = "", string $payment_method = "", string $payment_slug = "", string $payment_name = "", string $expired_at = "", int $price = 0, array $dataXendit = [])
     {
         /* VALIDATION */
         if(!$user_id_buyer || !$checkouts || !$kurirs || !$noteds || !$alamat || !$payment_method || !$payment_slug || !$payment_name || !$expired_at || !$price || !$dataXendit)
@@ -309,24 +533,19 @@ class CheckoutService
     }
 
     /**
-     * process delete keranjang after checkout
+     * menghapus item keranjang yang sudah berhasil diproses checkout untuk buyer terkait.
      */
-    public function deleteKeranjangAfterCheckout(array $checkouts = [])
+    public function deleteKeranjangAfterCheckoutForBuyer(string $user_id_buyer = "", array $checkouts = [])
     {
-        // info(__FUNCTION__);
-        /* VALIDATION */
-        if(!$checkouts)
+        if(!$user_id_buyer || !$checkouts)
         {
             return [
                 'status' => 'error',
-                'message' => 'Data Checkout Empty'
+                'message' => !$user_id_buyer ? 'Data User Id buyer Empty' : 'Data Checkout Empty'
             ];
         }
-        /* VALIDATION */
 
-        /* GET KERANJANG IDS */
         $keranjangIds = [];
-        
         foreach($checkouts as $checkout)
         {
             foreach(($checkout['keranjangs'] ?? []) as $keranjang)
@@ -334,14 +553,13 @@ class CheckoutService
                 $keranjangIds[] = $keranjang['k_id'] ?? "";
             }
         }
-        /* GET KERANJANG IDS */
 
-        /* DELETE KERANJANG */
         if($keranjangIds)
         {
-            Keranjang::whereIn('id', $keranjangIds)->delete();
+            Keranjang::where('user_id_buyer', $user_id_buyer)
+                     ->whereIn('id', $keranjangIds)
+                     ->delete();
         }
-        /* DELETE KERANJANG */
 
         return [
             'status' => 'success',
@@ -349,6 +567,9 @@ class CheckoutService
         ];
     }
 
+    /**
+     * mengurangi stok produk berdasarkan quantity checkout yang berhasil diproses.
+     */
     public function changeStockProductAfterCheckout(array $checkouts = [])
     {
         /* VALIDATION */
@@ -373,7 +594,7 @@ class CheckoutService
                     continue;
                 }
 
-                $product->stock = max(0, $product->stock - 1);
+                $product->stock = max(0, $product->stock - intval($keranjang['k_total'] ?? 0));
                 $product->save();
             }
         }

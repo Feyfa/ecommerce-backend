@@ -16,6 +16,7 @@ class PaymentService
         $paymentList = PaymentList::select('slug', 'method', 'name')
                                   ->where('type', 'incoming')
                                   ->where('method', 'va')
+                                  ->where('slug', 'bca')
                                   ->get()
                                   ->toArray();
 
