@@ -23,7 +23,7 @@ The account feature currently covers:
   Defines authenticated account, company, address, payment, and balance routes.
 
 - `app/Http/Controllers/UserController.php`
-  Handles user profile, user image, password, TFA payload updates, and account type switching.
+  Handles user profile, user image, password, and TFA payload updates.
 
 - `app/Http/Controllers/CompanyController.php`
   Handles seller company profile and company image updates.
@@ -49,7 +49,7 @@ The account feature currently covers:
 ## Documents
 
 - [Profile](profile.md)
-  User profile, user image upload/delete, and account type switching.
+  User profile and user image upload/delete behavior.
 
 - [Company Profile](company-profile.md)
   Seller company profile, seller address side effect, and company image upload/delete.
@@ -112,4 +112,3 @@ Future cleanup should standardize this, but frontend code should not assume one 
 - Keep seller company address stored through `alamats` with `type = seller`.
 - Keep buyer addresses scoped through `alamats.type = buyer`.
 - Coordinate frontend and backend changes before renaming request fields such as `wihtdrawPrice`.
-

@@ -53,7 +53,6 @@ class AuthController extends Controller
         /* VALIDATE AND GET */
 
         $validate['password'] = Hash::make($validate['password']);
-        $validate['account_type'] = 'buyer';
 
         User::create($validate);
 
@@ -174,11 +173,6 @@ class AuthController extends Controller
         }
         /* CREATE OTP WHEN USER USE TFA */
 
-        /* FORCE ACCOUNT TYPE BUYER */
-        $user->account_type = 'buyer';
-        $user->save();
-        /* FORCE ACCOUNT TYPE BUYER */
-
         /* GET COMPANY */
         $getCompany = $this->companyService->getCompany($user->id);
         $company = $getCompany['company'];
@@ -191,11 +185,6 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
-        /* RESET USER TO BUYER */
-        $user_id = optional(auth()->user())->id;
-        User::where('id', $user_id)->update(['account_type' => 'buyer']);
-        /* RESET USER TO BUYER */
-
         $request->user()->tokens()->delete();
 
         return response()->json(['status' => 200, 'message' => 'logout success'], 200);

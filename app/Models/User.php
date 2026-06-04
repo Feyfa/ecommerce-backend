@@ -27,7 +27,6 @@ class User extends Authenticatable
         'tfa',
         // 'alamat',
         'password',
-        'account_type',
     ];
 
     /**

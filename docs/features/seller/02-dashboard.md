@@ -52,7 +52,7 @@ The endpoint uses the authenticated Sanctum user.
 Behavior:
 
 - Returns `401` when there is no authenticated user.
-- Does not block the request based on `account_type`, because `account_type` is currently used as an active UI mode and can become out of sync with the authenticated API request.
+- Does not block the request based on UI mode, because active buyer/seller UI mode is stored per browser tab by the frontend and is not a backend authorization boundary.
 - Does not accept `user_id_seller` from the frontend, so dashboard data cannot be requested for another seller through a client-provided id.
 
 ## Response Shape

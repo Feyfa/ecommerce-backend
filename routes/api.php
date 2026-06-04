@@ -46,7 +46,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', [UserController::class, 'show']);
     Route::put('/user/{id}', [UserController::class, 'updateUser']);
     Route::put('/user/change/password', [UserController::class, 'changePassword']);
-    Route::put('/user/account/type', [UserController::class, 'changeAccountType']);
     Route::post('/user/image', [UserController::class, 'uploadImage']);
     Route::delete('/user/image', [UserController::class, 'deleteImage']);
 });

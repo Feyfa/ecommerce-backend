@@ -98,7 +98,6 @@ Important columns:
 - `phone`: optional phone number.
 - `password`: hashed password.
 - `tfa`: two-factor status flag.
-- `account_type`: current account mode, such as buyer or seller.
 
 Indexes:
 
@@ -106,7 +105,8 @@ Indexes:
 
 Notes:
 
-- The fields `jenis_kelamin`, `tfa`, and `account_type` use strings instead of database enums. This keeps PostgreSQL migration simpler and makes future values easier to change from application code.
+- The fields `jenis_kelamin` and `tfa` use strings instead of database enums. This keeps PostgreSQL migration simpler and makes future values easier to change from application code.
+- The old `account_type` column was removed by `2026_06_04_000001_drop_account_type_from_users_table.php` because active buyer/seller UI mode is stored per browser tab by the frontend.
 
 ### products
 

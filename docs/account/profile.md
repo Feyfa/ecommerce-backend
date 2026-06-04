@@ -10,7 +10,6 @@ Buyer and seller authenticated users.
 
 - `routes/api.php`
 - `app/Http/Controllers/UserController.php`
-- `app/Services/CompanyService.php`
 
 ## Routes
 
@@ -19,7 +18,6 @@ GET /api/user
 PUT /api/user/{id}
 POST /api/user/image
 DELETE /api/user/image
-PUT /api/user/account/type
 ```
 
 ## GET /api/user
@@ -148,24 +146,6 @@ Success response:
 }
 ```
 
-## PUT /api/user/account/type
+## Buyer/Seller Mode
 
-Toggles the authenticated user's account type.
-
-Behavior:
-
-- `buyer` changes to `seller`.
-- Any other current value changes to `buyer`.
-- The response includes the current company payload from `CompanyService`.
-
-Success response:
-
-```json
-{
-  "status": "success",
-  "user": {},
-  "company": {},
-  "message": "Switch Account Successfully"
-}
-```
-
+Buyer/seller active UI mode is handled by the frontend per browser tab. The profile API does not expose an endpoint that mutates account mode in the database.
