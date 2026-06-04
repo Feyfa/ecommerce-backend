@@ -12,6 +12,7 @@ use App\Http\Controllers\MessendController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\SaldoController;
+use App\Http\Controllers\SellerDashboardController;
 use App\Http\Controllers\TopupController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\UserController;
@@ -97,6 +98,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/belanja/{user_id_seller}', [BelanjaController::class, 'index']);
+});
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/dashboard', [SellerDashboardController::class, 'show']);
 });
 
 Route::middleware('auth:sanctum')->group(function () {

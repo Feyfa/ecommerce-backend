@@ -20,6 +20,9 @@ Frontend-specific documentation should live in the frontend repository.
 - [Seller Product](features/seller/01-product.md)
   Documents the seller product API routes, validation, request behavior, and data side effects.
 
+- [Seller Dashboard](features/seller/02-dashboard.md)
+  Documents the seller dashboard API route, response shape, metric rules, and data decisions.
+
 - [Buyer Belanja](features/buyer/01-belanja.md)
   Documents the buyer shopping API routes, search behavior, add-to-cart behavior, and data notes.
 
