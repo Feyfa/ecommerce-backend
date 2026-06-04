@@ -15,7 +15,7 @@ class SellerDashboardController extends Controller
     }
 
     /**
-     * Menampilkan data dashboard untuk seller yang sedang login.
+     * Menampilkan data dashboard yang dibatasi ke user yang sedang login.
      */
     public function show(): JsonResponse
     {
@@ -24,9 +24,6 @@ class SellerDashboardController extends Controller
 
         if(empty($user))
             return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
-
-        if($user->account_type != 'seller')
-            return response()->json(['status' => 'error', 'message' => 'This dashboard only for seller'], 403);
         /* VALIDATION USER */
 
         /* GET DASHBOARD */

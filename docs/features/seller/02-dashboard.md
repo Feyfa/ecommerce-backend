@@ -21,7 +21,7 @@ Current dashboard data:
   Defines the authenticated dashboard API route.
 
 - `app/Http/Controllers/SellerDashboardController.php`
-  Validates the authenticated seller and returns dashboard data.
+  Validates the authenticated user and returns dashboard data scoped to that user.
 
 - `app/Services/SellerDashboardService.php`
   Builds the dashboard response from product and transaction queries.
@@ -52,7 +52,7 @@ The endpoint uses the authenticated Sanctum user.
 Behavior:
 
 - Returns `401` when there is no authenticated user.
-- Returns `403` when the authenticated user is not in seller mode.
+- Does not block the request based on `account_type`, because `account_type` is currently used as an active UI mode and can become out of sync with the authenticated API request.
 - Does not accept `user_id_seller` from the frontend, so dashboard data cannot be requested for another seller through a client-provided id.
 
 ## Response Shape
@@ -150,6 +150,6 @@ Each item includes:
 ## Known Decisions
 
 - The dashboard route is `/api/dashboard` to match the project route style.
-- The dashboard is seller-only even though the route name is generic.
+- The dashboard page is seller-facing, but the API only validates authentication and scopes all data to the authenticated user id.
 - The frontend should call this endpoint without sending a seller id.
 - Chart data is returned as plain arrays so the frontend can render a lightweight SVG chart without adding a chart dependency.
