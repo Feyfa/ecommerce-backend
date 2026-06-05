@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Keranjang;
 use App\Models\Product;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
@@ -16,11 +17,15 @@ class ProductController extends Controller
         $validator = Validator::make(
             [
                 'user_id_seller' => $user_id_seller,
-                'products_current_id' => $request->products_current_id
+                'products_current_id' => $request->products_current_id,
+                'stock_filter' => $request->stock_filter,
+                'sort_product' => $request->sort_product,
             ],
             [
                 'user_id_seller' => ['required', 'uuid'],
-                'products_current_id' => ['required']
+                'products_current_id' => ['required'],
+                'stock_filter' => ['nullable', Rule::in(['all', 'available', 'low', 'empty'])],
+                'sort_product' => ['nullable', Rule::in(['latest', 'oldest', 'price_highest', 'price_lowest', 'stock_highest', 'stock_lowest', 'name_asc', 'name_desc'])],
             ]
         );
 
@@ -33,13 +38,44 @@ class ProductController extends Controller
         /* GET PRODUCT */
         $products_current_id = json_decode($request->products_current_id, true);
         $search_product = (isset($request->search_product)) ? trim($request->search_product) : '';
+        $stock_filter = $request->stock_filter ?? 'all';
+        $sort_product = $request->sort_product ?? 'latest';
 
         $products = Product::where('user_id_seller', $validate['user_id_seller'])
                            ->whereNotIn('id', $products_current_id)
-                           ->where('name', 'ILIKE', "%$search_product%")
-                           ->orderBy('updated_at', 'DESC')
-                           ->limit(50)
-                           ->get();
+                           ->where('name', 'ILIKE', "%$search_product%");
+
+        /* FILTER PRODUCT BY STOCK CONDITION */
+        if($stock_filter == 'available') {
+            $products->where('stock', '>', 0);
+        } else if($stock_filter == 'low') {
+            $products->whereBetween('stock', [1, 5]);
+        } else if($stock_filter == 'empty') {
+            $products->where('stock', '<=', 0);
+        }
+        /* FILTER PRODUCT BY STOCK CONDITION */
+
+        /* SORT PRODUCT BY SELECTED OPTION */
+        if($sort_product == 'oldest') {
+            $products->orderBy('updated_at', 'ASC');
+        } else if($sort_product == 'price_highest') {
+            $products->orderBy('price', 'DESC');
+        } else if($sort_product == 'price_lowest') {
+            $products->orderBy('price', 'ASC');
+        } else if($sort_product == 'stock_highest') {
+            $products->orderBy('stock', 'DESC');
+        } else if($sort_product == 'stock_lowest') {
+            $products->orderBy('stock', 'ASC');
+        } else if($sort_product == 'name_asc') {
+            $products->orderBy('name', 'ASC');
+        } else if($sort_product == 'name_desc') {
+            $products->orderBy('name', 'DESC');
+        } else {
+            $products->orderBy('updated_at', 'DESC');
+        }
+        /* SORT PRODUCT BY SELECTED OPTION */
+
+        $products = $products->limit(50)->get();
         /* GET PRODUCT */
 
         return response()->json(['status' => 200, 'products' => $products], 200);
