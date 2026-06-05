@@ -12,6 +12,8 @@ Current supported actions:
 
 - List products available for the buyer.
 - Search products by product name or seller name.
+- Filter products by buyer-facing stock availability.
+- Sort products by latest update, price, or name.
 - Exclude products already loaded by the frontend.
 - Add a product to the buyer cart.
 - Increase cart quantity when the same product is added again.
@@ -23,7 +25,7 @@ Current supported actions:
   Defines the authenticated belanja and keranjang API routes.
 
 - `app/Http/Controllers/BelanjaController.php`
-  Handles buyer product list and search behavior.
+  Handles buyer product list, search, stock filter, and sort behavior.
 
 - `app/Http/Controllers/KeranjangController.php`
   Handles add-to-cart behavior used from the belanja page.
@@ -58,18 +60,22 @@ Required query/body data:
 Optional data:
 
 - `search_product`: product or seller search keyword.
+- `stock_filter`: buyer stock filter. Allowed values are `all`, `available`, and `empty`.
+- `sort_product`: sorting option. Allowed values are `latest`, `price_highest`, `price_lowest`, `name_asc`, and `name_desc`.
 
 Behavior:
 
 - Validates `user_id_seller` as UUID.
+- Validates `stock_filter` and `sort_product` against allowed values when present.
 - Excludes products owned by `user_id_seller`.
 - Excludes ids from `products_current_id`.
 - Filters by `products.name ILIKE %search_product%` or `users.name ILIKE %search_product%`.
+- Applies stock filtering when the buyer selects available or sold-out products.
 - Joins `products` with `users` to return seller identity for each card.
-- Orders by `products.updated_at DESC`.
+- Orders by the selected sort option, defaulting to `products.updated_at DESC`.
 - Returns up to 200 products.
 
-This endpoint is used by the frontend for initial list loading, search, and infinite scroll.
+This endpoint is used by the frontend for initial list loading, search, filtering, sorting, and infinite scroll.
 
 ### Add To Cart
 
@@ -130,6 +136,8 @@ Stock failures return `422` with `message.stock_maximum`.
 - Product image paths are stored in the database and resolved by the frontend through the configured storage symlink/base URL.
 - Buyer belanja pagination uses `products_current_id` instead of page numbers.
 - Search uses PostgreSQL `ILIKE`, so it is case-insensitive.
+- Stock filter uses simple indexed-friendly comparisons against `products.stock`.
+- Sort options use direct `orderBy` clauses against product columns.
 - The route parameter is named `user_id_seller`, but in the belanja context it represents the current user's seller id to exclude their own products from the buyer list.
 
 ## Known Decisions
@@ -138,5 +146,7 @@ Stock failures return `422` with `message.stock_maximum`.
 - Buyer belanja intentionally excludes the current user's seller products.
 - Product list returns a maximum of 200 products per request.
 - Search covers both product name and seller name.
+- Buyer stock filters intentionally support fewer values than seller product management because buyers only need all products, available stock, or sold-out products.
+- Buyer sort options intentionally exclude stock-based sorting because stock management is a seller workflow.
 - Add-to-cart rejects missing products and products with stock lower than `1`; the frontend also hides the cart action for sold-out products.
 - The backend docs file name matches the frontend docs file name so the same feature can be compared across both repositories.
