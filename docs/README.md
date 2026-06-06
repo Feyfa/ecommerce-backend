@@ -8,6 +8,9 @@ Frontend-specific documentation should live in the frontend repository.
 
 ## Current Documents
 
+- [Local Native Development](setup/local-native-development.md)
+  Explains how to run the frontend and backend locally without Docker by using local HTTPS domains and native app runtimes.
+
 - [Database Architecture](architecture/database.md)
   Explains the current PostgreSQL database design, UUID strategy, table responsibilities, relationships, indexes, and required seed data.
 
@@ -15,7 +18,7 @@ Frontend-specific documentation should live in the frontend repository.
   Records the decision to move the backend database direction from MySQL-style local reconstruction to PostgreSQL with full UUID primary keys for application tables.
 
 - [Authentication Notes](features/auth.md)
-  Documents the current login flow, the pending TFA/Messend issue, and the future direction toward Clerk.
+  Documents the current login flow, the removed legacy TFA provider, and the future direction toward Clerk.
 
 - [Seller Product](features/seller/01-product.md)
   Documents the seller product API routes, validation, request behavior, and data side effects.
@@ -41,6 +44,12 @@ Frontend-specific documentation should live in the frontend repository.
 - [Xendit Integration](integrations/xendit.md)
   Documents the current Xendit payment, disbursement, webhook gap, and future integration notes.
 
+- [Docker Staging And Production Deployment](deployment/docker-staging-production.md)
+  Documents the decision to keep local development native while using Docker for staging and production deployment.
+
+- [Branching Strategy](deployment/branching-strategy.md)
+  Documents the shared frontend and backend branch roles, staging integration flow, production flow, and conflict rules.
+
 ## Documentation Rules
 
 Use English for every Markdown document in this folder.
@@ -65,11 +74,12 @@ docs/
   README.md
 
   setup/
-    local.md
-    docker.md
+    local-native-development.md
     database.md
 
   deployment/
+    branching-strategy.md
+    docker-staging-production.md
     staging.md
     production.md
     ci-cd.md

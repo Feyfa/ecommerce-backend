@@ -1,6 +1,8 @@
-# Local HTTPS Development
+# Local Native Development
 
-This document explains how to run the Ecommerce frontend and backend through local HTTPS domains.
+This document explains how to run the Ecommerce frontend and backend for local native development without Docker.
+
+Docker is reserved for staging and production deployment. Local development uses the host operating system, local HTTPS domains, local app runtimes, and local database services.
 
 The local browser URLs are:
 
@@ -44,6 +46,7 @@ Frontend `.env`:
 
 ```env
 VITE_APP_BACKEND_BASE_URL="https://api.ecommerce.dev"
+VITE_SYMLINK_FOLDER="storage"
 ```
 
 Frontend Vite config:
