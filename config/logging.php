@@ -52,12 +52,6 @@ return [
     */
 
     'channels' => [
-        'stripe' => [
-            'driver' => 'single',
-            'path' => storage_path('logs/stripe.log'),
-            'level' => 'info', // Atur level logging, bisa diubah ke 'debug', 'error', dll.
-        ],
-
         'stack' => [
             'driver' => 'stack',
             'channels' => ['single'],
