@@ -2,9 +2,15 @@
 
 This folder contains the technical documentation for the Laravel backend.
 
-The frontend and backend are stored in separate Git repositories, so backend-owned decisions should live here. Anything related to the database schema, API behavior, Laravel configuration, seeders, queues, payments, and backend deployment should be documented in this repository.
+The frontend and backend are stored in separate Git repositories, so backend-owned decisions should live here. Anything related to the database schema, API behavior, Laravel configuration, seeders, queues, payments, and backend runtime behavior should be documented in this repository.
 
 Frontend-specific documentation should live in the frontend repository.
+
+Deployment, branching, staging, production, Docker Compose, and server runbooks are owned by the deploy repository docs:
+
+```text
+../deploy/docs/
+```
 
 ## Current Documents
 
@@ -44,12 +50,6 @@ Frontend-specific documentation should live in the frontend repository.
 - [Xendit Integration](integrations/xendit.md)
   Documents the current Xendit payment, disbursement, webhook gap, and future integration notes.
 
-- [Docker Staging And Production Deployment](deployment/docker-staging-production.md)
-  Documents the decision to keep local development native while using Docker for staging and production deployment.
-
-- [Branching Strategy](deployment/branching-strategy.md)
-  Documents the shared frontend and backend branch roles, staging integration flow, production flow, and conflict rules.
-
 ## Documentation Rules
 
 Use English for every Markdown document in this folder.
@@ -76,13 +76,6 @@ docs/
   setup/
     local-native-development.md
     database.md
-
-  deployment/
-    branching-strategy.md
-    docker-staging-production.md
-    staging.md
-    production.md
-    ci-cd.md
 
   architecture/
     overview.md
