@@ -1,0 +1,68 @@
+name: Backend CI
+
+on:
+  pull_request:
+    branches:
+      - main
+      - staging
+      - develop-main
+      - develop-staging
+
+jobs:
+  test:
+    name: Test Laravel backend
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: ecommerce_testing
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d ecommerce_testing"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      APP_ENV: testing
+      APP_DEBUG: true
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: ecommerce_testing
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      CACHE_DRIVER: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: sync
+      MAIL_MAILER: array
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_pgsql, pgsql
+          coverage: none
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare Laravel testing environment
+        run: |
+          cp .env.example .env.testing
+          php artisan key:generate --env=testing --force
+
+      - name: Run database migrations
+        run: php artisan migrate --env=testing --force
+
+      - name: Run Laravel tests
+        run: php artisan test --env=testing
