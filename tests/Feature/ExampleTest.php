@@ -8,12 +8,16 @@ use Tests\TestCase;
 class ExampleTest extends TestCase
 {
     /**
-     * A basic test example.
+     * Memastikan root backend tidak lagi menampilkan halaman welcome Laravel.
      */
-    public function test_the_application_returns_a_successful_response(): void
+    public function test_the_root_endpoint_returns_backend_health_response(): void
     {
         $response = $this->get('/');
 
-        $response->assertStatus(200);
+        $response->assertOk()
+            ->assertJson([
+                'status' => 'ok',
+                'service' => 'backend',
+            ]);
     }
 }
