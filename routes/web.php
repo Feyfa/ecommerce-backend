@@ -17,8 +17,9 @@ use Illuminate\Support\Facades\Route;
  * Menampilkan status backend sederhana untuk menggantikan halaman welcome Laravel.
  */
 Route::get('/', function () {
-     return response()->json([
+    return response()->json([
         'status' => 'ok',
         'service' => 'backend',
+        'timestamp' => now()->toIso8601String(),
     ]);
 });

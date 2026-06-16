@@ -18,6 +18,11 @@ class ExampleTest extends TestCase
             ->assertJson([
                 'status' => 'ok',
                 'service' => 'backend',
+            ])
+            ->assertJsonStructure([
+                'status',
+                'service',
+                'timestamp',
             ]);
     }
 }
