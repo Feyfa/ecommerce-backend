@@ -63,7 +63,7 @@ Current supported actions:
 
 ## Routes
 
-All checkout routes are inside the Sanctum authenticated API group.
+All checkout routes are inside the Clerk-authenticated API group.
 
 ```text
 GET  /api/checkout/data
@@ -416,7 +416,7 @@ If stock decrement fails, the database transaction throws and checkout returns a
 
 ## Known Decisions
 
-- Checkout APIs are authenticated with Sanctum.
+- Checkout APIs are authenticated with Clerk-backed API auth.
 - Checkout uses backend database state as the source of truth.
 - Frontend totals are never trusted directly; they are only used for stale-checkout comparison.
 - Seller notes are truncated to 200 characters when building the backend snapshot.

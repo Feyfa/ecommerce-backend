@@ -22,7 +22,7 @@ The backend will use PostgreSQL as the default database target.
 
 Application-owned tables will use UUID primary keys.
 
-Laravel infrastructure tables, such as `migrations`, `failed_jobs`, and `personal_access_tokens`, will keep their framework defaults for now. Changing those primary keys can affect Laravel package behavior and should be handled only if there is a clear need.
+Laravel infrastructure tables, such as `migrations` and `failed_jobs`, will keep their framework defaults for now. Changing those primary keys can affect Laravel package behavior and should be handled only if there is a clear need.
 
 The old MySQL export will be used only as a reference for table structure and expected fields. Old rows will not be migrated into the new PostgreSQL database during this phase.
 

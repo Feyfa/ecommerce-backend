@@ -38,7 +38,7 @@ Current supported actions:
 
 ## Routes
 
-All cart routes are inside the Sanctum authenticated API group.
+All cart routes are inside the Clerk-authenticated API group.
 
 ```text
 GET    /api/keranjang/{user_id_buyer}

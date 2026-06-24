@@ -14,8 +14,7 @@ The account feature currently covers:
 - withdrawal bank accounts;
 - balance summary, history, and withdrawal;
 - user and company image upload/delete;
-- password change;
-- two-factor authentication setting.
+- account security information boundary.
 
 ## Main Files
 
@@ -23,7 +22,7 @@ The account feature currently covers:
   Defines authenticated account, company, address, payment, and balance routes.
 
 - `app/Http/Controllers/UserController.php`
-  Handles user profile, user image, password, and TFA payload updates.
+  Handles user profile and user image updates.
 
 - `app/Http/Controllers/CompanyController.php`
   Handles seller company profile and company image updates.
@@ -64,11 +63,11 @@ The account feature currently covers:
   Withdrawal bank account list, bank list, validation, create, and delete behavior.
 
 - [Security](security.md)
-  Password change and TFA backend behavior.
+  Account security behavior after password and MFA moved out of the local backend API.
 
 ## Authentication
 
-All account API routes are protected by `auth:sanctum`.
+All account API routes are protected by `auth.api`.
 
 Most controllers validate the authenticated user through `optional(auth()->user())->id` and return an unauthorized response when the user cannot be found.
 
@@ -97,7 +96,7 @@ Keep this response inconsistency in mind when changing frontend error handling.
 The account API currently uses mixed response keys:
 
 - `status` for user, company, payment, and saldo routes.
-- `result` for address routes and password success/error routes.
+- `result` for address routes.
 - Numeric `status` values for some user endpoints.
 - String `status` values for company/payment/saldo endpoints.
 

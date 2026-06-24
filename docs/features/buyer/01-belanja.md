@@ -38,7 +38,7 @@ Current supported actions:
 
 ## Routes
 
-All current buyer belanja routes are inside the Sanctum authenticated API group.
+All current buyer belanja routes are inside the Clerk-authenticated API group.
 
 ```text
 GET  /api/belanja/{user_id_seller}
@@ -142,7 +142,7 @@ Stock failures return `422` with `message.stock_maximum`.
 
 ## Known Decisions
 
-- Belanja APIs are authenticated with Sanctum.
+- Belanja APIs are authenticated with Clerk-backed API auth.
 - Buyer belanja intentionally excludes the current user's seller products.
 - Product list returns a maximum of 200 products per request.
 - Search covers both product name and seller name.

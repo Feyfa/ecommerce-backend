@@ -1,6 +1,6 @@
 # Security
 
-This document explains the backend API contract for security behavior in `Akun Saya`.
+This document explains the backend security boundary for `Akun Saya` after the Clerk migration.
 
 ## Applies To
 
@@ -12,76 +12,15 @@ Buyer and seller authenticated users.
 - `app/Http/Controllers/UserController.php`
 - `app/Models/User.php`
 
-## Password
+## Current Behavior
 
-Route:
+The backend no longer exposes local password-change or local TFA update endpoints for the active auth flow.
 
-```text
-PUT /api/user/change/password
-```
+Current rules:
 
-Required request fields:
+- password authentication is owned by the identity provider;
+- MFA should be configured in the identity provider if the product enables it later;
+- `PUT /api/user/change/password` has been removed;
+- `PUT /api/user/{id}` no longer accepts or stores the old local `tfa` payload.
 
-- `id`
-- `oldPassword`
-- `newPassword`
-
-Validation rules:
-
-- `id` must be a UUID.
-- `oldPassword` is required.
-- `newPassword` is required.
-- `oldPassword` must match the current stored user password.
-
-Success response:
-
-```json
-{
-  "result": "success",
-  "message": "Change Password Successfully"
-}
-```
-
-Validation error response:
-
-```json
-{
-  "status": 422,
-  "message": {}
-}
-```
-
-Old password invalid response:
-
-```json
-{
-  "result": "error",
-  "error_type": "old_password_invalid",
-  "message": "Old Password Invalid"
-}
-```
-
-## TFA
-
-TFA is currently updated through:
-
-```text
-PUT /api/user/{id}
-```
-
-Request field:
-
-- `tfa`
-
-Current accepted frontend values:
-
-- `F`
-- `Email`
-- `Phone`
-
-Backend note:
-
-- `updateUser` stores the submitted `tfa` value directly.
-- There is currently no backend enum validation for TFA values.
-- If stricter TFA validation is added later, update the frontend select options and this document together.
-
+The old `users.password` and `users.tfa` columns may still exist for historical schema compatibility, but they should not be treated as the active account-security contract.

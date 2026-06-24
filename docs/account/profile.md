@@ -44,26 +44,24 @@ Not found response:
 
 ## PUT /api/user/{id}
 
-Updates user profile fields and TFA status.
+Updates profile fields for the authenticated user only.
 
 Required request fields:
 
-- `name`
-- `email`
 - `phone`
 
 Optional request fields:
 
 - `jenis_kelamin`
 - `tanggal_lahir`
-- `tfa`
 
 Validation rules:
 
 - `id` must be a UUID.
-- `name` is required and must be a string.
-- `email` is required, must be a valid email, max 255 characters, and unique in `users` except the current user.
+- `id` must match the authenticated user.
 - `phone` is required, must be a string, max 15 characters, and unique in `users` except the current user.
+- `email` is not accepted by this endpoint because account email is synchronized from the authentication provider.
+- `name` is not accepted by this endpoint because account name is synchronized from the authentication provider.
 
 Success response:
 
@@ -97,6 +95,7 @@ Required request fields:
 Validation rules:
 
 - `id` must be a UUID.
+- `id` must match the authenticated user.
 - `file` is required.
 - `file` must be an image.
 - Allowed image MIME extensions: `jpeg`, `png`, `jpg`, `gif`, `svg`.
@@ -120,7 +119,7 @@ Success response:
 
 ## DELETE /api/user/image
 
-Deletes the current user image by submitted image path.
+Deletes the authenticated user's current image by submitted image path.
 
 Required request fields:
 
@@ -129,10 +128,10 @@ Required request fields:
 Validation rules:
 
 - `img` is required and must be a string.
+- `img` must match the authenticated user's current image path.
 
 Side effects:
 
-- Finds the user row by `img`.
 - Sets `users.img` to `null`.
 - Deletes the file from the public disk.
 

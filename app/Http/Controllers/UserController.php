@@ -5,20 +5,17 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
-    public function changePassword(Request $request)
+    public function deleteImage(Request $request)
     {
         /* VALIDATION REQUEST AND GET */
         $validator = Validator::make($request->all(), [
-            'id' => ['required', 'uuid'],
-            'oldPassword' => ['required'],
-            'newPassword' => ['required'],
+            'img' => ['required', 'string']
         ]);
 
         if($validator->fails())
@@ -27,48 +24,15 @@ class UserController extends Controller
         $validate = $validator->validate();
         /* VALIDATION REQUEST AND GET */
 
-        /* GET USER AND COMPARE PASSWORD */
-        $user = User::where('id', $request->id)
-                    ->first();
+        /* VALIDATION AUTHENTICATED USER */
+        $user = $request->user();
 
-        if(empty($user))
-            return response()->json([
-                'result' => 'error',
-                'error_type' => '',
-                'message' => 'User Not Found'
-            ], 404);
+        if(!$user)
+            return response()->json(['status' => 404, 'message' => 'User Not Found'], 404);
 
-        if(!Hash::check($request->oldPassword, $user->password))
-            return response()->json([
-                'result' => 'error',
-                'error_type' => 'old_password_invalid',
-                'message' => 'Old Password Invalid'
-            ], 404);
-        /* GET USER AND COMPARE PASSWORD */
-
-        /* UPDATE PASSWORD */
-        $user->password = Hash::make($request->newPassword);
-        $user->save();
-        /* UPDATE PASSWORD */
-
-        return response()->json([
-            'result' => 'success',
-            'message' => 'Change Password Successfully'
-        ]);
-    }
-
-    public function deleteImage(Request $request) 
-    {
-        /* VALIDATION REQUEST AND GET */
-        $validator = Validator::make($request->all(), [
-            'img' => ['required', 'string']   
-        ]);
-
-        if($validator->fails())
-            return response()->json(['status' => 422, 'message' => $validator->messages()], 422);
-
-        $validate = $validator->validate();
-        /* VALIDATION REQUEST AND GET */
+        if($user->img !== $validate['img'])
+            return response()->json(['status' => 403, 'message' => 'Forbidden'], 403);
+        /* VALIDATION AUTHENTICATED USER */
 
         /* DELETE IMG PREV, IF IMG EXISTS */
         if($validate['img'])
@@ -76,8 +40,6 @@ class UserController extends Controller
             if(Storage::disk('public')->exists($validate['img'])) 
             {
                 /* UPDATE IN DATABASE */
-                $user = User::where('img', $validate['img'])
-                            ->first();
                 $user->img = null;
                 $user->save();
                 /* UPDATE IN DATABASE */
@@ -106,14 +68,16 @@ class UserController extends Controller
         $validate = $validator->validate();
         /* VALIDATION REQUEST */ 
 
-        /* VALIDATION USER EXISTS */
-        $user = User::where('id', $validate['id'])
-                    ->first();
+        /* VALIDATION AUTHENTICATED USER */
+        $user = $request->user();
 
         if(!$user)
             return response()->json(['status' => 404, 'message' => 'User Not Found'], 404);
-        /* VALIDATION USER EXISTS */
-        
+
+        if((string) $user->id !== (string) $validate['id'])
+            return response()->json(['status' => 403, 'message' => 'Forbidden'], 403);
+        /* VALIDATION AUTHENTICATED USER */
+
         /* DELETE IMG PREV, IF IMG EXISTS */
         if($user->img)
             if(Storage::disk('public')->exists($user->img))
@@ -123,7 +87,7 @@ class UserController extends Controller
         /* UPLOAD IMG AND UPDATE IN DATABASE */   
         $filename = $request->id . "-" . Carbon::now()->timestamp . "." .$request->file('file')->getClientOriginalExtension();
         $path = Storage::disk('public')->putFileAs('user-imgs', $request->file('file'), $filename);
-        
+
         $user->img = $path;
         $user->save();
         /* UPLOAD IMG AND UPDATE IN DATABASE */
@@ -145,19 +109,34 @@ class UserController extends Controller
 
     public function updateUser(Request $request, string $id)
     {
+        /* VALIDATION ROUTE ID */
+        $routeIdValidator = Validator::make(['id' => $id], [
+            'id' => ['required', 'uuid'],
+        ]);
+
+        if($routeIdValidator->fails())
+            return response()->json(['status' => 422, 'result' => 'error', 'message' => $routeIdValidator->messages()], 422);
+
+        $validatedRouteId = $routeIdValidator->validate()['id'];
+        /* VALIDATION ROUTE ID */
+
+        /* VALIDATION AUTHENTICATED USER */
+        $user = $request->user();
+
+        if(!$user)
+            return response()->json(['status' => 404, 'message' => 'User Not Found'], 404);
+
+        if((string) $user->id !== (string) $validatedRouteId)
+            return response()->json(['status' => 403, 'message' => 'Forbidden'], 403);
+        /* VALIDATION AUTHENTICATED USER */
+
         /* VALIDATION REQUEST AND GET */        
         $validator = Validator::make(
             [
-                'id' => $id,
-                'name' => $request->name,
-                'email' => $request->email,
                 'phone' => $request->phone,
             ], 
             [
-                'id' => ['required', 'uuid'],
-                'name' => ['required', 'string'],
-                'email' => ['required', 'string', 'max:255', 'email', Rule::unique('users')->ignore($id)],
-                'phone' => ['required', 'string', 'max:15', Rule::unique('users')->ignore($id)],
+                'phone' => ['required', 'string', 'max:15', Rule::unique('users')->ignore($validatedRouteId)],
             ]
         );
         
@@ -166,22 +145,11 @@ class UserController extends Controller
 
         $validate = $validator->validate();
         /* VALIDATION REQUEST AND GET */
-
-        /* VALIDATION USER EXISTS */
-        $user = User::where('id', $validate['id'])
-                    ->first();
-
-        if(!$user)
-            return response()->json(['status' => 404, 'message' => 'User Not Found'], 404);
-        /* VALIDATION USER EXISTS */
         
         /* UPDATE USER */
-        $user->name = $validate['name'];
-        $user->email = $validate['email'];
         $user->jenis_kelamin = $request->jenis_kelamin;
         $user->tanggal_lahir = $request->tanggal_lahir;
         $user->phone = $validate['phone'];
-        $user->tfa = $request->tfa;
         // $user->alamat = $request->alamat;
         $user->save();
         /* UPDATE USER */
