@@ -1,6 +1,6 @@
 # Profile
 
-This document explains the backend API contract for user profile behavior in `Akun Saya`.
+This document explains the backend API contract for user profile behavior in `Pengaturan`.
 
 ## Applies To
 

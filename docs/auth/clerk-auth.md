@@ -317,8 +317,9 @@ Phase-one enabled methods:
 
 - Google login
 - manual email and password login
+- passkey login after the user creates a passkey in Clerk
 
-Both methods are intentionally enabled from the beginning so identity-linking behavior can be tested immediately.
+Google and manual email/password were intentionally enabled from the beginning so identity-linking behavior can be tested immediately. Passkey login is available after the user adds a passkey through Clerk-backed account security settings.
 
 ### Email Verification
 
@@ -362,11 +363,14 @@ This avoids mixing keys, domains, redirects, and callback behavior.
 
 ### MFA
 
-MFA is not part of the phase-one requirement.
+MFA is Clerk-managed.
 
-The project previously agreed that local legacy `tfa` should not continue as the main design.
+The project previously agreed that local legacy `tfa` should not continue as the main design. The active implementation keeps that boundary:
 
-If MFA is enabled later, it should be managed through Clerk rather than rebuilding the old local TFA model.
+- TOTP status is read from Clerk.
+- TOTP setup, verification, backup codes, and disable actions are performed through Clerk user methods.
+- Laravel exposes only safe security summary and session endpoints around Clerk-owned account security state.
+- The old local `users.tfa` field must not be reintroduced as the active login-control mechanism.
 
 ### User Self-Delete
 

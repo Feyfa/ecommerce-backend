@@ -46,21 +46,30 @@ class UserController extends Controller
 
                 Storage::disk('public')->delete($validate['img']);
     
-                return response()->json(['status' => 200, 'message' => 'Delete Image Success', 'user' => $user], 200);
+                return response()->json(['status' => 200, 'message' => 'Foto profil berhasil dihapus.', 'user' => $user], 200);
             }
         }
         /* DELETE IMG PREV, IF IMG EXISTS */
 
-        return response()->json(['status' => 404, 'message' => 'Delete Image Error, Path File Empty'], 404);
+        return response()->json(['status' => 404, 'message' => 'File foto profil tidak ditemukan.'], 404);
     }
 
     public function uploadImage(Request $request)
     {
         /* VALIDATION REQUEST */     
-        $validator = Validator::make($request->all(), [
-            'id' => ['required', 'uuid'],
-            'file' => ['required', 'image', 'mimes:jpeg,png,jpg,gif,svg', 'max:1024']
-        ]);
+        $validator = Validator::make(
+            $request->all(),
+            [
+                'id' => ['required', 'uuid'],
+                'file' => ['required', 'image', 'mimes:jpeg,png,jpg,gif,svg', 'max:1024']
+            ],
+            [
+                'file.required' => 'Gambar wajib dipilih.',
+                'file.image' => 'File harus berupa gambar.',
+                'file.mimes' => 'File harus berformat jpeg, png, jpg, gif, atau svg.',
+                'file.max' => 'Ukuran gambar tidak boleh lebih dari 1024 KB.',
+            ]
+        );
 
         if($validator->fails())
             return response()->json(['status' => 422, 'message' => $validator->messages()], 422);
@@ -92,7 +101,7 @@ class UserController extends Controller
         $user->save();
         /* UPLOAD IMG AND UPDATE IN DATABASE */
         
-        return response()->json(['status' => 200, 'message' => 'Upload Image Successfully', 'user' => $user], 200);
+        return response()->json(['status' => 200, 'message' => 'Foto profil berhasil diunggah.', 'user' => $user], 200);
     }
     
     public function show()

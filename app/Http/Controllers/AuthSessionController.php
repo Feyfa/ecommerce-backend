@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\Clerk\ClerkUserSyncService;
 use App\Services\CompanyService;
 use Illuminate\Http\Request;
+use RuntimeException;
 use Throwable;
 
 class AuthSessionController extends Controller
@@ -35,6 +36,11 @@ class AuthSessionController extends Controller
         /* step 2: sync Clerk hanya pada endpoint bootstrap auth utama */
         try {
             $user = $this->clerkUserSyncService->syncByClerkUserId($clerkUserId);
+        } catch (RuntimeException $runtimeException) {
+            return response()->json([
+                'status' => 422,
+                'message' => $runtimeException->getMessage(),
+            ], 422);
         } catch (Throwable $throwable) {
             return response()->json([
                 'status' => 500,

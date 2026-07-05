@@ -1,6 +1,6 @@
 # Company Profile
 
-This document explains the backend API contract for seller company profile behavior in `Akun Saya`.
+This document explains the backend API contract for seller company profile behavior in `Pengaturan`.
 
 ## Applies To
 
@@ -142,4 +142,3 @@ Error responses:
 
 - `400` with `Company Is Empty` when the company row does not exist.
 - `400` with `Delete Image Error, Path File Empty` when the image file path is empty or missing on disk.
-

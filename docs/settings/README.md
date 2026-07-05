@@ -1,12 +1,12 @@
-# Account
+# Settings
 
-This document explains the backend API contract used by the `Akun Saya` feature.
+This document explains the backend API contract used by the `Pengaturan` feature.
 
-The goal is to keep backend-owned account behavior documented by domain: routes, request fields, response shape, validation rules, and data side effects. Frontend UI layout and styling rules live in the frontend repository documentation.
+The goal is to keep backend-owned settings behavior documented by domain: routes, request fields, response shape, validation rules, and data side effects. Frontend UI layout and styling rules live in the frontend repository documentation.
 
 ## Scope
 
-The account feature currently covers:
+The settings feature currently covers:
 
 - authenticated user profile;
 - seller company profile;
@@ -14,7 +14,7 @@ The account feature currently covers:
 - withdrawal bank accounts;
 - balance summary, history, and withdrawal;
 - user and company image upload/delete;
-- account security information boundary.
+- Clerk-backed settings security endpoints.
 
 ## Main Files
 
@@ -36,6 +36,9 @@ The account feature currently covers:
 - `app/Http/Controllers/SaldoController.php`
   Handles balance summary, balance history, and withdrawal.
 
+- `app/Http/Controllers/SecurityController.php`
+  Handles Clerk-backed security summary, active sessions, Google link validation, and session revoke endpoints.
+
 - `app/Services/CompanyService.php`
   Formats company data and merges seller address into the company response.
 
@@ -44,6 +47,9 @@ The account feature currently covers:
 
 - `app/Services/SaldoService.php`
   Computes balance totals, balance history, and post-disbursement balance mutations.
+
+- `app/Services/Clerk/ClerkSecurityService.php`
+  Reads Clerk-owned account security state, validates Google external accounts, formats active sessions, and revokes sessions.
 
 ## Documents
 
@@ -63,11 +69,11 @@ The account feature currently covers:
   Withdrawal bank account list, bank list, validation, create, and delete behavior.
 
 - [Security](security.md)
-  Account security behavior after password and MFA moved out of the local backend API.
+  Clerk-backed settings security API behavior for sign-in methods, MFA/passkey status, Google link validation, active sessions, and session revocation.
 
 ## Authentication
 
-All account API routes are protected by `auth.api`.
+All settings API routes are protected by `auth.api`.
 
 Most controllers validate the authenticated user through `optional(auth()->user())->id` and return an unauthorized response when the user cannot be found.
 
@@ -93,7 +99,7 @@ Keep this response inconsistency in mind when changing frontend error handling.
 
 ## Response Shape Notes
 
-The account API currently uses mixed response keys:
+The settings API currently uses mixed response keys:
 
 - `status` for user, company, payment, and saldo routes.
 - `result` for address routes.

@@ -34,4 +34,4 @@ That flow was removed during the Clerk cleanup.
 
 The old local `tfa` column may still exist in the historical `users` schema, but it no longer controls the active login flow.
 
-If MFA is enabled later, it should be managed through the identity provider instead of rebuilding the old local TFA model.
+MFA/TOTP is managed through Clerk instead of rebuilding the old local TFA model.

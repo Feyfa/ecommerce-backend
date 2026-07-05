@@ -11,6 +11,7 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\SaldoController;
 use App\Http\Controllers\SellerDashboardController;
+use App\Http\Controllers\SecurityController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
@@ -34,6 +35,14 @@ Route::middleware('auth.api')->group(function () {
     Route::put('/user/{id}', [UserController::class, 'updateUser']);
     Route::post('/user/image', [UserController::class, 'uploadImage']);
     Route::delete('/user/image', [UserController::class, 'deleteImage']);
+});
+
+Route::middleware('auth.api')->group(function () {
+    Route::get('/security/summary', [SecurityController::class, 'summary']);
+    Route::get('/security/sessions', [SecurityController::class, 'sessions']);
+    Route::post('/security/google/link/validate', [SecurityController::class, 'validateGoogleLink']);
+    Route::post('/security/sessions/{sessionId}/revoke', [SecurityController::class, 'revokeSession']);
+    Route::post('/security/sessions/revoke-others', [SecurityController::class, 'revokeOtherSessions']);
 });
 
 Route::middleware('auth.api')->group(function () {

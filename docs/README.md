@@ -47,8 +47,8 @@ Deployment, branching, staging, production, Docker Compose, and server runbooks 
 - [Transaction](features/transaction.md)
   Documents the shared buyer and seller transaction API, filters, status mapping, pagination, seller approval, and display-name rules.
 
-- [Account](account/README.md)
-  Documents the account API routes for user profile, company profile, address, bank account, balance, image upload/delete, and account UI behavior.
+- [Settings](settings/README.md)
+  Documents the settings API routes for user profile, company profile, address, bank account, balance, image upload/delete, and security behavior.
 
 - [Xendit Integration](integrations/xendit.md)
   Documents the current Xendit payment, disbursement, webhook gap, and future integration notes.
@@ -92,7 +92,7 @@ docs/
   integrations/
     xendit.md
 
-  account/
+  settings/
     README.md
     profile.md
     company-profile.md

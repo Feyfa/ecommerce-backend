@@ -61,6 +61,9 @@ class AuthenticateApiRequest
             $clerkUserId = property_exists($authObject, 'sub')
                 ? (string) $authObject->sub
                 : (property_exists($authObject, 'user_id') ? (string) $authObject->user_id : '');
+            $clerkSessionId = property_exists($authObject, 'sid')
+                ? (string) $authObject->sid
+                : (property_exists($authObject, 'session_id') ? (string) $authObject->session_id : '');
 
             if ($clerkUserId === '') {
                 return response()->json([
@@ -78,6 +81,7 @@ class AuthenticateApiRequest
 
         /* step 3: resolve user lokal tanpa melakukan sync ke Clerk pada setiap request */
         $request->attributes->set('clerk_user_id', $clerkUserId);
+        $request->attributes->set('clerk_session_id', $clerkSessionId);
 
         $user = User::query()
             ->where('clerk_user_id', $clerkUserId)
