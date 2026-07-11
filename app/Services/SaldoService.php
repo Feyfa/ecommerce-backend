@@ -41,6 +41,7 @@ class SaldoService
                                     ->select(
                                         'sh.*',
                                         'tu.transaction_number',
+                                        'ti.id as invoice_id',
                                         'u.name as buyer_name',
                                         'pu.name as payment_name',
                                         'pu.account as payment_account',
@@ -48,6 +49,7 @@ class SaldoService
                                     )
                                     // for income
                                     ->leftJoin('transaction_users as tu', 'tu.id', '=', 'sh.transaction_user_id')
+                                    ->leftJoin('transaction_invoices as ti', 'ti.id', '=', 'tu.transaction_invoice_id')
                                     ->leftJoin('users as u', 'u.id', '=', 'tu.user_id_buyer')
                                     // for income
 
@@ -87,8 +89,9 @@ class SaldoService
 
                                         $priceString = number_format($item->price, 0, ',', '.');
                                         $paymentSlugUpper = strtoupper($item->payment_slug ?? "");
+                                        $invoiceNumber = $item->invoice_id ?? $item->transaction_number;
                                         $description = match($item->type) {
-                                            'incoming' => "Pembelian Dari {$item->buyer_name} - INV {$item->transaction_number}",
+                                            'incoming' => "Pembelian Dari {$item->buyer_name} - INV {$invoiceNumber}",
                                             'withdrawal' => "Penarikan Saldo Sebesar Rp{$priceString} Ke Bank {$paymentSlugUpper} {$item->payment_account} ({$item->payment_name})"
                                         };
 
@@ -119,6 +122,7 @@ class SaldoService
                                     ->select(
                                         'sh.*',
                                         'tu.transaction_number',
+                                        'ti.id as invoice_id',
                                         'u.name as buyer_name',
                                         'pu.name as payment_name',
                                         'pu.account as payment_account',
@@ -126,6 +130,7 @@ class SaldoService
                                     )
                                     // for income
                                     ->leftJoin('transaction_users as tu', 'tu.id', '=', 'sh.transaction_user_id')
+                                    ->leftJoin('transaction_invoices as ti', 'ti.id', '=', 'tu.transaction_invoice_id')
                                     ->leftJoin('users as u', 'u.id', '=', 'tu.user_id_buyer')
                                     // for income
 
@@ -151,8 +156,9 @@ class SaldoService
 
             $priceString = number_format($saldoHistory->price, 0, ',', '.');
             $paymentSlugUpper = strtoupper($saldoHistory->payment_slug ?? "");
+            $invoiceNumber = $saldoHistory->invoice_id ?? $saldoHistory->transaction_number;
             $description = match($saldoHistory->type) {
-                'incoming' => "Pembelian Dari {$saldoHistory->buyer_name} - INV {$saldoHistory->transaction_number}",
+                'incoming' => "Pembelian Dari {$saldoHistory->buyer_name} - INV {$invoiceNumber}",
                 'withdrawal' => "Penarikan Saldo Sebesar Rp{$priceString} Ke Bank {$paymentSlugUpper} {$saldoHistory->payment_account} ({$saldoHistory->payment_name})"
             };
 

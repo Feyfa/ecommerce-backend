@@ -1,6 +1,6 @@
 # Address
 
-This document explains the backend API contract for buyer address behavior in `Akun Saya`.
+This document explains the backend API contract for buyer address behavior in `Pengaturan`.
 
 ## Applies To
 
@@ -161,4 +161,3 @@ Success response:
   "message": "Alamat Berhasil Dihapus"
 }
 ```
-

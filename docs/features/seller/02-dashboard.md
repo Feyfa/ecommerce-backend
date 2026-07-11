@@ -37,7 +37,7 @@ Current dashboard data:
 
 ## Route
 
-The seller dashboard route is inside a Sanctum authenticated API group.
+The seller dashboard route is inside a Clerk-authenticated API group.
 
 ```text
 GET /api/dashboard
@@ -47,7 +47,7 @@ The route intentionally follows the existing project API style, such as `/api/pr
 
 ## Authorization
 
-The endpoint uses the authenticated Sanctum user.
+The endpoint uses the authenticated local user resolved from the Clerk-backed API request.
 
 Behavior:
 
