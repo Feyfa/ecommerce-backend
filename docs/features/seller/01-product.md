@@ -35,7 +35,7 @@ Current supported actions:
 
 ## Routes
 
-All current seller product routes are inside the Sanctum authenticated API group.
+All current seller product routes are inside the Clerk-authenticated API group.
 
 ```text
 GET    /api/product/{user_id_seller}
@@ -192,7 +192,7 @@ Validation failures return `422` with `message` containing validator messages.
 
 ## Known Decisions
 
-- Product APIs are authenticated with Sanctum.
+- Product APIs are authenticated with Clerk-backed API auth.
 - The product list endpoint is seller-scoped by `user_id_seller`.
 - Image upload size is currently limited to 1024 KB.
 - Update can set stock to `0`; create cannot.

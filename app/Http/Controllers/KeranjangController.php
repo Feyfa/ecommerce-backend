@@ -105,7 +105,7 @@ class KeranjangController extends Controller
         /* WHEN KERANJANG NOT ALREADY EXISTS */
 
 
-        return response()->json(['status' => 200, 'message' => 'Item Has Been Added To Basket'], 200);
+        return response()->json(['status' => 200], 200);
     }
 
     public function delete(string $user_id_buyer, string $product_id)
