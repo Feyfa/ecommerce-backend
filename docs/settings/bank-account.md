@@ -1,6 +1,6 @@
 # Bank Account
 
-This document explains the backend API contract for withdrawal bank account behavior in `Akun Saya`.
+This document explains the backend API contract for withdrawal bank account behavior in `Pengaturan`.
 
 ## Applies To
 
@@ -153,4 +153,3 @@ Success response:
   "message": "Rekening Berhasil Dihapus"
 }
 ```
-

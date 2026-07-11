@@ -1,5 +1,22 @@
 <?php
 
+/**
+ * Tujuan helper ini untuk membatasi CORS hanya ke origin frontend yang memang
+ * dikonfigurasi untuk environment aktif.
+ */
+$resolveFrontendOrigins = static function (): array {
+    $frontendUrl = trim((string) env('FRONTEND_URL', ''));
+
+    return array_values(
+        array_filter(
+            array_map(
+                static fn (string $value): string => trim($value),
+                explode(',', $frontendUrl)
+            )
+        )
+    );
+};
+
 return [
 
     /*
@@ -15,11 +32,11 @@ return [
     |
     */
 
-    'paths' => ['api/*', 'sanctum/csrf-cookie'],
+    'paths' => ['api/*'],
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['*'],
+    'allowed_origins' => $resolveFrontendOrigins(),
 
     'allowed_origins_patterns' => [],
 

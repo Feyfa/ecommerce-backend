@@ -147,7 +147,7 @@ Implementation notes for future work:
 
 ## Security Requirements
 
-Future Xendit webhook endpoints should not use normal Sanctum user authentication.
+Future Xendit webhook endpoints should not use normal user-session authentication.
 
 Recommended approach:
 
@@ -168,7 +168,7 @@ POST /api/webhook/disbursement/sent
 
 Recommended backend pieces:
 
-- `routes/api.php` webhook routes outside the Sanctum user-authenticated group.
+- `routes/api.php` webhook routes outside the normal user-authenticated API group.
 - `app/Http/Middleware/XenditWebhookMiddleware.php` for token/signature validation.
 - `app/Http/Controllers/Webhook/XenditVirtualAccountController.php`.
 - `app/Http/Controllers/Webhook/XenditDisbursementController.php`.
