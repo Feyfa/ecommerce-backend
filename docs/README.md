@@ -17,6 +17,9 @@ Deployment, branching, staging, production, Docker Compose, and server runbooks 
 - [Local Native Development](setup/local-native-development.md)
   Explains how to run the frontend and backend locally without Docker by using local HTTPS domains and native app runtimes.
 
+- [Clerk Authentication](auth/clerk-auth.md)
+  Documents the backend Clerk migration direction, local user bridge, request verification flow, dashboard setup decisions, and post-migration cleanup rules.
+
 - [Database Architecture](architecture/database.md)
   Explains the current PostgreSQL database design, UUID strategy, table responsibilities, relationships, indexes, and required seed data.
 
@@ -24,7 +27,7 @@ Deployment, branching, staging, production, Docker Compose, and server runbooks 
   Records the decision to move the backend database direction from MySQL-style local reconstruction to PostgreSQL with full UUID primary keys for application tables.
 
 - [Authentication Notes](features/auth.md)
-  Documents the current login flow, the removed legacy TFA provider, and the future direction toward Clerk.
+  Documents historical auth notes. The current production auth direction is recorded in `auth/clerk-auth.md`.
 
 - [Seller Product](features/seller/01-product.md)
   Documents the seller product API routes, validation, request behavior, and data side effects.
@@ -44,8 +47,8 @@ Deployment, branching, staging, production, Docker Compose, and server runbooks 
 - [Transaction](features/transaction.md)
   Documents the shared buyer and seller transaction API, filters, status mapping, pagination, seller approval, and display-name rules.
 
-- [Account](account/README.md)
-  Documents the account API routes for user profile, company profile, address, bank account, balance, image upload/delete, password, and TFA behavior.
+- [Settings](settings/README.md)
+  Documents the settings API routes for user profile, company profile, address, bank account, balance, image upload/delete, and security behavior.
 
 - [Xendit Integration](integrations/xendit.md)
   Documents the current Xendit payment, disbursement, webhook gap, and future integration notes.
@@ -77,6 +80,9 @@ docs/
     local-native-development.md
     database.md
 
+  auth/
+    clerk-auth.md
+
   architecture/
     overview.md
     backend.md
@@ -86,7 +92,7 @@ docs/
   integrations/
     xendit.md
 
-  account/
+  settings/
     README.md
     profile.md
     company-profile.md

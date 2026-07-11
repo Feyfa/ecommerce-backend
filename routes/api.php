@@ -1,7 +1,7 @@
 <?php
 
 use App\Http\Controllers\AlamatController;
-use App\Http\Controllers\AuthController;
+use App\Http\Controllers\AuthSessionController;
 use App\Http\Controllers\BelanjaController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\CompanyController;
@@ -11,9 +11,9 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\SaldoController;
 use App\Http\Controllers\SellerDashboardController;
+use App\Http\Controllers\SecurityController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\UserController;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -26,34 +26,33 @@ use Illuminate\Support\Facades\Route;
 | be assigned to the "api" middleware group. Make something great!
 |
 */
-Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-    return $request->user();
+Route::middleware('auth.api:optional-user')->group(function () {
+    Route::get('/auth/me', [AuthSessionController::class, 'show']);
 });
 
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
-
-Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/tokenvalidation', [AuthController::class, 'tokenValidation']);
-    Route::post('/logout', [AuthController::class, 'logout']);
-});
-
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware('auth.api')->group(function () {
     Route::get('/user', [UserController::class, 'show']);
     Route::put('/user/{id}', [UserController::class, 'updateUser']);
-    Route::put('/user/change/password', [UserController::class, 'changePassword']);
     Route::post('/user/image', [UserController::class, 'uploadImage']);
     Route::delete('/user/image', [UserController::class, 'deleteImage']);
 });
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware('auth.api')->group(function () {
+    Route::get('/security/summary', [SecurityController::class, 'summary']);
+    Route::get('/security/sessions', [SecurityController::class, 'sessions']);
+    Route::post('/security/google/link/validate', [SecurityController::class, 'validateGoogleLink']);
+    Route::post('/security/sessions/{sessionId}/revoke', [SecurityController::class, 'revokeSession']);
+    Route::post('/security/sessions/revoke-others', [SecurityController::class, 'revokeOtherSessions']);
+});
+
+Route::middleware('auth.api')->group(function () {
     Route::get('/company', [CompanyController::class, 'show']);
     Route::put('/company', [CompanyController::class, 'updateCompany']);
     Route::post('/company/image', [CompanyController::class, 'uploadImage']);
     Route::delete('/company/image', [CompanyController::class, 'deleteImage']);
 });
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware('auth.api')->group(function () {
     Route::get('/alamat/buyer', [AlamatController::class, 'getAlamatBuyer']);
     Route::post('/alamat/buyer', [AlamatController::class, 'addAlamatBuyer']);
     Route::put('/alamat-enable/buyer/{id}', [ALamatController::class, 'setEnableAlamatBuyer']);
@@ -61,7 +60,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/alamat/buyer/{id}', [AlamatController::class, 'deleteAlamatBuyer']);
 });
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware('auth.api')->group(function () {
     Route::get('/payment', [PaymentController::class, 'getPayment']);
     Route::get('/payment/list', [PaymentController::class, 'getPaymentList']);
     Route::post('/payment/account/validate', [PaymentController::class, 'validatePaymentAccount']);
@@ -70,7 +69,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/payment/simulate/charge-virtual-account', [PaymentController::class, 'simulateChargeVirtualAccount']);
 });
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware('auth.api')->group(function () {
     Route::get('/product/{user_id_seller}', [ProductController::class, 'index']);
     Route::get('/product/{user_id_seller}/{id}', [ProductController::class, 'show']);
     Route::post('/product', [ProductController::class, 'store']);
@@ -78,7 +77,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/product/{user_id_seller}/{id}', [ProductController::class, 'delete']);
 });
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware('auth.api')->group(function () {
     Route::get('/keranjang/{user_id_buyer}', [KeranjangController::class, 'index']);
     Route::post('/keranjang', [KeranjangController::class, 'store']);
     Route::delete('/keranjang/{user_id_buyer}/{product_id}', [KeranjangController::class, 'delete']);
@@ -91,26 +90,26 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/keranjang/validate/checkout', [KeranjangController::class, 'validateCheckout']);
 });
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware('auth.api')->group(function () {
     Route::get('/belanja/{user_id_seller}', [BelanjaController::class, 'index']);
 });
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware('auth.api')->group(function () {
     Route::get('/dashboard', [SellerDashboardController::class, 'show']);
 });
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware('auth.api')->group(function () {
     Route::get('/invoice', [InvoiceController::class, 'show']); // sudah tidak dipakai
     Route::get('/transaction', [TransactionController::class, 'getTransaction']);
     Route::post('/transaction/approved', [TransactionController::class, 'approvedTransaction']);
 });
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware('auth.api')->group(function () {
     Route::get('/checkout/data', [CheckoutController::class, 'getDataCheckout']);
     Route::post('/checkout/process', [CheckoutController::class, 'processCheckout']);
 });
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware('auth.api')->group(function () {
     Route::get('/saldo', [SaldoController::class, 'getSaldo']);
     Route::get('/saldo-history', [SaldoController::class, 'getSaldoHistory']);
     Route::post('/saldo-withdraw', [SaldoController::class, 'withdrawSaldo']);

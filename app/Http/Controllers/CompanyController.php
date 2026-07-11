@@ -138,9 +138,18 @@ class CompanyController extends Controller
         /* VALIDATION USER */
 
         /* VALIDATION REQUEST */     
-        $validator = Validator::make($request->all(), [
-            'file' => ['required', 'image', 'mimes:jpeg,png,jpg,gif,svg', 'max:1024']
-        ]);
+        $validator = Validator::make(
+            $request->all(),
+            [
+                'file' => ['required', 'image', 'mimes:jpeg,png,jpg,gif,svg', 'max:1024']
+            ],
+            [
+                'file.required' => 'Gambar wajib dipilih.',
+                'file.image' => 'File harus berupa gambar.',
+                'file.mimes' => 'File harus berformat jpeg, png, jpg, gif, atau svg.',
+                'file.max' => 'Ukuran gambar tidak boleh lebih dari 1024 KB.',
+            ]
+        );
 
         if($validator->fails())
             return response()->json(['status' => 'error', 'message' => $validator->messages()], 422);
@@ -171,7 +180,7 @@ class CompanyController extends Controller
         $company = $getCompany['company'];
         /* GET COMPANY */
 
-        return response()->json(['status' => 'success', 'message' => 'Upload Image Successfully', 'company' => $company], 200);
+        return response()->json(['status' => 'success', 'message' => 'Foto toko berhasil diunggah.', 'company' => $company], 200);
     }
 
     public function deleteImage()
@@ -193,13 +202,13 @@ class CompanyController extends Controller
 
         /* DELETE IMAGE IN PATH AND DATABASE */
         if(!Storage::disk('public')->exists(($company->img ?? "")))
-            return response()->json(['status' => 'error', 'message' => 'Delete Image Error, Path File Empty'], 400);    
-        
+            return response()->json(['status' => 'error', 'message' => 'File foto toko tidak ditemukan.'], 400);
+
         Storage::disk('public')->delete(($company->img ?? ""));
         $company->img = null;
         $company->save();
 
-        return response()->json(['status' => 'success', 'message' => 'Delete Image Success', 'company' => $company], 200);
+        return response()->json(['status' => 'success', 'message' => 'Foto toko berhasil dihapus.', 'company' => $company], 200);
         /* DELETE IMAGE IN PATH AND DATABASE */
     }
 }

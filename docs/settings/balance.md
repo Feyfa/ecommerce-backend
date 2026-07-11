@@ -1,6 +1,6 @@
 # Balance
 
-This document explains the backend API contract for balance behavior in `Akun Saya`.
+This document explains the backend API contract for balance behavior in `Pengaturan`.
 
 ## Applies To
 
@@ -54,6 +54,13 @@ Filtering:
 - When date fields are supplied, `SaldoService` filters by `DATE(sh.created_at)` between `startDate` and `endDate`.
 - Existing ids in `saldo_history_current_ids` are excluded for incremental loading.
 
+Description rules:
+
+- Incoming balance rows are shown as `Pembelian Dari {buyer_name} - INV {invoice_id}`.
+- `{invoice_id}` should come from `transaction_invoices.id` so it matches the invoice displayed in the seller transaction detail modal.
+- If `transaction_invoices.id` cannot be resolved, `SaldoService` falls back to `transaction_users.transaction_number`.
+- Withdrawal balance rows include the formatted withdrawal amount, payment slug, account number, and account holder name.
+
 Success response:
 
 ```json
@@ -98,4 +105,3 @@ Success response:
   "saldoHistory": {}
 }
 ```
-

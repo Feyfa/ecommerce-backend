@@ -25,7 +25,7 @@ Current supported actions:
 ## Main Files
 
 - `routes/api.php`
-  Defines transaction API routes inside the Sanctum authenticated group.
+  Defines transaction API routes inside the Clerk-authenticated group.
 
 - `app/Http/Controllers/TransactionController.php`
   Handles request authentication, query parameter collection, transaction response shape, and seller approval.
@@ -50,7 +50,7 @@ Current supported actions:
 
 ## Routes
 
-All transaction routes are inside the Sanctum authenticated API group.
+All transaction routes are inside the Clerk-authenticated API group.
 
 ```text
 GET  /api/transaction

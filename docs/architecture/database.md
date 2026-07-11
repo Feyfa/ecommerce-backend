@@ -43,7 +43,7 @@ The database name is intentionally `ecommerce`, not a temporary test database, b
 
 Application-owned tables use UUID primary keys.
 
-In this document, application-owned tables mean the ecommerce domain tables such as users, products, carts, payments, transactions, and balances. Laravel infrastructure tables such as `migrations`, `failed_jobs`, and `personal_access_tokens` keep their framework defaults unless there is a separate reason to customize the related package behavior.
+In this document, application-owned tables mean the ecommerce domain tables such as users, products, carts, payments, transactions, and balances. Laravel infrastructure tables such as `migrations` and `failed_jobs` keep their framework defaults unless there is a separate reason to customize the related package behavior.
 
 This means the main tables use this shape:
 
