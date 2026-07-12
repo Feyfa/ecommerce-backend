@@ -67,12 +67,6 @@ class ClerkUserSyncService
             /* step 3: jika tetap belum ada, buat row user lokal baru */
             if (!$user) {
                 $user = new User();
-
-                /*
-                 * password random sementara masih dipertahankan karena
-                 * column password lama belum dibersihkan pada fase ini.
-                 */
-                $user->password = Str::uuid()->toString() . Str::random(24);
             }
 
             /* step 4: sinkronkan identity utama dari Clerk */
