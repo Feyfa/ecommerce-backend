@@ -1,6 +1,7 @@
-# Authentication Notes
+# Historical Sanctum Authentication
 
-This document is historical.
+This document records the historical Sanctum authentication flow that is no
+longer active.
 
 The active backend authentication direction is documented in:
 
