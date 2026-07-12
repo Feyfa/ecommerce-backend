@@ -30,7 +30,10 @@ Current rules:
 - `PUT /api/user/change/password` has been removed;
 - `PUT /api/user/{id}` no longer accepts or stores the old local `tfa` payload.
 
-The old `users.password` and `users.tfa` columns may still exist for historical schema compatibility, but they should not be treated as the active account-security contract.
+The old `users.password`, `users.remember_token`, `users.email_verified_at`, and
+`users.tfa` columns, together with the local `password_reset_tokens` table, were
+removed through `2026_07_13_000001_remove_legacy_local_auth_schema.php`. Clerk
+remains the only account-security and password-reset authority.
 
 ## Routes
 
