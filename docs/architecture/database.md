@@ -96,8 +96,7 @@ Important columns:
 - `tanggal_lahir`: optional birth date.
 - `email`: unique email address.
 - `phone`: optional phone number.
-- `password`: hashed password.
-- `tfa`: two-factor status flag.
+- `clerk_user_id`: optional unique identity bridge to Clerk.
 
 Indexes:
 
@@ -105,8 +104,9 @@ Indexes:
 
 Notes:
 
-- The fields `jenis_kelamin` and `tfa` use strings instead of database enums. This keeps PostgreSQL migration simpler and makes future values easier to change from application code.
+- The field `jenis_kelamin` uses a string instead of a database enum. This keeps PostgreSQL migration simpler and makes future values easier to change from application code.
 - The old `account_type` column was removed by `2026_06_04_000001_drop_account_type_from_users_table.php` because active buyer/seller UI mode is stored per browser tab by the frontend.
+- The old local-auth columns `password`, `remember_token`, `email_verified_at`, and `tfa`, together with the `password_reset_tokens` table, were removed by `2026_07_13_000001_remove_legacy_local_auth_schema.php`. Clerk owns authentication, password reset, email verification, and MFA.
 
 ### products
 

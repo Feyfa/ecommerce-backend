@@ -133,7 +133,8 @@ created_at
 updated_at
 ```
 
-The old auth-centered fields no longer own authentication behavior:
+The following old auth-centered fields were removed through
+`2026_07_13_000001_remove_legacy_local_auth_schema.php`:
 
 ```text
 password
@@ -142,7 +143,9 @@ email_verified_at
 tfa
 ```
 
-If the project removes those columns later, it must happen through new migrations, not by silently editing old migrations.
+The same migration removes the unused Laravel `password_reset_tokens` table.
+Historical migrations remain unchanged so existing databases receive the cleanup
+through an explicit forward migration.
 
 ## Identity Bridge Rules
 
