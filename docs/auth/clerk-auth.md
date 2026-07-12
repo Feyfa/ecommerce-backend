@@ -49,6 +49,14 @@ The backend migration follows these main decisions:
 - The main identity bridge is `clerk_user_id`, not email.
 - Webhooks are a supplement for identity-change sync, not the primary user-creation mechanism.
 
+Security summaries only report Google as connected when the Clerk external
+account has a verified OAuth status. The `emailAddressVerified` flag is not an
+additional connection requirement because it can be unavailable on a valid
+external-account response; the provider email is still matched against the
+local application user during link validation. Pending or cancelled external
+accounts are excluded. Cleanup of a cancelled temporary external account is
+idempotent because Clerk may already have removed it.
+
 ## Main Files
 
 The current backend Clerk-related files are:
@@ -386,6 +394,8 @@ The current backend Clerk configuration expects:
 
 ```text
 CLERK_SECRET_KEY=
+CLERK_FEATURE_PASSKEY=true
+CLERK_FEATURE_TOTP=true
 ```
 
 Supporting application URLs still matter:
@@ -400,6 +410,8 @@ Notes:
 - `FRONTEND_URL` is used directly as the backend Clerk authorized party source and CORS allowed origin source.
 - The backend no longer requires a separate `CLERK_AUTHORIZED_PARTIES` env because that value would only duplicate `FRONTEND_URL` in the current architecture.
 - The current backend runtime only requires `CLERK_SECRET_KEY` for Clerk request authentication in this project.
+- `CLERK_FEATURE_PASSKEY` and `CLERK_FEATURE_TOTP` describe environment capability in the Security summary. They default to enabled locally and must remain disabled on staging and production while those Clerk instances do not support the features.
+- These backend flags keep capability metadata consistent with the frontend flags. Passkey and TOTP operations are still owned by Clerk and initiated from the frontend.
 
 ## Cleanup Notes
 
