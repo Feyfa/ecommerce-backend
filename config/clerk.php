@@ -42,4 +42,9 @@ return [
     |
     */
     'authorized_parties' => $resolveAuthorizedParties(),
+
+    'features' => [
+        'passkey' => filter_var(env('CLERK_FEATURE_PASSKEY', env('APP_ENV') === 'local'), FILTER_VALIDATE_BOOL),
+        'totp' => filter_var(env('CLERK_FEATURE_TOTP', env('APP_ENV') === 'local'), FILTER_VALIDATE_BOOL),
+    ],
 ];

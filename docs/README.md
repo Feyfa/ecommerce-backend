@@ -26,8 +26,8 @@ Deployment, branching, staging, production, Docker Compose, and server runbooks 
 - [ADR 0001: PostgreSQL and UUID Strategy](adr/0001-database-postgresql-uuid.md)
   Records the decision to move the backend database direction from MySQL-style local reconstruction to PostgreSQL with full UUID primary keys for application tables.
 
-- [Authentication Notes](features/auth.md)
-  Documents historical auth notes. The current production auth direction is recorded in `auth/clerk-auth.md`.
+- [Historical Sanctum Authentication](history/sanctum-auth.md)
+  Records the retired Sanctum authentication flow. The active authentication direction is documented in `auth/clerk-auth.md`.
 
 - [Seller Product](features/seller/01-product.md)
   Documents the seller product API routes, validation, request behavior, and data side effects.

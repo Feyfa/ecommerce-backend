@@ -8,6 +8,7 @@ use Clerk\Backend\Models\Components\ExternalAccountWithVerification;
 use Clerk\Backend\Models\Components\Session;
 use Clerk\Backend\Models\Components\SessionActivityResponse;
 use Clerk\Backend\Models\Components\User as ClerkUser;
+use Clerk\Backend\Models\Components\VerificationOauthVerificationStatus;
 use Clerk\Backend\Models\Operations\GetSessionListRequest;
 use Clerk\Backend\Models\Operations\GetUserListRequest;
 use Clerk\Backend\Models\Operations\Status as SessionListStatus;
@@ -27,7 +28,7 @@ class ClerkSecurityService
     public function getSummary(string $clerkUserId): array
     {
         $clerkUser = $this->getClerkUser($clerkUserId);
-        $hasGoogleAccount = $this->hasProvider($clerkUser, 'google');
+        $hasGoogleAccount = $this->hasVerifiedProvider($clerkUser, 'google');
         $passkeyCount = count($clerkUser->passkeys);
         $isMfaEnabled = $clerkUser->twoFactorEnabled || $clerkUser->totpEnabled;
 
@@ -59,6 +60,7 @@ class ClerkSecurityService
                     'description' => 'Gunakan biometrik atau PIN perangkat untuk login lebih aman.',
                     'action_label' => $passkeyCount > 0 ? 'Kelola' : 'Tambah',
                     'is_enabled' => $passkeyCount > 0,
+                    'feature_available' => (bool) config('clerk.features.passkey', false),
                     'meta' => [
                         'total' => $passkeyCount,
                         'passkeys' => $this->formatPasskeys($clerkUser->passkeys),
@@ -74,6 +76,7 @@ class ClerkSecurityService
                     'description' => 'Tambahkan verifikasi tambahan menggunakan aplikasi authenticator.',
                     'action_label' => $isMfaEnabled ? 'Kelola' : 'Aktifkan',
                     'is_enabled' => $isMfaEnabled,
+                    'feature_available' => (bool) config('clerk.features.totp', false),
                     'meta' => [
                         'totp_enabled' => $clerkUser->totpEnabled,
                         'backup_code_enabled' => $clerkUser->backupCodeEnabled,
@@ -168,22 +171,27 @@ class ClerkSecurityService
     {
         $clerkUser = $this->getClerkUser($clerkUserId);
         $googleAccounts = $this->getProviderAccounts($clerkUser, 'google');
+        $verifiedGoogleAccounts = collect($googleAccounts)
+            ->filter(fn (ExternalAccountWithVerification $account) => $this->isVerifiedProviderAccount($account))
+            ->values()
+            ->all();
 
-        if (count($googleAccounts) === 0) {
+        $unverifiedGoogleAccounts = collect($googleAccounts)
+            ->reject(fn (ExternalAccountWithVerification $account) => $this->isVerifiedProviderAccount($account))
+            ->values()
+            ->all();
+
+        $this->deleteProviderAccounts($clerkUser->id, $unverifiedGoogleAccounts);
+
+        if (count($verifiedGoogleAccounts) === 0) {
             throw new RuntimeException('Akun Google belum berhasil dihubungkan.');
         }
 
         $validGoogleAccount = null;
 
-        foreach ($googleAccounts as $googleAccount) {
+        foreach ($verifiedGoogleAccounts as $googleAccount) {
             if (!$this->isSameEmail($googleAccount->emailAddress, $localUser->email)) {
                 continue;
-            }
-
-            if ($googleAccount->emailAddressVerified !== true) {
-                $this->deleteExternalAccount($clerkUser->id, $googleAccount->id);
-
-                throw new RuntimeException('Email Google belum terverifikasi.');
             }
 
             $this->ensureProviderAccountIsNotUsedByAnotherUser($clerkUser->id, $googleAccount);
@@ -192,12 +200,12 @@ class ClerkSecurityService
         }
 
         if (!$validGoogleAccount) {
-            $this->deleteProviderAccounts($clerkUser->id, $googleAccounts);
+            $this->deleteProviderAccounts($clerkUser->id, $verifiedGoogleAccounts);
 
             throw new RuntimeException('Email Google harus sama dengan email akun Anda.');
         }
 
-        $this->deleteInvalidProviderAccounts($clerkUser->id, $googleAccounts, $validGoogleAccount->id);
+        $this->deleteInvalidProviderAccounts($clerkUser->id, $verifiedGoogleAccounts, $validGoogleAccount->id);
 
         return [
             'provider' => 'google',
@@ -244,9 +252,19 @@ class ClerkSecurityService
     /**
      * Tujuan helper ini untuk mengecek provider OAuth yang sudah tersambung.
      */
-    private function hasProvider(ClerkUser $clerkUser, string $provider): bool
+    private function hasVerifiedProvider(ClerkUser $clerkUser, string $provider): bool
     {
-        return count($this->getProviderAccounts($clerkUser, $provider)) > 0;
+        return collect($this->getProviderAccounts($clerkUser, $provider))
+            ->contains(fn (ExternalAccountWithVerification $account) => $this->isVerifiedProviderAccount($account));
+    }
+
+    /**
+     * External account hanya dianggap terhubung setelah provider dan Clerk
+     * menyatakan verifikasinya selesai.
+     */
+    private function isVerifiedProviderAccount(ExternalAccountWithVerification $externalAccount): bool
+    {
+        return $externalAccount->verification?->status === VerificationOauthVerificationStatus::Verified;
     }
 
     /**
@@ -330,10 +348,30 @@ class ClerkSecurityService
      */
     private function deleteExternalAccount(string $clerkUserId, string $externalAccountId): void
     {
-        $this->clerkBackendClientService
-            ->makeSdk()
-            ->users
-            ->deleteExternalAccount($clerkUserId, $externalAccountId);
+        try {
+            $this->clerkBackendClientService
+                ->makeSdk()
+                ->users
+                ->deleteExternalAccount($clerkUserId, $externalAccountId);
+        } catch (\Throwable $throwable) {
+            if ($this->isExternalAccountNotFoundError($throwable)) {
+                return;
+            }
+
+            throw $throwable;
+        }
+    }
+
+    /**
+     * Cleanup external account dibuat idempotent karena Clerk dapat lebih dulu
+     * menghapus account sementara ketika user membatalkan OAuth.
+     */
+    private function isExternalAccountNotFoundError(\Throwable $throwable): bool
+    {
+        $message = mb_strtolower($throwable->getMessage());
+
+        return str_contains($message, 'external_account_not_found')
+            || str_contains($message, 'external account was not found');
     }
 
     /**
