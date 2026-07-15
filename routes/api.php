@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AlamatController;
+use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\AuthSessionController;
 use App\Http\Controllers\BelanjaController;
 use App\Http\Controllers\CheckoutController;
@@ -10,8 +11,8 @@ use App\Http\Controllers\KeranjangController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\SaldoController;
-use App\Http\Controllers\SellerDashboardController;
 use App\Http\Controllers\SecurityController;
+use App\Http\Controllers\SellerDashboardController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
@@ -31,6 +32,10 @@ Route::middleware('auth.api:optional-user')->group(function () {
 });
 
 Route::middleware('auth.api')->group(function () {
+    Route::post('/auth/logout', [AuthSessionController::class, 'logout']);
+    Route::get('/audit-logs', [AuditLogController::class, 'index'])->name('audit-logs.index');
+    Route::get('/audit-logs/{auditLog}', [AuditLogController::class, 'show'])->name('audit-logs.show');
+
     Route::get('/user', [UserController::class, 'show']);
     Route::put('/user/{id}', [UserController::class, 'updateUser']);
     Route::post('/user/image', [UserController::class, 'uploadImage']);

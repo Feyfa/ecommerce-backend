@@ -4,17 +4,18 @@ namespace Tests\Feature;
 
 use App\Services\CheckoutService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Foundation\Testing\WithFaker;
 use Tests\TestCase;
 
 class CheckoutTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected CheckoutService $checkoutService;
 
     public function setUp(): void
     {
         parent::setUp();
-        
+
         $this->checkoutService = new CheckoutService();
     }
 
