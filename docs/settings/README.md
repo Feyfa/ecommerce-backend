@@ -14,7 +14,8 @@ The settings feature currently covers:
 - withdrawal bank accounts;
 - balance summary, history, and withdrawal;
 - user and company image upload/delete;
-- Clerk-backed settings security endpoints.
+- Clerk-backed settings security endpoints;
+- authentication audit log for successful register, login, and logout activity.
 
 ## Main Files
 
@@ -39,6 +40,9 @@ The settings feature currently covers:
 - `app/Http/Controllers/SecurityController.php`
   Handles Clerk-backed security summary, active sessions, Google link validation, and session revoke endpoints.
 
+- `app/Http/Controllers/AuditLogController.php`
+  Handles owner-scoped audit timeline filtering, cursor pagination, and detail responses.
+
 - `app/Services/CompanyService.php`
   Formats company data and merges seller address into the company response.
 
@@ -50,6 +54,9 @@ The settings feature currently covers:
 
 - `app/Services/Clerk/ClerkSecurityService.php`
   Reads Clerk-owned account security state, validates Google external accounts, formats active sessions, and revokes sessions.
+
+- `app/Services/AuditLogService.php`
+  Records idempotent Register, Login, and Logout activity with request and device metadata.
 
 ## Documents
 
@@ -70,6 +77,9 @@ The settings feature currently covers:
 
 - [Security](security.md)
   Clerk-backed settings security API behavior for sign-in methods, MFA/passkey status, Google link validation, active sessions, and session revocation.
+
+- [Audit Log](audit-log.md)
+  Phase 1 database, API, authorization, idempotency, request correlation, and Clerk authentication event behavior for `TOK-1`.
 
 ## Authentication
 
