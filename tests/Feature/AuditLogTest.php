@@ -10,6 +10,7 @@ use App\Services\AuditLogService;
 use App\Services\Clerk\ClerkBackendClientService;
 use App\Services\Clerk\ClerkUserSyncService;
 use App\Services\UserAgentParserService;
+use Carbon\CarbonImmutable;
 use Clerk\Backend\Models\Components\EmailAddress;
 use Clerk\Backend\Models\Components\EmailAddressObject;
 use Clerk\Backend\Models\Components\User as ClerkUser;
@@ -287,17 +288,19 @@ class AuditLogTest extends TestCase
     public function test_date_filter_uses_the_application_timezone_day_boundaries(): void
     {
         $user = $this->createUser();
+
+        $this->travelTo(CarbonImmutable::parse('2026-07-13T23:59:59+07:00'));
         $includedAudit = $this->auditLogService->recordLogin(
             $user,
             $this->auditRequest('sess_included_date')
         );
-        $excludedAudit = $this->auditLogService->recordLogin(
+
+        $this->travelTo(CarbonImmutable::parse('2026-07-14T00:00:00+07:00'));
+        $this->auditLogService->recordLogin(
             $user,
             $this->auditRequest('sess_excluded_date')
         );
-
-        $includedAudit?->forceFill(['occurred_at' => '2026-07-13T23:59:59+07:00'])->save();
-        $excludedAudit?->forceFill(['occurred_at' => '2026-07-14T00:00:00+07:00'])->save();
+        $this->travelBack();
 
         $this->actingAs($user)
             ->getJson('/api/audit-logs?from=2026-07-13&to=2026-07-13')
