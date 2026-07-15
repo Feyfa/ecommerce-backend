@@ -13,8 +13,7 @@ class ClerkUserSyncService
 {
     public function __construct(
         protected ClerkBackendClientService $clerkBackendClientService
-    ) {
-    }
+    ) {}
 
     /**
      * Tujuan method ini untuk mengambil identity user dari Clerk
@@ -22,16 +21,29 @@ class ClerkUserSyncService
      */
     public function syncByClerkUserId(string $clerkUserId): User
     {
+        return $this->syncByClerkUserIdWithStatus($clerkUserId)['user'];
+    }
+
+    /**
+     * Mengembalikan status create agar auth bootstrap dapat membedakan
+     * register baru dari login user existing secara terpercaya.
+     *
+     * @param  string  $clerkUserId  Identity user dari token Clerk valid.
+     * @param  callable|null  $afterSync  Callback yang dijalankan dalam transaction.
+     * @return array{user: User, was_created: bool}
+     */
+    public function syncByClerkUserIdWithStatus(string $clerkUserId, ?callable $afterSync = null): array
+    {
         $response = $this->clerkBackendClientService
             ->makeSdk()
             ->users
             ->get($clerkUserId);
 
-        if (!$response->user) {
+        if (! $response->user) {
             throw new RuntimeException('Authenticated Clerk user could not be found.');
         }
 
-        return $this->syncClerkUser($response->user);
+        return $this->syncClerkUserWithStatus($response->user, $afterSync);
     }
 
     /**
@@ -40,36 +52,54 @@ class ClerkUserSyncService
      */
     public function syncClerkUser(ClerkUser $clerkUser): User
     {
+        return $this->syncClerkUserWithStatus($clerkUser)['user'];
+    }
+
+    /**
+     * Callback dijalankan di dalam transaction user sync agar register dan
+     * audit pertama dapat berhasil atau rollback sebagai satu unit.
+     *
+     * @param  ClerkUser  $clerkUser  User yang sudah diambil dari Clerk Backend API.
+     * @param  callable|null  $afterSync  Callback yang menerima user dan status create.
+     * @return array{user: User, was_created: bool}
+     */
+    public function syncClerkUserWithStatus(ClerkUser $clerkUser, ?callable $afterSync = null): array
+    {
         $primaryEmail = $this->resolvePrimaryEmail($clerkUser);
 
-        if (!$primaryEmail) {
+        if (! $primaryEmail) {
             throw new RuntimeException('Authenticated Clerk user does not have a primary email address.');
         }
 
         $displayName = $this->resolveDisplayName($clerkUser, $primaryEmail);
 
-        return DB::transaction(function () use ($clerkUser, $primaryEmail, $displayName): User {
-            /* step 1: cari user lokal berdasarkan clerk_user_id */
+        return DB::transaction(function () use ($clerkUser, $primaryEmail, $displayName, $afterSync): array {
+            // --- step 1 - start - cari user lokal berdasarkan clerk_user_id
             $user = User::query()
                 ->where('clerk_user_id', $clerkUser->id)
                 ->lockForUpdate()
                 ->first();
+            // --- step 1 - end - cari user lokal berdasarkan clerk_user_id
 
-            /* step 2: jika belum ada, coba attach ke email lokal yang sama */
-            if (!$user && $primaryEmail) {
+            // --- step 2 - start - jika belum ada coba attach ke email lokal yang sama
+            if (! $user && $primaryEmail) {
                 $user = User::query()
                     ->whereNull('clerk_user_id')
                     ->whereRaw('LOWER(email) = ?', [mb_strtolower($primaryEmail)])
                     ->lockForUpdate()
                     ->first();
             }
+            // --- step 2 - end - jika belum ada coba attach ke email lokal yang sama
 
-            /* step 3: jika tetap belum ada, buat row user lokal baru */
-            if (!$user) {
+            // --- step 3 - start - jika tetap belum ada buat row user lokal baru
+            if (! $user) {
                 $user = new User();
             }
 
-            /* step 4: sinkronkan identity utama dari Clerk */
+            $wasCreated = ! $user->exists;
+            // --- step 3 - end - jika tetap belum ada buat row user lokal baru
+
+            // --- step 4 - start - sinkronkan identity utama dari Clerk
             $user->clerk_user_id = $clerkUser->id;
 
             if ($primaryEmail) {
@@ -87,7 +117,19 @@ class ClerkUserSyncService
              */
             $user->save();
 
-            return $user->fresh();
+            $syncedUser = $user->fresh();
+
+            if ($afterSync) {
+                $afterSync($syncedUser, $wasCreated);
+            }
+
+            $syncResult = [
+                'user' => $syncedUser,
+                'was_created' => $wasCreated,
+            ];
+            // --- step 4 - end - sinkronkan identity utama dari Clerk
+
+            return $syncResult;
         });
     }
 
@@ -104,7 +146,7 @@ class ClerkUserSyncService
         }
 
         foreach ($clerkUser->emailAddresses as $emailAddress) {
-            if ($emailAddress instanceof EmailAddress && !empty($emailAddress->emailAddress)) {
+            if ($emailAddress instanceof EmailAddress && ! empty($emailAddress->emailAddress)) {
                 return $emailAddress->emailAddress;
             }
         }
@@ -127,7 +169,7 @@ class ClerkUserSyncService
             return $fullName;
         }
 
-        if (!empty($clerkUser->username)) {
+        if (! empty($clerkUser->username)) {
             return $clerkUser->username;
         }
 
@@ -135,6 +177,6 @@ class ClerkUserSyncService
             return Str::before($primaryEmail, '@');
         }
 
-        return 'user-' . Str::lower(Str::substr($clerkUser->id, -8));
+        return 'user-'.Str::lower(Str::substr($clerkUser->id, -8));
     }
 }

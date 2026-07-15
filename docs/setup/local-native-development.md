@@ -66,6 +66,25 @@ APP_URL=https://api.ecommerce.dev
 FRONTEND_URL=https://app.ecommerce.dev
 ```
 
+## Automated Test Database Safety
+
+Local PHPUnit runs use an isolated SQLite in-memory database configured by `phpunit.xml`. They must never reuse the PostgreSQL development database from `.env`, because database-resetting traits such as `RefreshDatabase` recreate the active test schema.
+
+`AppServiceProvider` also stops the testing application during bootstrap, before the first database connection is created, unless both conditions are satisfied. The guard resolves the final connection configuration, including a `DATABASE_URL` override, so a safe-looking `DB_DATABASE` value cannot hide an unsafe URL target:
+
+- `APP_ENV` is `testing`;
+- the connection uses SQLite `:memory:` or an external database whose name explicitly contains `test` or `testing`.
+
+GitHub Actions remains configured to use the dedicated PostgreSQL database `ecommerce_testing`; explicit CI environment variables take precedence over the local SQLite defaults.
+
+Run the local suite normally:
+
+```bash
+php artisan test
+```
+
+Do not disable the PHPUnit database settings or the bootstrap database guard to make a test run against the development database.
+
 ## macOS Setup
 
 This setup assumes Homebrew, Homebrew nginx, Homebrew PHP 8.3, and `mkcert`.
