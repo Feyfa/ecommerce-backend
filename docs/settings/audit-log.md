@@ -189,6 +189,32 @@ Audit context must be intentionally allow-listed. It must never contain:
 
 The database stores the full source IP for the owner-visible detail flow. Collection responses expose a masked value. Full IP access must use an authenticated owner-scoped detail endpoint.
 
+### Client IP Behind Reverse Proxies
+
+`AuditLogService` stores the IP resolved by Laravel through `Request::ip()`. It
+must not read `X-Forwarded-For`, `X-Real-IP`, or Cloudflare-specific headers
+directly because an untrusted client can supply those headers.
+
+Native development leaves `TRUSTED_PROXIES` empty. Docker staging and
+production set it to `REMOTE_ADDR`, which trusts only the `backend-nginx`
+instance directly connected to PHP-FPM. The public reverse proxy must first
+validate its upstream edge proxy and replace the forwarded chain with one
+normalized client IP.
+
+Expected public request flow:
+
+```text
+client public IP
+  -> trusted Cloudflare Tunnel connector
+  -> reverse proxy validates CF-Connecting-IP and normalizes X-Forwarded-For
+  -> backend-nginx
+  -> Laravel trusts only REMOTE_ADDR and resolves the normalized client IP
+```
+
+Direct requests from other LAN hosts are not allowed to override their source
+address with a forged forwarded header. Existing audit rows are immutable and
+are not rewritten after proxy configuration changes.
+
 ## API Contract
 
 The phase 1 endpoints are:
