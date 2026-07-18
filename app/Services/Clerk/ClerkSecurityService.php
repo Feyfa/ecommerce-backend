@@ -12,14 +12,15 @@ use Clerk\Backend\Models\Components\VerificationOauthVerificationStatus;
 use Clerk\Backend\Models\Operations\GetSessionListRequest;
 use Clerk\Backend\Models\Operations\GetUserListRequest;
 use Clerk\Backend\Models\Operations\Status as SessionListStatus;
+use Psr\Http\Message\ResponseInterface;
 use RuntimeException;
+use Throwable;
 
 class ClerkSecurityService
 {
     public function __construct(
         protected ClerkBackendClientService $clerkBackendClientService
-    ) {
-    }
+    ) {}
 
     /**
      * Tujuan method ini untuk membentuk ringkasan keamanan akun
@@ -190,7 +191,7 @@ class ClerkSecurityService
         $validGoogleAccount = null;
 
         foreach ($verifiedGoogleAccounts as $googleAccount) {
-            if (!$this->isSameEmail($googleAccount->emailAddress, $localUser->email)) {
+            if (! $this->isSameEmail($googleAccount->emailAddress, $localUser->email)) {
                 continue;
             }
 
@@ -199,7 +200,7 @@ class ClerkSecurityService
             break;
         }
 
-        if (!$validGoogleAccount) {
+        if (! $validGoogleAccount) {
             $this->deleteProviderAccounts($clerkUser->id, $verifiedGoogleAccounts);
 
             throw new RuntimeException('Email Google harus sama dengan email akun Anda.');
@@ -210,7 +211,7 @@ class ClerkSecurityService
         return [
             'provider' => 'google',
             'email' => $validGoogleAccount->emailAddress,
-            'external_account_id' => $validGoogleAccount->id,
+            'external_account_id' => $this->getExternalAccountDeletionId($validGoogleAccount),
         ];
     }
 
@@ -224,11 +225,94 @@ class ClerkSecurityService
             ->users
             ->get($clerkUserId);
 
-        if (!$response->user) {
+        if (! $response->user) {
             throw new RuntimeException('Authenticated Clerk user could not be found.');
         }
 
+        $this->hydrateExternalAccountDeletionIds($response->user, $response->rawResponse);
+
         return $response->user;
+    }
+
+    /**
+     * Tujuan helper ini untuk melengkapi model external account SDK dengan ID
+     * resource `eac_` yang hanya tersedia pada raw response untuk Google/Facebook.
+     */
+    private function hydrateExternalAccountDeletionIds(ClerkUser $clerkUser, ResponseInterface $rawResponse): void
+    {
+        $deletionIds = $this->extractExternalAccountDeletionIds($rawResponse);
+
+        foreach ($clerkUser->externalAccounts as $externalAccount) {
+            if (! $externalAccount instanceof ExternalAccountWithVerification) {
+                continue;
+            }
+
+            $lookupKey = $this->getExternalAccountLookupKey(
+                $externalAccount->provider,
+                $externalAccount->identificationId
+            );
+
+            if (! isset($deletionIds[$lookupKey])) {
+                continue;
+            }
+
+            $externalAccount->additionalProperties = array_merge(
+                $externalAccount->additionalProperties ?? [],
+                ['external_account_id' => $deletionIds[$lookupKey]]
+            );
+        }
+    }
+
+    /**
+     * Tujuan helper ini untuk mengambil ID resource external account dari raw
+     * response Clerk tanpa bergantung pada kelengkapan model SDK yang terpasang.
+     *
+     * @return array<string, string>
+     */
+    private function extractExternalAccountDeletionIds(ResponseInterface $rawResponse): array
+    {
+        $payload = json_decode((string) $rawResponse->getBody(), true);
+
+        if (! is_array($payload) || ! is_array($payload['external_accounts'] ?? null)) {
+            return [];
+        }
+
+        $deletionIds = [];
+
+        foreach ($payload['external_accounts'] as $externalAccount) {
+            if (! is_array($externalAccount)) {
+                continue;
+            }
+
+            $provider = trim((string) ($externalAccount['provider'] ?? ''));
+            $identificationId = trim((string) (
+                $externalAccount['identification_id']
+                ?? $externalAccount['id']
+                ?? ''
+            ));
+            $deletionId = trim((string) (
+                $externalAccount['external_account_id']
+                ?? $externalAccount['id']
+                ?? ''
+            ));
+
+            if ($provider === '' || $identificationId === '' || $deletionId === '') {
+                continue;
+            }
+
+            $deletionIds[$this->getExternalAccountLookupKey($provider, $identificationId)] = $deletionId;
+        }
+
+        return $deletionIds;
+    }
+
+    /**
+     * Tujuan helper ini untuk membentuk key provider dan identification yang
+     * stabil agar ID Google dan Facebook tidak dapat saling tertukar.
+     */
+    private function getExternalAccountLookupKey(string $provider, string $identificationId): string
+    {
+        return mb_strtolower(trim($provider)).'|'.trim($identificationId);
     }
 
     /**
@@ -242,7 +326,7 @@ class ClerkSecurityService
             ->sessions
             ->get($sessionId);
 
-        if (!$response->session || $response->session->userId !== $clerkUserId) {
+        if (! $response->session || $response->session->userId !== $clerkUserId) {
             throw new RuntimeException('Session could not be found for the authenticated user.');
         }
 
@@ -319,13 +403,19 @@ class ClerkSecurityService
      */
     private function deleteProviderAccounts(string $clerkUserId, array $externalAccounts): void
     {
-        foreach ($externalAccounts as $externalAccount) {
-            if (!$externalAccount instanceof ExternalAccountWithVerification) {
-                continue;
-            }
+        $deletableAccounts = collect($externalAccounts)
+            ->filter(fn ($externalAccount) => $externalAccount instanceof ExternalAccountWithVerification)
+            ->values()
+            ->all();
 
-            $this->deleteExternalAccount($clerkUserId, $externalAccount->id);
+        foreach ($deletableAccounts as $externalAccount) {
+            $this->deleteExternalAccount(
+                $clerkUserId,
+                $this->getExternalAccountDeletionId($externalAccount)
+            );
         }
+
+        $this->ensureProviderAccountsAreDeleted($clerkUserId, $deletableAccounts);
     }
 
     /**
@@ -334,13 +424,37 @@ class ClerkSecurityService
      */
     private function deleteInvalidProviderAccounts(string $clerkUserId, array $externalAccounts, string $validExternalAccountId): void
     {
-        foreach ($externalAccounts as $externalAccount) {
-            if (!$externalAccount instanceof ExternalAccountWithVerification || $externalAccount->id === $validExternalAccountId) {
-                continue;
-            }
+        $invalidExternalAccounts = collect($externalAccounts)
+            ->filter(fn ($externalAccount) => $externalAccount instanceof ExternalAccountWithVerification)
+            ->reject(fn (ExternalAccountWithVerification $externalAccount) => $externalAccount->id === $validExternalAccountId)
+            ->values()
+            ->all();
 
-            $this->deleteExternalAccount($clerkUserId, $externalAccount->id);
+        $this->deleteProviderAccounts($clerkUserId, $invalidExternalAccounts);
+    }
+
+    /**
+     * Tujuan helper ini untuk memilih ID resource yang diterima endpoint delete
+     * Clerk dan mencegah identification ID `idn_` terkirim sebagai penggantinya.
+     */
+    private function getExternalAccountDeletionId(ExternalAccountWithVerification $externalAccount): string
+    {
+        $externalAccountId = trim((string) (
+            $externalAccount->additionalProperties['external_account_id']
+            ?? ''
+        ));
+
+        if (str_starts_with($externalAccountId, 'eac_')) {
+            return $externalAccountId;
         }
+
+        $modelId = trim($externalAccount->id);
+
+        if (str_starts_with($modelId, 'eac_')) {
+            return $modelId;
+        }
+
+        throw new RuntimeException('ID akun eksternal Clerk tidak dapat ditentukan. Silakan coba lagi.');
     }
 
     /**
@@ -353,13 +467,65 @@ class ClerkSecurityService
                 ->makeSdk()
                 ->users
                 ->deleteExternalAccount($clerkUserId, $externalAccountId);
-        } catch (\Throwable $throwable) {
+        } catch (Throwable $throwable) {
             if ($this->isExternalAccountNotFoundError($throwable)) {
                 return;
             }
 
             throw $throwable;
         }
+    }
+
+    /**
+     * Tujuan helper ini untuk memastikan respons not-found hanya dianggap aman
+     * ketika external account memang sudah tidak ada pada user Clerk terbaru.
+     */
+    private function ensureProviderAccountsAreDeleted(string $clerkUserId, array $deletedExternalAccounts): void
+    {
+        if (count($deletedExternalAccounts) === 0) {
+            return;
+        }
+
+        $currentClerkUser = $this->getClerkUser($clerkUserId);
+
+        foreach ($deletedExternalAccounts as $deletedExternalAccount) {
+            if (! $deletedExternalAccount instanceof ExternalAccountWithVerification) {
+                continue;
+            }
+
+            $stillConnected = collect($currentClerkUser->externalAccounts)
+                ->contains(function ($currentExternalAccount) use ($deletedExternalAccount) {
+                    return $currentExternalAccount instanceof ExternalAccountWithVerification
+                        && $this->isSameExternalAccount($currentExternalAccount, $deletedExternalAccount);
+                });
+
+            if ($stillConnected) {
+                throw new RuntimeException('Akun Google yang tidak sesuai belum berhasil dilepaskan. Silakan coba lagi.');
+            }
+        }
+    }
+
+    /**
+     * Tujuan helper ini untuk membandingkan external account berdasarkan provider
+     * dan identification ID, dengan provider user ID sebagai fallback yang aman.
+     */
+    private function isSameExternalAccount(
+        ExternalAccountWithVerification $firstExternalAccount,
+        ExternalAccountWithVerification $secondExternalAccount
+    ): bool {
+        if (mb_strtolower($firstExternalAccount->provider) !== mb_strtolower($secondExternalAccount->provider)) {
+            return false;
+        }
+
+        $firstIdentificationId = trim($firstExternalAccount->identificationId);
+        $secondIdentificationId = trim($secondExternalAccount->identificationId);
+
+        if ($firstIdentificationId !== '' && $secondIdentificationId !== '') {
+            return $firstIdentificationId === $secondIdentificationId;
+        }
+
+        return trim($firstExternalAccount->providerUserId) !== ''
+            && $firstExternalAccount->providerUserId === $secondExternalAccount->providerUserId;
     }
 
     /**
@@ -422,7 +588,7 @@ class ClerkSecurityService
      */
     private function resolveDeviceLabel(?SessionActivityResponse $activity): string
     {
-        if (!$activity) {
+        if (! $activity) {
             return 'Perangkat tidak dikenal';
         }
 
@@ -450,7 +616,7 @@ class ClerkSecurityService
      */
     private function resolveLocationLabel(?SessionActivityResponse $activity): ?string
     {
-        if (!$activity) {
+        if (! $activity) {
             return null;
         }
 
@@ -478,7 +644,7 @@ class ClerkSecurityService
      */
     private function normalizeTimestamp(?int $timestamp): ?Carbon
     {
-        if (!$timestamp) {
+        if (! $timestamp) {
             return null;
         }
 

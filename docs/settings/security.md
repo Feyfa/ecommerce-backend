@@ -166,6 +166,13 @@ The backend validates that:
 
 If invalid Google accounts are found, the service removes them from the current Clerk user so the local account is not left with the wrong provider link.
 
+Cleanup rules:
+
+- Google and Facebook responses can expose an identification ID (`idn_...`) as the model `id`, while Clerk's delete endpoint requires the external account resource ID (`eac_...`).
+- The service resolves `external_account_id` from Clerk's raw user response and keys it by provider plus identification ID so different providers cannot be mixed up.
+- A not-found deletion response is only treated as an idempotent success after the latest Clerk user state confirms that the rejected external account is no longer connected.
+- The success response returns the resolved `eac_...` resource ID, not the `idn_...` identification ID.
+
 Success response:
 
 ```json

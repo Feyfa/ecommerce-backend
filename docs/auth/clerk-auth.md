@@ -55,7 +55,13 @@ additional connection requirement because it can be unavailable on a valid
 external-account response; the provider email is still matched against the
 local application user during link validation. Pending or cancelled external
 accounts are excluded. Cleanup of a cancelled temporary external account is
-idempotent because Clerk may already have removed it.
+idempotent because Clerk may already have removed it. The installed Clerk PHP
+SDK does not expose Google/Facebook's `external_account_id` on its typed model,
+so the security service resolves the required `eac_...` resource ID from the
+raw Clerk user response. Provider plus identification ID is used as the lookup
+key to keep provider identities isolated. A not-found delete response is only
+accepted after a fresh Clerk user response confirms that the rejected account
+is no longer connected.
 
 ## Main Files
 
