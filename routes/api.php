@@ -45,6 +45,7 @@ Route::middleware('auth.api')->group(function () {
 Route::middleware('auth.api')->group(function () {
     Route::get('/security/summary', [SecurityController::class, 'summary']);
     Route::get('/security/sessions', [SecurityController::class, 'sessions']);
+    Route::post('/security/google/link/cleanup', [SecurityController::class, 'cleanupGoogleLink']);
     Route::post('/security/google/link/validate', [SecurityController::class, 'validateGoogleLink']);
     Route::post('/security/sessions/{sessionId}/revoke', [SecurityController::class, 'revokeSession']);
     Route::post('/security/sessions/revoke-others', [SecurityController::class, 'revokeOtherSessions']);
