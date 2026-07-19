@@ -107,16 +107,14 @@ class ClerkSecurityServiceTest extends TestCase
             json_encode([
                 'external_accounts' => [
                     [
-                        'id' => 'idn_shared',
+                        'id' => 'eac_google',
                         'identification_id' => 'idn_shared',
                         'provider' => 'oauth_google',
-                        'external_account_id' => 'eac_google',
                     ],
                     [
-                        'id' => 'idn_shared',
+                        'id' => 'eac_facebook',
                         'identification_id' => 'idn_shared',
                         'provider' => 'oauth_facebook',
-                        'external_account_id' => 'eac_facebook',
                     ],
                 ],
             ], JSON_THROW_ON_ERROR)
@@ -158,7 +156,73 @@ class ClerkSecurityServiceTest extends TestCase
         $service = $this->makeServiceWithUsers($users);
         $method = new ReflectionMethod($service, 'deleteProviderAccounts');
 
-        $method->invoke($service, 'user_test', [$googleAccount]);
+        $method->invoke($service, $this->makeClerkUser([$googleAccount]), [$googleAccount]);
+    }
+
+    public function test_failed_google_link_cleanup_only_removes_unverified_account(): void
+    {
+        $failedGoogleAccount = $this->makeExternalAccount(
+            ExternalAccountWithVerificationObject::GoogleAccount,
+            'oauth_google',
+            'idn_failed_google',
+            ['external_account_id' => 'eac_failed_google'],
+            VerificationOauthVerificationStatus::Unverified
+        );
+        $verifiedGoogleAccount = $this->makeExternalAccount(
+            ExternalAccountWithVerificationObject::GoogleAccount,
+            'oauth_google',
+            'idn_verified_google',
+            ['external_account_id' => 'eac_verified_google']
+        );
+        $users = $this->getMockBuilder(Users::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['deleteExternalAccount', 'get'])
+            ->getMock();
+
+        $users->expects($this->exactly(2))
+            ->method('get')
+            ->with('user_test')
+            ->willReturnOnConsecutiveCalls(
+                $this->makeClerkUserResponse([$failedGoogleAccount, $verifiedGoogleAccount]),
+                $this->makeClerkUserResponse([$verifiedGoogleAccount])
+            );
+        $users->expects($this->once())
+            ->method('deleteExternalAccount')
+            ->with('user_test', 'eac_failed_google')
+            ->willReturn(new DeleteExternalAccountResponse(
+                contentType: 'application/json',
+                statusCode: 200,
+                rawResponse: new Response(200)
+            ));
+
+        $result = $this->makeServiceWithUsers($users)->cleanupFailedGoogleAccountLinks('user_test');
+
+        $this->assertSame(['removed_total' => 1], $result);
+    }
+
+    public function test_failed_google_link_cleanup_preserves_verified_account(): void
+    {
+        $verifiedGoogleAccount = $this->makeExternalAccount(
+            ExternalAccountWithVerificationObject::GoogleAccount,
+            'oauth_google',
+            'idn_verified_google',
+            ['external_account_id' => 'eac_verified_google']
+        );
+        $users = $this->getMockBuilder(Users::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['deleteExternalAccount', 'get'])
+            ->getMock();
+
+        $users->expects($this->once())
+            ->method('get')
+            ->with('user_test')
+            ->willReturn($this->makeClerkUserResponse([$verifiedGoogleAccount]));
+        $users->expects($this->never())
+            ->method('deleteExternalAccount');
+
+        $result = $this->makeServiceWithUsers($users)->cleanupFailedGoogleAccountLinks('user_test');
+
+        $this->assertSame(['removed_total' => 0], $result);
     }
 
     public function test_identification_id_cannot_be_used_as_external_account_deletion_id(): void
@@ -206,7 +270,7 @@ class ClerkSecurityServiceTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Akun Google yang tidak sesuai belum berhasil dilepaskan. Silakan coba lagi.');
 
-        $method->invoke($service, 'user_test', [$googleAccount]);
+        $method->invoke($service, $this->makeClerkUser([$googleAccount]), [$googleAccount]);
     }
 
     public function test_not_found_cleanup_is_accepted_when_external_account_is_no_longer_connected(): void
@@ -235,7 +299,7 @@ class ClerkSecurityServiceTest extends TestCase
         $service = $this->makeServiceWithUsers($users);
         $method = new ReflectionMethod($service, 'deleteProviderAccounts');
 
-        $method->invoke($service, 'user_test', [$googleAccount]);
+        $method->invoke($service, $this->makeClerkUser([$googleAccount]), [$googleAccount]);
     }
 
     /**
@@ -247,7 +311,8 @@ class ClerkSecurityServiceTest extends TestCase
         ExternalAccountWithVerificationObject $object,
         string $provider,
         string $identificationId,
-        ?array $additionalProperties = null
+        ?array $additionalProperties = null,
+        VerificationOauthVerificationStatus $verificationStatus = VerificationOauthVerificationStatus::Verified
     ): ExternalAccountWithVerification {
         return new ExternalAccountWithVerification(
             object: $object,
@@ -263,7 +328,7 @@ class ClerkSecurityServiceTest extends TestCase
             createdAt: 1,
             updatedAt: 1,
             verification: new VerificationOauthVerificationOauth(
-                status: VerificationOauthVerificationStatus::Verified,
+                status: $verificationStatus,
                 strategy: $provider,
                 expireAt: 2,
                 object: VerificationOauthVerificationObject::VerificationOauth
@@ -280,6 +345,7 @@ class ClerkSecurityServiceTest extends TestCase
     private function makeClerkUser(array $externalAccounts): ClerkUser
     {
         $clerkUser = (new ReflectionClass(ClerkUser::class))->newInstanceWithoutConstructor();
+        $clerkUser->id = 'user_test';
         $clerkUser->externalAccounts = $externalAccounts;
 
         return $clerkUser;
@@ -292,11 +358,10 @@ class ClerkSecurityServiceTest extends TestCase
     {
         $rawExternalAccounts = array_map(function (ExternalAccountWithVerification $externalAccount) {
             return [
-                'id' => $externalAccount->id,
+                'id' => $externalAccount->additionalProperties['external_account_id']
+                    ?? $externalAccount->id,
                 'identification_id' => $externalAccount->identificationId,
                 'provider' => $externalAccount->provider,
-                'external_account_id' => $externalAccount->additionalProperties['external_account_id']
-                    ?? $externalAccount->id,
             ];
         }, $externalAccounts);
 
