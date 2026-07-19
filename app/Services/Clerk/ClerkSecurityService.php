@@ -182,7 +182,7 @@ class ClerkSecurityService
             ->values()
             ->all();
 
-        $this->deleteProviderAccounts($clerkUser->id, $unverifiedGoogleAccounts);
+        $this->deleteProviderAccounts($clerkUser, $unverifiedGoogleAccounts);
 
         if (count($verifiedGoogleAccounts) === 0) {
             throw new RuntimeException('Akun Google belum berhasil dihubungkan.');
@@ -201,17 +201,36 @@ class ClerkSecurityService
         }
 
         if (! $validGoogleAccount) {
-            $this->deleteProviderAccounts($clerkUser->id, $verifiedGoogleAccounts);
+            $this->deleteProviderAccounts($clerkUser, $verifiedGoogleAccounts);
 
             throw new RuntimeException('Email Google harus sama dengan email akun Anda.');
         }
 
-        $this->deleteInvalidProviderAccounts($clerkUser->id, $verifiedGoogleAccounts, $validGoogleAccount->id);
+        $this->deleteInvalidProviderAccounts($clerkUser, $verifiedGoogleAccounts, $validGoogleAccount->id);
 
         return [
             'provider' => 'google',
             'email' => $validGoogleAccount->emailAddress,
             'external_account_id' => $this->getExternalAccountDeletionId($validGoogleAccount),
+        ];
+    }
+
+    /**
+     * Tujuan method ini untuk membersihkan external account Google sementara
+     * yang ditinggalkan Clerk setelah OAuth gagal, dibatalkan, atau kedaluwarsa.
+     */
+    public function cleanupFailedGoogleAccountLinks(string $clerkUserId): array
+    {
+        $clerkUser = $this->getClerkUser($clerkUserId);
+        $failedGoogleAccounts = collect($this->getProviderAccounts($clerkUser, 'google'))
+            ->reject(fn (ExternalAccountWithVerification $account) => $this->isVerifiedProviderAccount($account))
+            ->values()
+            ->all();
+
+        $this->deleteProviderAccounts($clerkUser, $failedGoogleAccounts);
+
+        return [
+            'removed_total' => count($failedGoogleAccounts),
         ];
     }
 
@@ -401,7 +420,7 @@ class ClerkSecurityService
     /**
      * Tujuan helper ini untuk menghapus external account provider yang gagal validasi.
      */
-    private function deleteProviderAccounts(string $clerkUserId, array $externalAccounts): void
+    private function deleteProviderAccounts(ClerkUser $clerkUser, array $externalAccounts): void
     {
         $deletableAccounts = collect($externalAccounts)
             ->filter(fn ($externalAccount) => $externalAccount instanceof ExternalAccountWithVerification)
@@ -410,19 +429,19 @@ class ClerkSecurityService
 
         foreach ($deletableAccounts as $externalAccount) {
             $this->deleteExternalAccount(
-                $clerkUserId,
+                $clerkUser->id,
                 $this->getExternalAccountDeletionId($externalAccount)
             );
         }
 
-        $this->ensureProviderAccountsAreDeleted($clerkUserId, $deletableAccounts);
+        $this->ensureProviderAccountsAreDeleted($clerkUser->id, $deletableAccounts);
     }
 
     /**
      * Tujuan helper ini untuk membersihkan akun provider tambahan
      * tanpa menghapus akun provider yang sudah valid.
      */
-    private function deleteInvalidProviderAccounts(string $clerkUserId, array $externalAccounts, string $validExternalAccountId): void
+    private function deleteInvalidProviderAccounts(ClerkUser $clerkUser, array $externalAccounts, string $validExternalAccountId): void
     {
         $invalidExternalAccounts = collect($externalAccounts)
             ->filter(fn ($externalAccount) => $externalAccount instanceof ExternalAccountWithVerification)
@@ -430,7 +449,7 @@ class ClerkSecurityService
             ->values()
             ->all();
 
-        $this->deleteProviderAccounts($clerkUserId, $invalidExternalAccounts);
+        $this->deleteProviderAccounts($clerkUser, $invalidExternalAccounts);
     }
 
     /**

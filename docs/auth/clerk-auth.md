@@ -63,6 +63,17 @@ key to keep provider identities isolated. A not-found delete response is only
 accepted after a fresh Clerk user response confirms that the rejected account
 is no longer connected.
 
+Every Clerk environment must disable **Allow users to change their email
+address**. With that restriction, Clerk rejects a Google link whose email does
+not match the user's existing primary email and does not add the Google email
+as another login identifier. Clerk can still leave an unverified temporary
+Google external account after the rejection. The frontend callback requests
+`POST /api/security/google/link/cleanup`, and Laravel removes only those
+failed/unverified Google external accounts. Primary and secondary email
+addresses are never deleted by this cleanup. A verified Google account then
+continues to `POST /api/security/google/link/validate` for the final email and
+ownership checks.
+
 ## Main Files
 
 The current backend Clerk-related files are:

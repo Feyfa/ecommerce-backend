@@ -11,8 +11,7 @@ class SecurityController extends Controller
 {
     public function __construct(
         protected ClerkSecurityService $clerkSecurityService
-    ) {
-    }
+    ) {}
 
     /**
      * Tujuan endpoint ini untuk menampilkan ringkasan keamanan akun
@@ -142,7 +141,7 @@ class SecurityController extends Controller
         $clerkUserId = $this->resolveClerkUserId($request);
         $user = $request->user();
 
-        if ($clerkUserId === '' || !$user) {
+        if ($clerkUserId === '' || ! $user) {
             return response()->json([
                 'status' => 401,
                 'message' => 'Unauthorized',
@@ -164,6 +163,40 @@ class SecurityController extends Controller
             return response()->json([
                 'status' => 422,
                 'message' => 'Akun Google belum berhasil dihubungkan.',
+            ], 422);
+        }
+    }
+
+    /**
+     * Tujuan endpoint ini untuk membersihkan external account Google sementara
+     * yang gagal diselesaikan oleh callback OAuth Clerk.
+     */
+    public function cleanupGoogleLink(Request $request)
+    {
+        $clerkUserId = $this->resolveClerkUserId($request);
+
+        if ($clerkUserId === '') {
+            return response()->json([
+                'status' => 401,
+                'message' => 'Unauthorized',
+            ], 401);
+        }
+
+        try {
+            return response()->json([
+                'status' => 200,
+                'message' => 'Failed Google account link cleaned successfully.',
+                'google' => $this->clerkSecurityService->cleanupFailedGoogleAccountLinks($clerkUserId),
+            ], 200);
+        } catch (RuntimeException $runtimeException) {
+            return response()->json([
+                'status' => 422,
+                'message' => $runtimeException->getMessage(),
+            ], 422);
+        } catch (Throwable $throwable) {
+            return response()->json([
+                'status' => 422,
+                'message' => 'Percobaan menghubungkan Google belum berhasil dibersihkan. Silakan coba lagi.',
             ], 422);
         }
     }
