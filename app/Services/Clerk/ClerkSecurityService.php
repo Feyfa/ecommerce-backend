@@ -594,6 +594,7 @@ class ClerkSecurityService
             'id' => $session->id,
             'status' => $session->status->value,
             'is_current' => $session->id === $currentSessionId,
+            'is_mobile' => (bool) ($activity?->isMobile ?? false),
             'device_label' => $this->resolveDeviceLabel($activity),
             'location_label' => $this->resolveLocationLabel($activity),
             'last_active_at' => $lastActiveAt?->toIso8601String(),
@@ -612,14 +613,33 @@ class ClerkSecurityService
         }
 
         $browserName = trim((string) $activity->browserName);
-        $deviceType = trim((string) $activity->deviceType);
+        $deviceType = $this->resolveSessionDeviceType($activity);
 
         if ($browserName !== '' && $deviceType !== '') {
-            return "{$browserName} di {$this->formatDeviceType($deviceType)}";
+            return "{$browserName} di {$deviceType}";
         }
 
         if ($browserName !== '') {
             return $browserName;
+        }
+
+        if ($deviceType !== '') {
+            return $deviceType;
+        }
+
+        return 'Perangkat tidak dikenal';
+    }
+
+    /**
+     * Tujuan helper ini untuk menormalkan tipe perangkat dari Clerk agar
+     * Android mobile yang berbasis Linux tidak ditampilkan sebagai desktop Linux.
+     */
+    private function resolveSessionDeviceType(SessionActivityResponse $activity): string
+    {
+        $deviceType = trim((string) $activity->deviceType);
+
+        if ($activity->isMobile && strcasecmp($deviceType, 'Linux') === 0) {
+            return 'Android';
         }
 
         if ($deviceType !== '') {
