@@ -136,6 +136,7 @@ Success response:
         "id": "sess_xxx",
         "status": "active",
         "is_current": true,
+        "is_mobile": false,
         "device_label": "Chrome di Desktop",
         "location_label": "Jakarta, Indonesia",
         "last_active_at": "2026-06-25T20:15:00+00:00",
@@ -151,6 +152,8 @@ Behavior notes:
 - Only active Clerk sessions are listed.
 - Session rows are sorted by newest activity first.
 - Device and location labels are formatted by `ClerkSecurityService`.
+- Android sessions reported by Clerk as mobile Linux are normalized to Android.
+- `is_mobile` exposes Clerk's device category so the frontend does not infer it from the label.
 - The current session is identified by the Clerk session id from the authenticated request.
 
 ## POST /api/security/google/link/validate
