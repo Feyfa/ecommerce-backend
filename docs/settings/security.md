@@ -164,7 +164,18 @@ The backend validates that:
 - the Google email is verified;
 - the same Google external account is not already attached to another Clerk user.
 
-If invalid Google accounts are found, the service removes them from the current Clerk user so the local account is not left with the wrong provider link.
+This endpoint is called only after the frontend confirms that Clerk completed
+and verified the Google OAuth connection. If final validation rejects a Google
+account, the service removes that external account from the current Clerk user.
+It does not delete any email address.
+
+Cleanup rules:
+
+- Google and Facebook responses can expose an identification ID (`idn_...`) as the model `id`, while Clerk's delete endpoint requires the external account resource ID (`eac_...`).
+- The service resolves `external_account_id` from Clerk's raw user response and keys it by provider plus identification ID so different providers cannot be mixed up.
+- Provider cleanup never deletes the primary or secondary email addresses.
+- A not-found deletion response is only treated as an idempotent success after the latest Clerk user state confirms that the rejected external account is no longer connected.
+- The success response returns the resolved `eac_...` resource ID, not the `idn_...` identification ID.
 
 Success response:
 
@@ -186,6 +197,31 @@ Validation failure response:
 {
   "status": 422,
   "message": "Email Google harus sama dengan email akun Anda."
+}
+```
+
+## POST /api/security/google/link/cleanup
+
+Removes temporary Google external accounts left on the authenticated Clerk user
+after a failed, cancelled, or expired account-link OAuth callback.
+
+This flow requires **Allow users to change their email address** to be disabled
+in every Clerk environment. Clerk then blocks a different Google email before
+it can become another email address on the user. The cleanup endpoint removes
+only Google external accounts whose OAuth verification status is not
+`verified`; an existing verified Google account and every email address remain
+untouched. After deletion, Laravel fetches the Clerk user again and reports an
+error if the rejected external account is still present.
+
+Success response:
+
+```json
+{
+  "status": 200,
+  "message": "Failed Google account link cleaned successfully.",
+  "google": {
+    "removed_total": 1
+  }
 }
 ```
 
