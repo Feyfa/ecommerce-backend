@@ -7,6 +7,10 @@ use App\Services\Clerk\ClerkSecurityService;
 use Clerk\Backend\ClerkBackend;
 use Clerk\Backend\Models\Components\ExternalAccountWithVerification;
 use Clerk\Backend\Models\Components\ExternalAccountWithVerificationObject;
+use Clerk\Backend\Models\Components\Session;
+use Clerk\Backend\Models\Components\SessionActivityResponse;
+use Clerk\Backend\Models\Components\SessionObject;
+use Clerk\Backend\Models\Components\Status;
 use Clerk\Backend\Models\Components\User as ClerkUser;
 use Clerk\Backend\Models\Components\VerificationOauthVerificationOauth;
 use Clerk\Backend\Models\Components\VerificationOauthVerificationObject;
@@ -23,6 +27,68 @@ use RuntimeException;
 
 class ClerkSecurityServiceTest extends TestCase
 {
+    public function test_formatted_session_exposes_mobile_category_and_normalized_android_label(): void
+    {
+        $service = new ClerkSecurityService(new ClerkBackendClientService());
+        $method = new ReflectionMethod($service, 'formatSession');
+        $activity = new SessionActivityResponse(
+            object: 'session_activity',
+            id: 'activity_test',
+            isMobile: true,
+            deviceType: 'Linux',
+            browserName: 'Chrome'
+        );
+        $session = new Session(
+            object: SessionObject::Session,
+            id: 'session_test',
+            userId: 'user_test',
+            clientId: 'client_test',
+            status: Status::Active,
+            lastActiveAt: 1_750_000_000,
+            expireAt: 1_750_003_600,
+            abandonAt: 1_750_007_200,
+            updatedAt: 1_750_000_000,
+            createdAt: 1_750_000_000,
+            latestActivity: $activity
+        );
+
+        $result = $method->invoke($service, $session, 'session_test');
+
+        $this->assertTrue($result['is_mobile']);
+        $this->assertSame('Chrome di Android', $result['device_label']);
+    }
+
+    #[DataProvider('deviceLabelCases')]
+    public function test_device_label_uses_mobile_context(
+        bool $isMobile,
+        ?string $deviceType,
+        ?string $browserName,
+        string $expected
+    ): void {
+        $service = new ClerkSecurityService(new ClerkBackendClientService());
+        $method = new ReflectionMethod($service, 'resolveDeviceLabel');
+        $activity = new SessionActivityResponse(
+            object: 'session_activity',
+            id: 'activity_test',
+            isMobile: $isMobile,
+            deviceType: $deviceType,
+            browserName: $browserName
+        );
+
+        $this->assertSame($expected, $method->invoke($service, $activity));
+    }
+
+    public static function deviceLabelCases(): array
+    {
+        return [
+            'Android reported as Linux' => [true, 'Linux', 'Chrome', 'Chrome di Android'],
+            'desktop Linux' => [false, 'Linux', 'Chrome', 'Chrome di Linux'],
+            'explicit Android' => [true, 'Android', 'Chrome', 'Chrome di Android'],
+            'unknown mobile type' => [true, null, 'Chrome', 'Chrome di Perangkat mobile'],
+            'unknown desktop type' => [false, null, 'Chrome', 'Chrome di Perangkat desktop'],
+        ];
+    }
+
     #[DataProvider('providerVerificationCases')]
     public function test_external_account_is_connected_after_oauth_is_verified(
         VerificationOauthVerificationStatus $status,
