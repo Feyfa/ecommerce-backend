@@ -22,3 +22,6 @@ Review the relevant documentation before modifying endpoints, business logic, da
 
 The project may include separate frontend and deployment repositories. If a task affects another repository and that repository is available in the workspace, inspect its code and documentation as well. Do not assume that related repositories are always available or located at a specific path.
 
+## GitHub Pull Requests
+
+When the user asks to create, open, update, or otherwise operate a pull request, use the GitHub API through the connected GitHub integration. Do not use the GitHub website through browser automation for pull request operations unless the API is unavailable or the user explicitly requests browser-based interaction.
