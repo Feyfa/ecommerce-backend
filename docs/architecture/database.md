@@ -126,6 +126,28 @@ Indexes:
 - `user_id_seller` for seller product lists.
 - `updated_at` for recently updated product sorting.
 
+The legacy `img` column remains a compatibility cover and mirrors the path of `product_images.position = 1`.
+
+### product_images
+
+Stores the ordered image collection for each product.
+
+Important columns:
+
+- `id`: UUID primary key.
+- `product_id`: UUID reference to the owning product.
+- `path`: stored image path.
+- `position`: display order from 1 to 5; position 1 is the primary cover.
+
+Constraints and indexes:
+
+- Foreign key to `products.id` with cascade delete.
+- Index on `product_id`.
+- Unique constraint on `product_id, position`.
+- PostgreSQL check constraint limiting `position` to values from 1 through 5.
+
+The table-creation migration copies non-empty legacy `products.img` paths into position 1. It copies only database references and does not move physical files.
+
 ### keranjangs
 
 Stores cart items.

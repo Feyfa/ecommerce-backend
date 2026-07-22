@@ -15,9 +15,9 @@ Current supported actions:
 - Filter seller products by stock condition.
 - Sort seller products by update date, price, stock, or name.
 - Show one seller product.
-- Create a product with image upload.
-- Update product fields and optionally replace the image.
-- Delete a product and its stored image.
+- Create a product with one to five image uploads.
+- Update product fields and manage image additions, removals, and ordering.
+- Delete a product and all of its stored images.
 
 ## Main Files
 
@@ -30,8 +30,17 @@ Current supported actions:
 - `app/Models/Product.php`
   Product model and relationships.
 
+- `app/Models/ProductImage.php`
+  Ordered image records owned by a product.
+
 - `app/Models/Keranjang.php`
   Used during product deletion to remove cart rows that reference the deleted product.
+
+- `database/migrations/2026_07_21_000001_create_product_images_table.php`
+  Creates the ordered image table and backfills legacy product covers as position 1.
+
+- `tests/Feature/ProductImagesTest.php`
+  Covers image limits, malformed manifests, ordering, cleanup, migration backfill, and seller ownership.
 
 ## Routes
 
@@ -53,7 +62,7 @@ DELETE /api/product/{user_id_seller}/{id}
 
 Required query/body data:
 
-- `products_current_id`: JSON encoded array of product ids already loaded by the frontend.
+- `products_current_id`: JSON encoded array of product ids already loaded by the frontend. Malformed JSON and non-array JSON values are rejected.
 
 Optional data:
 
@@ -104,15 +113,16 @@ This endpoint is used before opening the edit form with existing product data.
 Required form data:
 
 - `user_id_seller`: UUID.
-- `img`: required image file, max 1024 KB.
+- `images[]`: required image files, between 1 and 5 files, max 1024 KB each.
+- `image_order[]`: required ordered tokens. New uploads use `new:{index}`, matching the zero-based index in `images[]`.
 - `name`: required, minimum 3 characters.
 - `price`: required integer, minimum 1.
 - `stock`: required integer, minimum 1.
 
 Behavior:
 
-- Stores the uploaded image in `product-imgs`.
-- Creates a product row with the stored image path.
+- Stores every uploaded image in `product-imgs`.
+- Creates ordered `product_images` rows and keeps the first path in `products.img` as a compatibility cover.
 - Returns the created product.
 
 ### Update Product
@@ -121,20 +131,23 @@ Behavior:
 
 Required form data:
 
-- `oldImg`: current stored image path.
 - `name`: required, minimum 3 characters.
 - `price`: required integer, minimum 1.
 - `stock`: required integer.
+- `image_order[]`: required final image order containing between 1 and 5 tokens.
 
 Optional form data:
 
-- `img`: replacement image file, max 1024 KB.
+- `images[]`: optional new image files, max 1024 KB each. New files are referenced from `image_order[]` with `new:{index}`.
 
 Behavior:
 
 - Validates the product id as UUID.
-- Updates product name, price, and stock.
-- If a replacement image is uploaded, deletes `oldImg`, stores the new image in `product-imgs`, and updates the product image path.
+- Resolves the product through the authenticated seller so another seller cannot update it by UUID.
+- Existing image tokens are UUIDs from the product `images` response.
+- Updates product fields and rebuilds the final image order in one database transaction.
+- The first image becomes `position = 1` and is synchronized to `products.img`.
+- Removed physical files are deleted only after the database transaction succeeds.
 - Returns the updated product.
 
 Current validation allows update `stock` to be `0`, while create requires stock to be at least `1`.
@@ -147,7 +160,7 @@ Behavior:
 
 - Validates `user_id_seller` and `id` as UUID.
 - Deletes cart rows in `keranjangs` where `product_id` matches the product id.
-- Deletes the stored product image.
+- Deletes every stored product image.
 - Deletes the product row.
 
 ## Response Shape
@@ -179,12 +192,24 @@ Create and update responses include:
 }
 ```
 
+Each returned product keeps the legacy `img` cover and includes its ordered image collection:
+
+```json
+{
+  "img": "product-imgs/main.jpg",
+  "images": [
+    { "id": "uuid", "path": "product-imgs/main.jpg", "position": 1 }
+  ]
+}
+```
+
 Validation failures return `422` with `message` containing validator messages.
 
 ## Data Notes
 
 - Product ids are UUIDs.
-- Product image paths are stored in the database and resolved by the frontend through the configured storage symlink/base URL.
+- Product image paths are stored in `product_images`; `products.img` mirrors position 1 for existing buyer, cart, checkout, and transaction consumers.
+- The product-images migration backfills every non-empty legacy `products.img` as position 1 without moving the physical file.
 - Product list pagination uses `products_current_id` instead of page numbers.
 - Search uses PostgreSQL `ILIKE`, so it is case-insensitive.
 - Stock filtering and sorting use existing `products` columns, so they do not require extra database fields.
@@ -193,8 +218,44 @@ Validation failures return `422` with `message` containing validator messages.
 ## Known Decisions
 
 - Product APIs are authenticated with Clerk-backed API auth.
+- Seller product operations enforce the authenticated seller identity.
 - The product list endpoint is seller-scoped by `user_id_seller`.
-- Image upload size is currently limited to 1024 KB.
+- Products require 1 to 5 images, limited to 1024 KB per image.
+- Image position 1 is the primary product cover.
 - Update can set stock to `0`; create cannot.
 - Product list returns a maximum of 50 products per request.
 - The backend docs file name matches the frontend docs file name so the same feature can be compared across both repositories.
+
+## TOK-6 Manual QA Checklist
+
+### Phase A — Main Flow
+
+| ID | Done | Action | Expected |
+| --- | --- | --- | --- |
+| TOK-6-A1 | ✅ | Create a product with 5 valid images. | Card uses image 1; edit reloads all 5; database positions are 1–5. |
+| TOK-6-A2 | ✅ | Drag another image to position 1 and save. | Card cover and `products.img` change to the new position 1. |
+
+### Phase B — Edit Images
+
+| ID | Done | Action | Expected |
+| --- | --- | --- | --- |
+| TOK-6-B1 | ✅ | Remove 1 image, add 1 new image, reorder, and save. | Final order persists; removed file is deleted; new file is stored. |
+| TOK-6-B2 | ✅ | Remove images until 1 remains, then save. | Product saves with exactly 1 primary image. |
+| TOK-6-B3 | ✅ | Change previews, then cancel and reopen edit. | No update is sent; the last saved state returns. |
+
+### Phase C — Validation
+
+| ID | Done | Action | Expected |
+| --- | --- | --- | --- |
+| TOK-6-C1 | ✅ | Remove every image and press save. | Submit is rejected; saved data stays unchanged. |
+| TOK-6-C2 | ✅ | Select more files than the available 5 slots. | UI remains at no more than 5 images. |
+| TOK-6-C3 | ✅ | Select a non-image and an image larger than 1 MB. | Both files are rejected and not uploaded. |
+
+### Phase D — Compatibility and Cleanup
+
+| ID | Done | Action | Expected |
+| --- | --- | --- | --- |
+| TOK-6-D1 | ✅ | Open a legacy product after migration. | Legacy `products.img` appears as `product_images.position = 1`. |
+| TOK-6-D2 | ✅ | Check buyer card, cart, checkout, and transaction. | Each view still displays the current primary image. |
+| TOK-6-D3 | ✅ | Delete a disposable product with multiple images. | Product rows and all physical image files are removed. |
+| TOK-6-D4 | ✅ | Try modifying another seller's product UUID. | The request is forbidden or returns not found; no data changes. |
