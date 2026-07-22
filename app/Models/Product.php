@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Product extends Model
@@ -26,6 +26,14 @@ class Product extends Model
     public function keranjangs()
     {
         return $this->hasMany(Keranjang::class, 'product_id');
+    }
+
+    /**
+     * Mengambil seluruh gambar produk berdasarkan urutan tampil.
+     */
+    public function images()
+    {
+        return $this->hasMany(ProductImage::class)->orderBy('position');
     }
 
     public function transactionProducts()
