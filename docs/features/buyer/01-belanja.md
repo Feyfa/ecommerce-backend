@@ -12,8 +12,8 @@ Current supported actions:
 
 - List products available for the buyer.
 - Search products by product name or seller name.
-- Filter products by buyer-facing stock availability.
-- Sort products by latest update, price, or name.
+- Always restrict the buyer catalog to products with purchasable stock.
+- Sort products by update date, price, or name.
 - Exclude products already loaded by the frontend.
 - Add a product to the buyer cart.
 - Increase cart quantity when the same product is added again.
@@ -25,7 +25,7 @@ Current supported actions:
   Defines the authenticated belanja and keranjang API routes.
 
 - `app/Http/Controllers/BelanjaController.php`
-  Handles buyer product list, search, stock filter, and sort behavior.
+  Handles buyer product list, purchasable-stock restriction, search, and sort behavior.
 
 - `app/Http/Controllers/KeranjangController.php`
   Handles add-to-cart behavior used from the belanja page.
@@ -41,7 +41,7 @@ Current supported actions:
 All current buyer belanja routes are inside the Clerk-authenticated API group.
 
 ```text
-GET  /api/belanja/{user_id_seller}
+GET  /api/belanja
 POST /api/keranjang
 ```
 
@@ -51,7 +51,7 @@ POST /api/keranjang
 
 ### List Belanja Products
 
-`GET /api/belanja/{user_id_seller}`
+`GET /api/belanja`
 
 Required query/body data:
 
@@ -60,22 +60,21 @@ Required query/body data:
 Optional data:
 
 - `search_product`: product or seller search keyword.
-- `stock_filter`: buyer stock filter. Allowed values are `all`, `available`, and `empty`.
-- `sort_product`: sorting option. Allowed values are `latest`, `price_highest`, `price_lowest`, `name_asc`, and `name_desc`.
+- `sort_product`: sorting option. Allowed values are `latest`, `oldest`, `price_highest`, `price_lowest`, `name_asc`, and `name_desc`.
 
 Behavior:
 
-- Validates `user_id_seller` as UUID.
-- Validates `stock_filter` and `sort_product` against allowed values when present.
-- Excludes products owned by `user_id_seller`.
+- Derives the current user id from the authenticated request instead of client input.
+- Validates `products_current_id` as a JSON array and `sort_product` against allowed values when present.
+- Excludes products owned by the authenticated user.
 - Excludes ids from `products_current_id`.
-- Filters by `products.name ILIKE %search_product%` or `users.name ILIKE %search_product%`.
-- Applies stock filtering when the buyer selects available or sold-out products.
+- Applies case-insensitive matching against product or seller name with normalized `LOWER(...) LIKE` expressions.
+- Always requires `products.stock > 0`, regardless of legacy or unknown stock-filter query parameters.
 - Joins `products` with `users` to return seller identity for each card.
 - Orders by the selected sort option, defaulting to `products.updated_at DESC`.
 - Returns up to 200 products.
 
-This endpoint is used by the frontend for initial list loading, search, filtering, sorting, and infinite scroll.
+This endpoint is used by the frontend for initial list loading, search, sorting, and infinite scroll.
 
 ### Add To Cart
 
@@ -83,7 +82,7 @@ This endpoint is used by the frontend for initial list loading, search, filterin
 
 Required body data:
 
-- `user_id_seller`: UUID.
+- `user_id_seller`: UUID of the seller whose product is added to the cart.
 - `user_id_buyer`: UUID.
 - `product_id`: UUID.
 
@@ -135,10 +134,10 @@ Stock failures return `422` with `message.stock_maximum`.
 - Product ids and user ids are UUIDs.
 - Product image paths are stored in the database and resolved by the frontend through the configured storage symlink/base URL.
 - Buyer belanja pagination uses `products_current_id` instead of page numbers.
-- Search uses PostgreSQL `ILIKE`, so it is case-insensitive.
-- Stock filter uses simple indexed-friendly comparisons against `products.stock`.
+- Search normalizes both columns and keywords to lowercase so it remains case-insensitive and testable across supported database environments.
+- Buyer stock availability is an API invariant rather than a frontend-selected filter.
 - Sort options use direct `orderBy` clauses against product columns.
-- The route parameter is named `user_id_seller`, but in the belanja context it represents the current user's seller id to exclude their own products from the buyer list.
+- The primary route does not accept a user id; the authenticated token owner is the source of truth.
 
 ## Known Decisions
 
@@ -146,7 +145,16 @@ Stock failures return `422` with `message.stock_maximum`.
 - Buyer belanja intentionally excludes the current user's seller products.
 - Product list returns a maximum of 200 products per request.
 - Search covers both product name and seller name.
-- Buyer stock filters intentionally support fewer values than seller product management because buyers only need all products, available stock, or sold-out products.
-- Buyer sort options intentionally exclude stock-based sorting because stock management is a seller workflow.
-- Add-to-cart rejects missing products and products with stock lower than `1`; the frontend also hides the cart action for sold-out products.
+- Buyer does not receive sold-out products because there is no buyer workflow that can act on them.
+- Buyer and seller share the same update-date, price, and name sort contract; stock management remains a seller workflow.
+- Add-to-cart still rejects missing products and products with stock lower than `1` to handle stock changes after listing.
 - The backend docs file name matches the frontend docs file name so the same feature can be compared across both repositories.
+
+## TOK-17 Manual QA Checklist
+
+| ID | Done | Action | Expected |
+| --- | --- | --- | --- |
+| TOK-17-B1 | ✅ | Request katalog berisi stok `1`, `0`, negatif, dan produk sendiri; coba juga URL lama yang menyertakan UUID. | Hanya produk seller lain dengan stok `> 0` yang dikembalikan; URL lama tidak tersedia. |
+| TOK-17-B2 | ✅ | Jalankan `latest`, `oldest`, kedua urutan harga, dan kedua urutan nama. | Keenam nilai diterima dan urutan hasil sesuai pilihan. |
+| TOK-17-B3 | ✅ | Kombinasikan pencarian nama produk/seller, sorting, dan `products_current_id`. | Pencarian tetap case-insensitive, ID yang sudah dimuat tidak muncul, dan hasil tetap terurut. |
+| TOK-17-B4 | ✅ | Kirim cursor invalid/non-array dan ulangi request valid dengan parameter legacy `stock_filter=empty`. | Cursor invalid ditolak `422`; request valid tetap hanya mengembalikan stok `> 0`. |
