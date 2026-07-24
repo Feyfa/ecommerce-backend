@@ -45,8 +45,8 @@ class ProductController extends Controller
                     },
                 ],
                 'search_product' => ['nullable', 'string'],
-                'stock_filter' => ['nullable', Rule::in(['all', 'available', 'low', 'empty'])],
-                'sort_product' => ['nullable', Rule::in(['latest', 'oldest', 'price_highest', 'price_lowest', 'stock_highest', 'stock_lowest', 'name_asc', 'name_desc'])],
+                'stock_filter' => ['nullable', Rule::in(Product::STOCK_FILTER_OPTIONS)],
+                'sort_product' => ['nullable', Rule::in(Product::SORT_OPTIONS)],
             ]
         );
 
@@ -64,46 +64,18 @@ class ProductController extends Controller
         // --- step 2 - end - pastikan seller hanya membaca daftar produknya sendiri
 
         // --- step 3 - start - siapkan query dasar dan parameter pencarian produk
-        $products_current_id = json_decode($request->products_current_id, true);
-        $search_product = (isset($request->search_product)) ? trim($request->search_product) : '';
-        $stock_filter = $request->stock_filter ?? 'all';
-        $sort_product = $request->sort_product ?? 'latest';
+        $products_current_id = json_decode($validate['products_current_id'], true);
+        $search_product = trim($validate['search_product'] ?? '');
+        $stock_filter = $validate['stock_filter'] ?? 'all';
+        $sort_product = $validate['sort_product'] ?? 'latest';
 
         $products = Product::with('images')
             ->where('user_id_seller', $validate['user_id_seller'])
             ->whereNotIn('id', $products_current_id)
-            ->where('name', 'ILIKE', "%$search_product%");
+            ->whereRaw('LOWER(name) LIKE ?', ['%'.mb_strtolower($search_product).'%'])
+            ->withStockCondition($stock_filter)
+            ->withProductSort($sort_product);
         // --- step 3 - end - siapkan query dasar dan parameter pencarian produk
-
-        // --- step 4 - start - terapkan filter kondisi stok
-        if ($stock_filter == 'available') {
-            $products->where('stock', '>', 0);
-        } elseif ($stock_filter == 'low') {
-            $products->whereBetween('stock', [1, 5]);
-        } elseif ($stock_filter == 'empty') {
-            $products->where('stock', '<=', 0);
-        }
-        // --- step 4 - end - terapkan filter kondisi stok
-
-        // --- step 5 - start - terapkan urutan produk dan batasi hasil response
-        if ($sort_product == 'oldest') {
-            $products->orderBy('updated_at', 'ASC');
-        } elseif ($sort_product == 'price_highest') {
-            $products->orderBy('price', 'DESC');
-        } elseif ($sort_product == 'price_lowest') {
-            $products->orderBy('price', 'ASC');
-        } elseif ($sort_product == 'stock_highest') {
-            $products->orderBy('stock', 'DESC');
-        } elseif ($sort_product == 'stock_lowest') {
-            $products->orderBy('stock', 'ASC');
-        } elseif ($sort_product == 'name_asc') {
-            $products->orderBy('name', 'ASC');
-        } elseif ($sort_product == 'name_desc') {
-            $products->orderBy('name', 'DESC');
-        } else {
-            $products->orderBy('updated_at', 'DESC');
-        }
-        // --- step 5 - end - terapkan urutan produk dan batasi hasil response
 
         return response()->json(['status' => 200, 'products' => $products->limit(50)->get()], 200);
     }
