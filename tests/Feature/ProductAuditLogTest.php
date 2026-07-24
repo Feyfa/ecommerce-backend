@@ -81,6 +81,17 @@ class ProductAuditLogTest extends TestCase
         $audit = AuditLog::query()->sole();
 
         $this->assertSame(AuditEvent::PRODUCT_UPDATED, $audit->event);
+
+        // PostgreSQL jsonb does not preserve object-key order. Rebuild each
+        // payload in the contract order so this remains a strict value/type
+        // assertion on both PostgreSQL CI and SQLite in-memory tests.
+        $changes = array_map(static fn (array $change): array => [
+            'field' => $change['field'],
+            'label' => $change['label'],
+            'before' => $change['before'],
+            'after' => $change['after'],
+        ], $audit->context['changes']);
+
         $this->assertSame([
             [
                 'field' => 'name',
@@ -94,7 +105,9 @@ class ProductAuditLogTest extends TestCase
                 'before' => 12500,
                 'after' => 15000,
             ],
-        ], $audit->context['changes']);
+        ], $changes);
+
+        $imageChanges = $audit->context['image_changes'];
         $this->assertSame([
             'before_count' => 2,
             'after_count' => 2,
@@ -102,7 +115,14 @@ class ProductAuditLogTest extends TestCase
             'removed_count' => 1,
             'cover_changed' => true,
             'order_changed' => false,
-        ], $audit->context['image_changes']);
+        ], [
+            'before_count' => $imageChanges['before_count'],
+            'after_count' => $imageChanges['after_count'],
+            'added_count' => $imageChanges['added_count'],
+            'removed_count' => $imageChanges['removed_count'],
+            'cover_changed' => $imageChanges['cover_changed'],
+            'order_changed' => $imageChanges['order_changed'],
+        ]);
         $this->assertStringNotContainsString('product-imgs/', json_encode($audit->context, JSON_THROW_ON_ERROR));
     }
 
