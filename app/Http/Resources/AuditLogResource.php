@@ -43,6 +43,17 @@ class AuditLogResource extends JsonResource
                 : $this->maskIpAddress($this->ip_address),
             'occurred_at' => $this->occurred_at?->toIso8601String(),
         ];
+
+        if ($event->category() === 'product') {
+            $data['subject'] = [
+                'type' => $this->subject_type,
+                'id' => $this->subject_id,
+                'name' => $context['subject_name'] ?? null,
+            ];
+            $data['product_snapshot'] = $context['product_snapshot'] ?? null;
+            $data['changes'] = $context['changes'] ?? [];
+            $data['image_changes'] = $context['image_changes'] ?? null;
+        }
         // --- step 2 - end - full IP hanya boleh keluar pada route detail yang sudah owner-scoped
 
         return $data;

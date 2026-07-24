@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\AuditEvent;
 use App\Models\AuditLog;
+use App\Models\Product;
 use App\Models\User;
 use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
@@ -111,12 +112,110 @@ class AuditLogService
     }
 
     /**
+     * Mencatat kondisi awal produk setelah produk dan seluruh gambar berhasil dibuat.
+     */
+    public function recordProductCreated(User $user, Product $product, Request $request): AuditLog
+    {
+        return $this->record(
+            user: $user,
+            request: $request,
+            event: AuditEvent::PRODUCT_CREATED,
+            idempotencySource: "product-created|{$product->id}",
+            subjectType: 'product',
+            subjectId: (string) $product->id,
+            extraContext: [
+                'subject_name' => (string) $product->name,
+                'product_snapshot' => $this->productSnapshot($product),
+            ],
+        );
+    }
+
+    /**
+     * Mencatat field dan metadata gambar yang berubah pada satu request update.
+     * Request id menjadi bagian kunci agar retry request yang sama tetap idempotent.
+     *
+     * @param  array<int, array{field: string, label: string, before: mixed, after: mixed}>  $changes
+     * @param  array<string, int|bool>  $imageChanges
+     */
+    public function recordProductUpdated(
+        User $user,
+        Product $product,
+        Request $request,
+        array $changes,
+        array $imageChanges
+    ): AuditLog {
+        $requestId = $this->resolveRequestId($request);
+
+        return $this->record(
+            user: $user,
+            request: $request,
+            event: AuditEvent::PRODUCT_UPDATED,
+            idempotencySource: "product-updated|{$product->id}|{$requestId}",
+            subjectType: 'product',
+            subjectId: (string) $product->id,
+            extraContext: [
+                'subject_name' => (string) $product->name,
+                'product_snapshot' => $this->productSnapshot($product),
+                'changes' => array_values($changes),
+                'image_changes' => $imageChanges,
+            ],
+            requestId: $requestId,
+        );
+    }
+
+    /**
+     * Menyimpan snapshot terakhir sebelum row produk dihapus agar detail audit
+     * tetap dapat dibaca tanpa bergantung pada product storage.
+     *
+     * @param  array{name: string, price: int, stock: int, image_count: int}  $snapshot
+     */
+    public function recordProductDeleted(
+        User $user,
+        Product $product,
+        Request $request,
+        array $snapshot
+    ): AuditLog {
+        return $this->record(
+            user: $user,
+            request: $request,
+            event: AuditEvent::PRODUCT_DELETED,
+            idempotencySource: "product-deleted|{$product->id}",
+            subjectType: 'product',
+            subjectId: (string) $product->id,
+            extraContext: [
+                'subject_name' => $snapshot['name'],
+                'product_snapshot' => [
+                    'price' => $snapshot['price'],
+                    'stock' => $snapshot['stock'],
+                    'image_count' => $snapshot['image_count'],
+                ],
+            ],
+        );
+    }
+
+    /**
+     * Membentuk snapshot allow-listed tanpa path atau identifier gambar.
+     *
+     * @return array{price: int, stock: int, image_count: int}
+     */
+    public function productSnapshot(Product $product): array
+    {
+        return [
+            'price' => (int) $product->price,
+            'stock' => (int) $product->stock,
+            'image_count' => $product->relationLoaded('images')
+                ? $product->images->count()
+                : $product->images()->count(),
+        ];
+    }
+
+    /**
      * Insert-or-ignore dipakai bersama unique idempotency_key agar request
      * paralel tetap tidak membuat row audit duplikat.
      *
      * @param  User  $user  Actor lokal pemilik audit.
      * @param  Request  $request  Request sumber metadata audit.
-     * @param  AuditEvent  $event  Event autentikasi yang berhasil.
+     * @param  AuditEvent  $event  Event domain yang berhasil.
      * @param  string  $idempotencySource  Sumber stabil untuk hash unique.
      * @param  string  $subjectType  Tipe object yang terkena aktivitas.
      * @param  string  $subjectId  Identifier object yang terkena aktivitas.
@@ -129,18 +228,27 @@ class AuditLogService
         string $idempotencySource,
         string $subjectType,
         string $subjectId,
-        array $extraContext = []
+        array $extraContext = [],
+        ?string $requestId = null
     ): AuditLog {
         // --- step 1 - start - susun metadata aman dan identifier untuk insert idempotent
         $idempotencyKey = hash('sha256', $idempotencySource);
         $now = $this->formatDatabaseTimestamp(now());
         $userAgent = (string) $request->userAgent();
-        $context = array_filter([
-            'provider' => 'clerk',
-            'auth_method' => null,
+        $context = [
             'device' => $this->userAgentParserService->parse($userAgent),
             ...$extraContext,
-        ], static fn ($value) => $value !== null);
+        ];
+
+        if ($event->category() === 'authentication') {
+            $context = [
+                'provider' => 'clerk',
+                'auth_method' => null,
+                ...$context,
+            ];
+        }
+
+        $context = array_filter($context, static fn ($value) => $value !== null);
         // --- step 1 - end - susun metadata aman dan identifier untuk insert idempotent
 
         // --- step 2 - start - insert atomik dan tangani dua request paralel untuk event yang sama
@@ -149,14 +257,14 @@ class AuditLogService
             'actor_user_id' => $user->id,
             'actor_clerk_user_id' => $user->clerk_user_id,
             'event' => $event->value,
-            'category' => 'authentication',
+            'category' => $event->category(),
             'subject_type' => $subjectType,
             'subject_id' => $subjectId,
             'context' => json_encode($context, JSON_THROW_ON_ERROR),
             'ip_address' => $request->ip(),
             'user_agent' => $userAgent !== '' ? $userAgent : null,
             'clerk_session_id' => $this->resolveClerkSessionId($request) ?: null,
-            'request_id' => $this->resolveRequestId($request),
+            'request_id' => $requestId ?? $this->resolveRequestId($request),
             'idempotency_key' => $idempotencyKey,
             'occurred_at' => $now,
             'created_at' => $now,
