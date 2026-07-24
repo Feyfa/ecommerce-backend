@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Keranjang;
 use App\Models\Product;
 use App\Models\ProductImage;
+use App\Services\AuditLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -14,6 +15,10 @@ use Throwable;
 
 class ProductController extends Controller
 {
+    public function __construct(
+        protected AuditLogService $auditLogService
+    ) {}
+
     /**
      * Mengambil daftar produk milik seller dengan filter dan urutan yang dipilih.
      */
@@ -132,6 +137,10 @@ class ProductController extends Controller
             ->where('user_id_seller', $validate['user_id_seller'])
             ->where('id', $validate['id'])
             ->first();
+
+        if (! $product) {
+            return response()->json(['status' => 404, 'message' => 'Product Not Found'], 404);
+        }
         // --- step 3 - end - ambil produk dan seluruh gambar sesuai urutan
 
         return response()->json(['status' => 200, 'product' => $product]);
@@ -173,7 +182,7 @@ class ProductController extends Controller
                 $storedPaths[$index] = $storedPath;
             }
 
-            $product = DB::transaction(function () use ($validate, $storedPaths) {
+            $product = DB::transaction(function () use ($request, $validate, $storedPaths) {
                 $product = Product::create([
                     'user_id_seller' => $validate['user_id_seller'],
                     'img' => $storedPaths[0],
@@ -186,7 +195,10 @@ class ProductController extends Controller
                     $product->images()->create(['path' => $path, 'position' => $index + 1]);
                 }
 
-                return $product->load('images');
+                $product->load('images');
+                $this->auditLogService->recordProductCreated($request->user(), $product, $request);
+
+                return $product;
             });
         } catch (Throwable $exception) {
             Storage::delete($storedPaths);
@@ -228,6 +240,8 @@ class ProductController extends Controller
 
         $validate = $validator->validate();
         $orderedImages = $this->resolveImageOrder($request, $product);
+        $beforeValues = $this->productValues($product);
+        $imageChanges = $this->imageChanges($product, $orderedImages);
         $storedPaths = [];
         // --- step 2 - end - validasi data produk dan susun urutan gambar final
 
@@ -255,7 +269,14 @@ class ProductController extends Controller
                 ->all();
 
             // --- step 4 - start - bangun ulang posisi gambar dan sinkronkan cover dalam transaksi
-            $product = DB::transaction(function () use ($product, $validate, $orderedImages) {
+            $product = DB::transaction(function () use (
+                $request,
+                $product,
+                $validate,
+                $orderedImages,
+                $beforeValues,
+                $imageChanges
+            ) {
                 $product->images()->delete();
 
                 foreach ($orderedImages as $index => $orderedImage) {
@@ -273,7 +294,16 @@ class ProductController extends Controller
                 $product->img = $orderedImages[0]['path'];
                 $product->save();
 
-                return $product->load('images');
+                $product->load('images');
+                $this->auditLogService->recordProductUpdated(
+                    $request->user(),
+                    $product,
+                    $request,
+                    $this->productChanges($beforeValues, $product),
+                    $imageChanges,
+                );
+
+                return $product;
             });
             // --- step 4 - end - bangun ulang posisi gambar dan sinkronkan cover dalam transaksi
         } catch (Throwable $exception) {
@@ -324,12 +354,17 @@ class ProductController extends Controller
 
         // --- step 3 - start - kumpulkan seluruh path gambar sebelum row database dihapus
         $paths = $product->images->pluck('path')->push($product->img)->filter()->unique()->all();
+        $snapshot = [
+            'name' => (string) $product->name,
+            ...$this->auditLogService->productSnapshot($product),
+        ];
         // --- step 3 - end - kumpulkan seluruh path gambar sebelum row database dihapus
 
         // --- step 4 - start - hapus dependensi keranjang dan produk dalam transaksi
-        DB::transaction(function () use ($product) {
+        DB::transaction(function () use ($request, $product, $snapshot) {
             Keranjang::where('product_id', $product->id)->delete();
             $product->delete();
+            $this->auditLogService->recordProductDeleted($request->user(), $product, $request, $snapshot);
         });
         // --- step 4 - end - hapus dependensi keranjang dan produk dalam transaksi
 
@@ -433,5 +468,82 @@ class ProductController extends Controller
         // --- step 4 - end - pastikan semua file upload tercantum dalam manifest final
 
         return $orderedImages;
+    }
+
+    /**
+     * Mengambil nilai produk yang boleh muncul pada before/after audit.
+     *
+     * @return array{name: string, price: int, stock: int}
+     */
+    private function productValues(Product $product): array
+    {
+        return [
+            'name' => (string) $product->name,
+            'price' => (int) $product->price,
+            'stock' => (int) $product->stock,
+        ];
+    }
+
+    /**
+     * Menghasilkan daftar perubahan nilai yang sebenarnya saja.
+     * Request update identik tetap diaudit dengan array kosong.
+     *
+     * @param  array{name: string, price: int, stock: int}  $beforeValues
+     * @return array<int, array{field: string, label: string, before: mixed, after: mixed}>
+     */
+    private function productChanges(array $beforeValues, Product $product): array
+    {
+        $afterValues = $this->productValues($product);
+        $labels = [
+            'name' => 'Nama produk',
+            'price' => 'Harga',
+            'stock' => 'Stok',
+        ];
+        $changes = [];
+
+        foreach ($labels as $field => $label) {
+            if ($beforeValues[$field] === $afterValues[$field]) {
+                continue;
+            }
+
+            $changes[] = [
+                'field' => $field,
+                'label' => $label,
+                'before' => $beforeValues[$field],
+                'after' => $afterValues[$field],
+            ];
+        }
+
+        return $changes;
+    }
+
+    /**
+     * Merangkum perubahan gambar tanpa menyimpan path, file, atau id internal.
+     * Perubahan urutan hanya membandingkan urutan relatif gambar lama yang dipertahankan.
+     *
+     * @param  array<int, array{id?: string, path?: string, file?: mixed}>  $orderedImages
+     * @return array{before_count: int, after_count: int, added_count: int, removed_count: int, cover_changed: bool, order_changed: bool}
+     */
+    private function imageChanges(Product $product, array $orderedImages): array
+    {
+        $beforeIds = $product->images->pluck('id')->values()->all();
+        $afterExistingIds = collect($orderedImages)->pluck('id')->filter()->values()->all();
+        $beforeRetainedIds = array_values(array_filter(
+            $beforeIds,
+            static fn (string $id): bool => in_array($id, $afterExistingIds, true)
+        ));
+        $afterCoverId = $orderedImages[0]['id'] ?? null;
+
+        return [
+            'before_count' => count($beforeIds),
+            'after_count' => count($orderedImages),
+            'added_count' => count(array_filter(
+                $orderedImages,
+                static fn (array $image): bool => ! isset($image['id'])
+            )),
+            'removed_count' => count($beforeIds) - count($afterExistingIds),
+            'cover_changed' => ($beforeIds[0] ?? null) !== $afterCoverId,
+            'order_changed' => $beforeRetainedIds !== $afterExistingIds,
+        ];
     }
 }

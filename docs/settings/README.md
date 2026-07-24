@@ -15,7 +15,7 @@ The settings feature currently covers:
 - balance summary, history, and withdrawal;
 - user and company image upload/delete;
 - Clerk-backed settings security endpoints;
-- authentication audit log for successful register, login, and logout activity.
+- owner-scoped audit log for successful authentication and seller product activity.
 
 ## Main Files
 
@@ -56,7 +56,7 @@ The settings feature currently covers:
   Reads Clerk-owned account security state, validates Google external accounts, formats active sessions, and revokes sessions.
 
 - `app/Services/AuditLogService.php`
-  Records idempotent Register, Login, and Logout activity with request and device metadata.
+  Records idempotent Register, Login, Logout, and product create/update/delete activity with safe request, device, and product change metadata.
 
 ## Documents
 
