@@ -103,6 +103,7 @@ Behavior:
 - Validates `user_id_seller` and `id` as UUID.
 - Finds one product matching both seller id and product id.
 - Returns the product in `product`.
+- Returns `404` with `Product Not Found` when the authenticated seller's product does not exist.
 
 This endpoint is used before opening the edit form with existing product data.
 

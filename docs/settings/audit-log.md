@@ -1,18 +1,18 @@
 # Audit Log
 
-This document explains the backend implementation for Audit Log phase 1 under Jira issue `TOK-1`.
+This document explains the backend Audit Log foundation from `TOK-1` and the product activity extension under `TOK-16`.
 
 ## Status
 
-Implemented. The backend now stores and serves successful Register, Login, and user-initiated Logout activity.
+Implemented. The backend stores and serves successful authentication and seller product create, update, and delete activity.
 
 ## Purpose
 
 Audit Log gives an authenticated user a trustworthy history of important activity on their own account. Laravel owns audit persistence and access control; the browser must not be treated as the source of actor identity or event success.
 
-Phase 1 establishes the reusable audit foundation but records authentication activity only. Profile, address, bank account, product, checkout, transaction, and other business events are outside this phase.
+Phase 1 established the reusable authentication audit foundation. `TOK-16` extends the same owner-scoped timeline to product management. Profile, address, bank account, checkout, transaction, and other business events remain outside the current scope.
 
-## Phase 1 Scope
+## Supported Scope
 
 Phase 1 records successful events only:
 
@@ -20,6 +20,9 @@ Phase 1 records successful events only:
 auth.registered
 auth.logged_in
 auth.logged_out
+product.created
+product.updated
+product.deleted
 ```
 
 Rules:
@@ -31,6 +34,9 @@ Rules:
 - Failed registration and login attempts are outside phase 1.
 - Existing activity is not backfilled. Recording starts after the feature is deployed.
 - Audit rows have no automatic retention limit in phase 1.
+- Product reads are not audited. Only successful create, update, and delete operations are recorded.
+- Product audit persistence is part of the same database transaction as the domain mutation; an audit failure rolls back the database change.
+- Product image audit data is metadata only. It never stores image files, paths, URLs, or internal image identifiers.
 
 ## Authentication Context
 
@@ -70,7 +76,7 @@ The `audit_logs` table contains:
 | `actor_user_id` | Nullable local user UUID. User-facing queries are scoped through this value. |
 | `actor_clerk_user_id` | Snapshot of the Clerk user identifier for investigation and identity correlation. |
 | `event` | Stable machine-readable event name such as `auth.logged_in`. |
-| `category` | Event group. Phase 1 uses `authentication`. |
+| `category` | Event group. Supported values currently include `authentication` and `product`. |
 | `subject_type` | Optional subject type such as `user` or `session`. |
 | `subject_id` | Optional identifier of the affected subject. |
 | `context` | Sanitized PostgreSQL JSONB metadata. |
@@ -99,6 +105,8 @@ Additional indexes or uniqueness constraints should support:
 - one login event per user and Clerk session;
 - one logout event per user and Clerk session;
 - one registration event per local user.
+
+Product create/delete idempotency uses event plus product id. Product update additionally uses the request id so separate successful updates remain separate timeline events.
 
 The implementation hashes a stable event/session source into the unique `idempotency_key`. `insertOrIgnore` and the database unique constraint enforce idempotency safely under concurrent requests rather than relying only on a read-before-insert check.
 
@@ -159,6 +167,16 @@ user presses Logout
 ```
 
 The frontend must continue Clerk sign-out even when the audit endpoint fails or is unavailable. Session expiry, provider-side revocation, and closing the browser are not labeled as user-initiated logout in phase 1.
+
+### Product Create, Update, and Delete
+
+Seller product writes derive the actor from the authenticated request, never from `user_id_seller` in the URL or payload.
+
+- Create stores the initial price, stock, and image count after product images are persisted.
+- Update stores only actual before/after changes for name, price, and stock. An identical successful update still produces an event with an empty `changes` array.
+- Image changes store counts for before, after, added, and removed images plus cover/order booleans. Visual snapshots and storage references are intentionally excluded.
+- Delete stores the final safe snapshot before the product row disappears, so the audit detail remains readable afterward.
+- Create/update file uploads are cleaned up when the database transaction, including audit persistence, fails. Obsolete product files continue to be removed only after a successful commit.
 
 ## Authentication Method
 
@@ -240,7 +258,7 @@ Rules:
 - derive ownership from the authenticated local user;
 - never accept an arbitrary `user_id` for the user-facing endpoint;
 - default `per_page` to 20 and cap it at 50;
-- whitelist phase 1 events;
+- whitelist all currently supported authentication and product events;
 - validate date ranges;
 - reject malformed cursor payloads;
 - order by `occurred_at DESC, id DESC`;
@@ -286,7 +304,17 @@ If a retention policy is introduced later, the backend command and deployment sc
 
 ## Automated Verification
 
-`tests/Feature/AuditLogTest.php` covers:
+`tests/Feature/AuditLogTest.php` covers authentication behavior. `tests/Feature/ProductAuditLogTest.php` additionally covers:
+
+- create, update, and delete event persistence and ownership;
+- safe product snapshots and accurate before/after values;
+- image change metadata without storage paths;
+- identical updates without false value changes;
+- delete details after the product row is gone;
+- validation/ownership failures that create no audit row;
+- rollback of product data and uploaded files when audit persistence fails.
+
+The authentication suite covers:
 
 - registration creates one registration event;
 - the first registration session does not create a redundant login event;
@@ -298,11 +326,52 @@ If a retention policy is introduced later, the backend command and deployment sc
 - collection IP is masked while owner detail can return the full value;
 - collection and detail responses omit internal Clerk, user-agent, session, request, and idempotency fields;
 - cursor pagination is deterministic;
+- changing a product event filter after pagination starts a fresh cursor collection;
+- mixed authentication/product pagination remains ordered, complete, and duplicate-free;
 - filters are validated and scoped to the authenticated user;
 - malformed cursors are rejected before pagination;
 - known desktop, mobile, and tablet user agents are classified without inventing a device type for unknown clients.
 
 Sensitive-field exposure is additionally constrained by the allow-listed context in `AuditLogService` and the explicit response contract in `AuditLogResource`.
+
+## TOK-16 Manual QA Checklist
+
+Run this checklist in local or staging. Replace `⬜` with `✅` only after the action is completed and its expected result is verified. Keep evidence outside this table redacted; never capture tokens, cookies, authorization headers, or raw image storage paths.
+
+### Phase A — Main Product Audit Flow
+
+| ID | Done | Action | Expected |
+| --- | --- | --- | --- |
+| TOK-16-A1 | ✅ | Create a product with multiple valid images, then open its Audit Log detail. | Exactly one `product.created` event shows the product name, initial price, stock, and photo count without image previews or paths. |
+| TOK-16-A2 | ✅ | Update the product name, price, and stock once. | Exactly one `product.updated` event preserves accurate `Sebelum`/`Sesudah` values and the UI marks changed versus unchanged rows correctly. |
+| TOK-16-A3 | ✅ | Delete the product, then open the delete audit after confirming the product is gone. | Exactly one `product.deleted` event remains readable with the final product snapshot and deleted-product explanation. |
+
+### Phase B — Image Metadata and Idempotent Detail
+
+| ID | Done | Action | Expected |
+| --- | --- | --- | --- |
+| TOK-16-B1 | ✅ | Add one photo, remove another, change the cover, reorder retained photos, and save. | Audit text accurately reports before/after, added/removed, cover, and order metadata; it stores no photo file, path, URL, or internal image id. |
+| TOK-16-B2 | ✅ | Submit a successful update without changing product values or image order. | One update event is recorded with no false field or image changes, and the UI explains that no change was detected. |
+| TOK-16-B3 | ✅ | Repeat collection refreshes and reopen the same detail. | No duplicate event appears for the same domain operation; snapshot and metadata remain stable. |
+
+### Phase C — Validation, Ownership, and Failure Safety
+
+| ID | Done | Action | Expected |
+| --- | --- | --- | --- |
+| TOK-16-C1 | ✅ | Submit invalid create/update data and request a missing product. | Validation/not-found responses create no audit row and leave product data unchanged. |
+| TOK-16-C2 | ✅ | As Seller A, attempt to create, update, or delete a product owned by Seller B. | The operation is forbidden or not found; Seller B's data is unchanged and Seller A receives no product audit for it. |
+| TOK-16-C3 | ✅ | In local/staging, run the controlled audit-persistence failure scenario for product writes. | Database mutations roll back, new uploads are cleaned when applicable, and no successful product event is shown. |
+| TOK-16-C4 | ✅ | Inspect collection/detail responses and request Seller B's audit UUID as Seller A. | Collection IP is masked, owner detail may reveal full IP, cross-owner detail returns `404`, and no raw context or internal metadata is exposed. |
+
+### Phase D — Filters, Responsive UI, and Regression
+
+| ID | Done | Action | Expected |
+| --- | --- | --- | --- |
+| TOK-16-D1 | ✅ | Select each Product event in the grouped event filter. | Only events matching `product.created`, `product.updated`, or `product.deleted` appear for the selected filter. |
+| TOK-16-D2 | ✅ | Load more than one page, then change the Product event filter. | Each filter change discards the previous cursor and starts a new collection without stale or duplicate rows. |
+| TOK-16-D3 | ✅ | Inspect product cards and create/update/delete details on desktop and representative mobile widths. | Cards, snapshot/comparison tables, image-change card, and modal remain readable without page overflow; actions remain keyboard/touch accessible. |
+| TOK-16-D4 | ✅ | Recheck Register, Login, Logout, IP reveal, date filters, and refresh with mixed product events present. | Existing authentication audit behavior remains unchanged, owner IP reveal still works, and refresh keeps the combined timeline newest-first without duplicates. |
+| TOK-16-D5 | ✅ | Load multiple pages containing both authentication and product events. | Mixed-event pagination remains newest-first without missing or duplicate rows across page boundaries. |
 
 ## Manual QA Scenarios
 
@@ -323,7 +392,7 @@ Run the scenarios from the easiest checks to the flows with the highest security
 | --- | --- | --- | --- | --- | --- |
 | MQA-01 | Open Audit Log | Sign in normally and open `/settings/audit-log`.<br>Inspect the page and first collection request. | The page loads without console errors; title, description, filters, Refresh, and cards render; the default range is 30 days; the request uses `per_page=20`; no `Segera` badge appears. | ✅ Pass | Screenshots confirm the Audit Log UI, 30-day default (`2026-06-14` to `2026-07-13`), `GET /api/audit-logs` status `200`, `per_page=20`, no Audit Log `Segera` badge, and zero console errors. |
 | MQA-02 | Desktop and mobile layout | Check desktop and representative mobile widths such as 375px, 425px, and 476px.<br>Open Detail at each layout. | Controls remain readable without horizontal overflow; Detail stays at the card's top-right on mobile; the modal follows its content width and remains inside the viewport. | ✅ Pass | Screenshots confirm the desktop layout and responsive layouts at 375px, 400px, 425px, and 476px; filters stack correctly, cards remain readable, Detail stays at the top-right, and the content-sized modal remains inside the viewport without horizontal overflow. Additional long-list screenshots confirm the filter toolbar remains sticky inside the desktop Settings scroll area while the stacked mobile toolbar stays in normal document flow. |
-| MQA-03 | Card content and spacing | Inspect Register, Login, and Logout cards.<br>Compare title, badge, description, and metadata spacing. | Cards are consistent; description and metadata have a small readable separation; missing optional metadata is omitted instead of invented. | ✅ Pass | Screenshots confirm consistent Register, Login, and Logout presentation on desktop and mobile; title, description, divider, table, and security-note spacing are balanced; the desktop IP row aligns with the other rows; optional authentication method remains omitted because no verified value is available. |
+| MQA-03 | Card content and spacing | Inspect Register, Login, and Logout cards.<br>Compare title, description, and metadata spacing. | Cards are consistent; description and metadata have a small readable separation; missing optional metadata is omitted instead of invented. | ✅ Pass | Screenshots confirm consistent Register, Login, and Logout presentation on desktop and mobile; title, description, divider, table, and security-note spacing are balanced; the desktop IP row aligns with the other rows; optional authentication method remains omitted because no verified value is available. |
 | MQA-04 | IP masking and reveal | Confirm the card IP is masked.<br>Open Detail, reveal the IP, hide it, then close and reopen the modal. | Collection and newly opened Detail show a masked IP; full IP appears only after selecting the eye icon; reopening Detail resets it to masked. | ✅ Pass | Screenshots confirm the collection and initial Detail show `127.0.xxx.xxx`; selecting the eye reveals `127.0.0.1` and changes the control to hide; closing and reopening Detail resets the value to masked. |
 | MQA-05 | Event filters | Select Register, Login, and Logout one at a time, then return to `Semua Aktivitas`. | Every card matches the selected event; changing the filter replaces the collection and resets the previous cursor. | ✅ Pass | Screenshots confirm Register, Login, and Logout filters each return only the matching card; Network requests use `event=auth.registered`, `event=auth.logged_in`, and `event=auth.logged_out` with status `200`; the initial unfiltered request is also present and results do not mix between filter changes. |
 | MQA-06 | Time filters and no-result state | Check 7, 30, and 90 days.<br>Use a custom range containing known activity, then a valid future range.<br>Select Reset Filter. | Date boundaries follow Asia/Jakarta; the future range shows `Aktivitas tidak ditemukan`; Reset Filter returns to the default 30-day collection. | ✅ Pass | Screenshots and Network requests confirm the 7-, 30-, and 90-day presets send the corresponding date boundaries; a custom range containing 1–14 July 2026 returns known activity, while 1–8 July 2026 shows `Aktivitas tidak ditemukan`; Reset Filter restores the default 30-day collection. The custom date control remains readable on desktop and uses separate single-calendar start/end inputs on mobile without horizontal overflow. |
@@ -333,7 +402,7 @@ Run the scenarios from the easiest checks to the flows with the highest security
 
 | ID | Scenario | Manual Steps | Expected Result | Status | Evidence |
 | --- | --- | --- | --- | --- | --- |
-| MQA-08 | Register a new account | Register Account A through the normal Clerk flow.<br>Wait for `/api/auth/me` to succeed, then open Audit Log. | Exactly one Register activity exists for the first session; a redundant Login does not appear for that session. | ✅ Pass | Screenshots confirm a new Clerk account completed the normal Google registration and callback flow, reached the authenticated Audit Log page, and produced exactly one `Akun berhasil dibuat` activity at 14 July 2026 19:44 WIB. Repeated collection requests return status `200`, the Register row remains single, and no redundant Login activity appears for the registration session. |
+| MQA-08 | Register a new account | Register Account A through the normal Clerk flow.<br>Wait for `/api/auth/me` to succeed, then open Audit Log. | Exactly one Register activity exists for the first session; a redundant Login does not appear for that session. | ✅ Pass | Screenshots confirm a new Clerk account completed the normal Google registration and callback flow, reached the authenticated Audit Log page, and produced exactly one `Akun Berhasil Dibuat` activity at 14 July 2026 19:44 WIB. Repeated collection requests return status `200`, the Register row remains single, and no redundant Login activity appears for the registration session. |
 | MQA-09 | Reuse the registration session | While Account A remains signed in, refresh and navigate between authenticated routes several times.<br>Return to Audit Log and select Refresh. | The Register row remains single and no Login is created for the already-observed first session. | ✅ Pass | Screenshots confirm Account A remained authenticated while navigating across buyer routes, switching to seller mode, opening Product and Settings, and returning to Audit Log. Refresh shows the loading state and completes the Audit Log request with status `200`; the collection still contains exactly one Register activity and no new Login or duplicate Register activity. |
 | MQA-10 | Normal user-initiated logout | Sign out Account A using the application's Logout action.<br>Confirm `POST /api/auth/logout` occurs before Clerk sign-out.<br>Sign in again and inspect Audit Log. | One Logout activity exists for the previous session; local state was cleared and the user was redirected to Login during sign-out. | ✅ Pass | Screenshots confirm the application initiated `POST /api/auth/logout` before completing sign-out, the endpoint returned status `200`, local navigation returned to `/login`, and Account A could authenticate again. Audit Log then shows exactly one Logout activity between the new Login and the original Register activity, with no duplicate rows. |
 | MQA-11 | Login with a new Clerk session | After the previous logout, sign in again as Account A.<br>Refresh and navigate repeatedly, then inspect Audit Log. | Exactly one new Login exists for the new session; repeated `/api/auth/me` calls do not duplicate it. | ✅ Pass | Screenshots confirm Account A reused the new Clerk session across repeated browser refreshes and authenticated navigation, including opening Bank Account and returning to Audit Log. Repeated `/api/auth/me` and `/api/audit-logs` requests complete with status `200`; the collection remains exactly one Login, one Logout, and one Register activity, with no duplicate Login created. The updated `Login` title also renders correctly. |
@@ -360,4 +429,4 @@ Run the scenarios from the easiest checks to the flows with the highest security
 
 ## Future Phases
 
-The reusable foundation may later record security, profile, address, bank account, product, checkout, transaction, and financial actions. Those events require separate domain review and are intentionally not part of `TOK-1`.
+The reusable foundation may later record security, profile, address, bank account, checkout, transaction, and financial actions. Those events require separate domain review.

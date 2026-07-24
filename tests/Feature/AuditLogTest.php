@@ -30,6 +30,19 @@ class AuditLogTest extends TestCase
     private AuditLogService $auditLogService;
 
     /**
+     * Memastikan heading event multi-kata memakai Title Case secara konsisten.
+     */
+    public function test_event_titles_use_consistent_title_case(): void
+    {
+        $this->assertSame('Akun Berhasil Dibuat', AuditEvent::AUTH_REGISTERED->title());
+        $this->assertSame('Login', AuditEvent::AUTH_LOGGED_IN->title());
+        $this->assertSame('Logout', AuditEvent::AUTH_LOGGED_OUT->title());
+        $this->assertSame('Produk Ditambahkan', AuditEvent::PRODUCT_CREATED->title());
+        $this->assertSame('Produk Diperbarui', AuditEvent::PRODUCT_UPDATED->title());
+        $this->assertSame('Produk Dihapus', AuditEvent::PRODUCT_DELETED->title());
+    }
+
+    /**
      * Menyiapkan service audit dan melewati middleware Clerk eksternal.
      */
     protected function setUp(): void
@@ -161,6 +174,76 @@ class AuditLogTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('meta.has_more', false);
+    }
+
+    /**
+     * Memastikan timeline campuran tetap lengkap dan deterministik ketika
+     * batas halaman memotong event autentikasi dan produk.
+     */
+    public function test_mixed_event_cursor_pagination_has_no_missing_or_duplicate_rows(): void
+    {
+        // --- step 1 - start - prepare mixed events including equal timestamps for the ID tie-breaker
+        $user = $this->createUser();
+        $events = AuditEvent::cases();
+        $baseTime = CarbonImmutable::parse('2026-07-20 12:00:00');
+
+        foreach (range(0, 29) as $index) {
+            $event = $events[$index % count($events)];
+
+            $this->createTimelineAudit(
+                $user,
+                $event,
+                $baseTime->subSeconds(intdiv($index, 3)),
+                $index
+            );
+        }
+
+        $expectedIds = AuditLog::query()
+            ->where('actor_user_id', $user->id)
+            ->orderByDesc('occurred_at')
+            ->orderByDesc('id')
+            ->pluck('id')
+            ->all();
+        // --- step 1 - end - prepare mixed events including equal timestamps for the ID tie-breaker
+
+        // --- step 2 - start - follow every cursor exactly as the frontend load-more flow does
+        $collectedIds = [];
+        $collectedEvents = [];
+        $cursor = null;
+        $pageCount = 0;
+
+        do {
+            $query = '/api/audit-logs?per_page=7';
+            if ($cursor) {
+                $query .= '&cursor='.urlencode($cursor);
+            }
+
+            $response = $this->actingAs($user)
+                ->getJson($query)
+                ->assertOk();
+            $pageData = $response->json('data');
+
+            $collectedIds = array_merge($collectedIds, array_column($pageData, 'id'));
+            $collectedEvents = array_merge($collectedEvents, array_column($pageData, 'event'));
+            $cursor = $response->json('meta.next_cursor');
+            $hasMore = $response->json('meta.has_more');
+            $pageCount++;
+
+            $this->assertLessThanOrEqual(5, $pageCount, 'Pagination menghasilkan cursor yang tidak berakhir.');
+            $this->assertSame($hasMore, $cursor !== null);
+        } while ($hasMore);
+        // --- step 2 - end - follow every cursor exactly as the frontend load-more flow does
+
+        // --- step 3 - start - verify order, completeness, uniqueness, and event coverage
+        $this->assertSame(5, $pageCount);
+        $this->assertSame($expectedIds, $collectedIds);
+        $this->assertCount(30, $collectedIds);
+        $this->assertCount(30, array_unique($collectedIds));
+
+        foreach ($events as $event) {
+            $this->assertContains($event->value, $collectedEvents);
+        }
+        // --- step 3 - end - verify order, completeness, uniqueness, and event coverage
     }
 
     /**
@@ -316,6 +399,36 @@ class AuditLogTest extends TestCase
     {
         return User::factory()->create([
             'clerk_user_id' => 'user_'.Str::lower(Str::random(16)),
+        ]);
+    }
+
+    /**
+     * Membuat row timeline deterministik tanpa memanggil layanan eksternal.
+     */
+    private function createTimelineAudit(
+        User $user,
+        AuditEvent $event,
+        CarbonImmutable $occurredAt,
+        int $sequence
+    ): AuditLog {
+        $isProductEvent = $event->category() === 'product';
+
+        return AuditLog::create([
+            'actor_user_id' => $user->id,
+            'actor_clerk_user_id' => $user->clerk_user_id,
+            'event' => $event,
+            'category' => $event->category(),
+            'subject_type' => $isProductEvent ? 'product' : 'session',
+            'subject_id' => $isProductEvent ? (string) Str::uuid() : "session-{$sequence}",
+            'context' => $isProductEvent
+                ? [
+                    'subject_name' => "Produk {$sequence}",
+                    'product_snapshot' => ['price' => 12500, 'stock' => 4, 'image_count' => 1],
+                ]
+                : [],
+            'ip_address' => '127.0.0.1',
+            'idempotency_key' => hash('sha256', "mixed-pagination|{$sequence}"),
+            'occurred_at' => $occurredAt,
         ]);
     }
 
