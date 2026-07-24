@@ -13,7 +13,7 @@ Current supported actions:
 - List seller products.
 - Search seller products by name.
 - Filter seller products by stock condition.
-- Sort seller products by update date, price, stock, or name.
+- Sort seller products by update date, price, or name.
 - Show one seller product.
 - Create a product with one to five image uploads.
 - Update product fields and manage image additions, removals, and ordering.
@@ -42,6 +42,9 @@ Current supported actions:
 - `tests/Feature/ProductImagesTest.php`
   Covers image limits, malformed manifests, ordering, cleanup, migration backfill, and seller ownership.
 
+- `tests/Feature/ProductListFilterTest.php`
+  Covers buyer availability, shared sorting, seller stock conditions, combined filters, cursor validation, and seller ownership.
+
 ## Routes
 
 All current seller product routes are inside the Clerk-authenticated API group.
@@ -67,18 +70,19 @@ Required query/body data:
 Optional data:
 
 - `search_product`: product name search keyword.
-- `stock_filter`: stock filter. Allowed values are `all`, `available`, `low`, and `empty`.
-- `sort_product`: sorting option. Allowed values are `latest`, `oldest`, `price_highest`, `price_lowest`, `stock_highest`, `stock_lowest`, `name_asc`, and `name_desc`.
+- `stock_filter`: stock filter. Public values are `all`, `healthy`, `low`, and `empty`; deprecated `available` remains a compatibility alias for `healthy` during rollout.
+- `sort_product`: sorting option. Allowed values are `latest`, `oldest`, `price_highest`, `price_lowest`, `name_asc`, and `name_desc`.
 
 Behavior:
 
 - Validates `user_id_seller` as UUID.
 - Validates `stock_filter` and `sort_product` against allowed values when present.
 - Excludes ids from `products_current_id`.
-- Filters by `name ILIKE %search_product%`.
+- Applies case-insensitive product-name matching with a normalized `LOWER(name) LIKE` expression.
 - Applies stock filters:
   - `all`: no stock restriction.
-  - `available`: `stock > 0`.
+  - `healthy`: `stock > 5`.
+  - `available`: deprecated alias for `healthy` so the previous frontend remains safe during backend-first deployment.
   - `low`: `stock` between `1` and `5`.
   - `empty`: `stock <= 0`.
 - Applies sorting:
@@ -86,8 +90,6 @@ Behavior:
   - `oldest`: `updated_at ASC`.
   - `price_highest`: `price DESC`.
   - `price_lowest`: `price ASC`.
-  - `stock_highest`: `stock DESC`.
-  - `stock_lowest`: `stock ASC`.
   - `name_asc`: `name ASC`.
   - `name_desc`: `name DESC`.
 - Returns up to 50 products.
@@ -212,7 +214,7 @@ Validation failures return `422` with `message` containing validator messages.
 - Product image paths are stored in `product_images`; `products.img` mirrors position 1 for existing buyer, cart, checkout, and transaction consumers.
 - The product-images migration backfills every non-empty legacy `products.img` as position 1 without moving the physical file.
 - Product list pagination uses `products_current_id` instead of page numbers.
-- Search uses PostgreSQL `ILIKE`, so it is case-insensitive.
+- Search normalizes the product name and keyword to lowercase so it remains case-insensitive and testable across supported database environments.
 - Stock filtering and sorting use existing `products` columns, so they do not require extra database fields.
 - Product deletion has a cart side effect because related cart rows are removed before deleting the product.
 
@@ -225,7 +227,19 @@ Validation failures return `422` with `message` containing validator messages.
 - Image position 1 is the primary product cover.
 - Update can set stock to `0`; create cannot.
 - Product list returns a maximum of 50 products per request.
+- Product stock conditions are mutually exclusive: healthy is above 5, low is 1–5, and empty is 0 or below.
+- Buyer and seller list queries share the product sorting scope so their accepted sort values cannot drift apart.
 - The backend docs file name matches the frontend docs file name so the same feature can be compared across both repositories.
+
+## TOK-17 Manual QA Checklist
+
+| ID | Done | Action | Expected |
+| --- | --- | --- | --- |
+| TOK-17-S1 | ✅ | Request daftar tanpa `stock_filter`, lalu gunakan `all`. | Keduanya menampilkan seluruh produk milik seller tanpa produk seller lain. |
+| TOK-17-S2 | ✅ | Siapkan stok `6`, `5`, `1`, `0`, dan negatif; jalankan `healthy`, `available`, `low`, dan `empty`. | `healthy`/alias `available` hanya stok `> 5`, `low` stok `1–5`, dan `empty` stok `<= 0`. |
+| TOK-17-S3 | ✅ | Jalankan keenam sorting valid, lalu kirim `stock_highest` dan `stock_lowest`. | Sorting valid terurut benar; kedua nilai legacy ditolak `422`. |
+| TOK-17-S4 | ✅ | Kombinasikan search, kondisi stok, sorting, dan `products_current_id`. | Seluruh kondisi diterapkan bersamaan dan ID yang sudah dimuat tidak muncul kembali. |
+| TOK-17-S5 | ✅ | Akses endpoint daftar menggunakan UUID seller lain. | Request ditolak `403` dan tidak membocorkan katalog seller tersebut. |
 
 ## TOK-6 Manual QA Checklist
 
