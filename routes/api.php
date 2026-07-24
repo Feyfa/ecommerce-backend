@@ -97,7 +97,7 @@ Route::middleware('auth.api')->group(function () {
 });
 
 Route::middleware('auth.api')->group(function () {
-    Route::get('/belanja/{user_id_seller}', [BelanjaController::class, 'index']);
+    Route::get('/belanja', [BelanjaController::class, 'index']);
 });
 
 Route::middleware('auth.api')->group(function () {
