@@ -258,7 +258,7 @@ This lets buyer pages show a seller/company identity, while seller pages show th
 
 Transaction rows are created by the checkout flow after a Xendit virtual account is created.
 
-The transaction read API currently does not receive Xendit events directly. Payment status changes should eventually be synchronized by Xendit webhook endpoints. See `docs/integrations/xendit.md` for the broader Xendit integration notes and known webhook gap.
+The transaction read API currently does not receive Xendit events directly. Payment status changes should eventually be synchronized by Xendit webhook endpoints. See `docs/application/integrations/xendit.md` for the broader Xendit integration notes and known webhook gap.
 
 ## Known Decisions
 
