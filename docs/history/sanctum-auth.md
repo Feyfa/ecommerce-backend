@@ -6,7 +6,7 @@ longer active.
 The active backend authentication direction is documented in:
 
 ```text
-docs/auth/clerk-auth.md
+docs/application/auth/clerk-auth.md
 ```
 
 ## Current Decision
