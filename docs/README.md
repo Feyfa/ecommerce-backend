@@ -17,7 +17,7 @@ Deployment, branching, staging, production, Docker Compose, and server runbooks 
 - [Local Native Development](setup/local-native-development.md)
   Explains how to run the frontend and backend locally without Docker by using local HTTPS domains and native app runtimes.
 
-- [Clerk Authentication](auth/clerk-auth.md)
+- [Clerk Authentication](application/auth/clerk-auth.md)
   Documents the backend Clerk migration direction, local user bridge, request verification flow, dashboard setup decisions, and post-migration cleanup rules.
 
 - [Database Architecture](architecture/database.md)
@@ -27,31 +27,34 @@ Deployment, branching, staging, production, Docker Compose, and server runbooks 
   Records the decision to move the backend database direction from MySQL-style local reconstruction to PostgreSQL with full UUID primary keys for application tables.
 
 - [Historical Sanctum Authentication](history/sanctum-auth.md)
-  Records the retired Sanctum authentication flow. The active authentication direction is documented in `auth/clerk-auth.md`.
+  Records the retired Sanctum authentication flow. The active authentication direction is documented in `application/auth/clerk-auth.md`.
 
-- [Seller Product](features/seller/01-product.md)
+- [Seller Product](application/seller/product.md)
   Documents the seller product API routes, validation, request behavior, and data side effects.
 
-- [Seller Dashboard](features/seller/02-dashboard.md)
+- [Seller Dashboard](application/seller/dashboard.md)
   Documents the seller dashboard API route, response shape, metric rules, and data decisions.
 
-- [Buyer Belanja](features/buyer/01-belanja.md)
+- [Buyer Belanja](application/buyer/belanja.md)
   Documents the buyer shopping API routes, search behavior, add-to-cart behavior, and data notes.
 
-- [Buyer Cart](features/buyer/02-cart.md)
+- [Buyer Cart](application/buyer/cart.md)
   Documents the buyer cart API routes, checked-state behavior, quantity validation, checkout validation, and stale-state recovery.
 
-- [Buyer Checkout](features/buyer/03-checkout.md)
+- [Buyer Checkout](application/buyer/checkout.md)
   Documents the buyer checkout API routes, backend snapshot validation, payment processing, idempotency, and checkout data side effects.
 
-- [Transaction](features/transaction.md)
+- [Transaction](application/transaction.md)
   Documents the shared buyer and seller transaction API, filters, status mapping, pagination, seller approval, and display-name rules.
 
-- [Settings](settings/README.md)
+- [Settings](application/settings/README.md)
   Documents the settings API routes for user profile, company profile, address, bank account, balance, image upload/delete, and security behavior.
 
-- [Xendit Integration](integrations/xendit.md)
+- [Xendit Integration](application/integrations/xendit.md)
   Documents the current Xendit payment, disbursement, webhook gap, and future integration notes.
+
+- [Commit Guidelines](development/commit-guidelines.md)
+  Explains how to keep commits focused on one purpose and separate unrelated changes.
 
 ## Documentation Rules
 
@@ -68,54 +71,49 @@ Write documents for humans first:
 - Keep historical context when it helps future maintenance.
 - Update the relevant document whenever a feature changes the database, payment flow, authentication flow, or deployment process.
 
-## Suggested Future Structure
-
-The documentation can grow using this structure:
+## Documentation Structure
 
 ```text
 docs/
   README.md
 
-  setup/
-    local-native-development.md
-    database.md
-
-  auth/
-    clerk-auth.md
-
   architecture/
-    overview.md
-    backend.md
     database.md
-    payment-xendit.md
 
-  integrations/
-    xendit.md
-
-  settings/
-    README.md
-    profile.md
-    company-profile.md
-    address.md
-    balance.md
-    bank-account.md
-    security.md
-
-  features/
-    _template.md
-    auth.md
-    transaction.md
-    seller/
-      01-product.md
-      03-company-profile.md
+  application/
+    auth/
+      clerk-auth.md
     buyer/
-      01-belanja.md
-      02-cart.md
-      03-checkout.md
-      04-order.md
+      belanja.md
+      cart.md
+      checkout.md
+    seller/
+      product.md
+      dashboard.md
+    settings/
+      README.md
+      profile.md
+      company-profile.md
+      address.md
+      balance.md
+      bank-account.md
+      security.md
+      audit-log.md
+    integrations/
+      xendit.md
+    transaction.md
 
   adr/
     0001-database-postgresql-uuid.md
+
+  development/
+    commit-guidelines.md
+
+  history/
+    sanctum-auth.md
+
+  setup/
+    local-native-development.md
 ```
 
-This structure does not need to be created all at once. Add new documents only when the project actually needs them.
+Keep documentation directly related to Laravel implementation inside `application/`. Keep architecture, ADR, historical, setup, and development-process documentation in their dedicated top-level folders.
