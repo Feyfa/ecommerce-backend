@@ -53,6 +53,9 @@ Deployment, branching, staging, production, Docker Compose, and server runbooks 
 - [Xendit Integration](integrations/xendit.md)
   Documents the current Xendit payment, disbursement, webhook gap, and future integration notes.
 
+- [Commit Guidelines](development/commit-guidelines.md)
+  Explains how to keep commits focused on one purpose and separate unrelated changes.
+
 ## Documentation Rules
 
 Use English for every Markdown document in this folder.
