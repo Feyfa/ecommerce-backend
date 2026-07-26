@@ -21,8 +21,5 @@ Route::get('/', function () {
         'status' => 'ok',
         'service' => 'backend',
         'timestamp' => now()->toIso8601String(),
-        // This temporary marker makes the backend portion of TOK-18 visible
-        // after staging and production deployment without changing health status.
-        'release_test' => 'tokshop-lowercase',
     ]);
 });
