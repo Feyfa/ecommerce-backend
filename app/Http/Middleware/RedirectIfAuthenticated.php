@@ -11,9 +11,17 @@ use Symfony\Component\HttpFoundation\Response;
 class RedirectIfAuthenticated
 {
     /**
-     * Handle an incoming request.
+     * Mengalihkan user yang sudah terautentikasi agar tidak kembali mengakses route guest.
      *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * Setiap guard yang diberikan diperiksa sebelum request diteruskan. User yang sudah login
+     * diarahkan ke halaman utama sehingga route guest tidak dapat digunakan sebagai halaman
+     * autentikasi kedua.
+     *
+     * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
+     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next  Callback middleware berikutnya pada pipeline request.
+     * @param  string  $guards  Daftar guard autentikasi yang akan diperiksa.
+     *
+     * @return Response  Hasil proses yang telah dinormalisasi sesuai kontrak function ini.
      */
     public function handle(Request $request, Closure $next, string ...$guards): Response
     {

@@ -14,6 +14,14 @@ class AuditLogResource extends JsonResource
     /**
      * Membatasi payload audit ke data yang aman untuk pemilik akun.
      * Full IP hanya diberikan oleh endpoint detail yang owner-scoped.
+     *
+     * Resource hanya mengekspos context yang telah diizinkan dan menyesuaikan detail sensitif dengan
+     * mode collection atau detail. Alamat IP penuh tidak dikirim pada daftar, sedangkan metadata
+     * produk dan perangkat dinormalisasi menjadi kontrak API yang stabil.
+     *
+     * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
+     *
+     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function toArray(Request $request): array
     {
@@ -62,7 +70,13 @@ class AuditLogResource extends JsonResource
     /**
      * Menyamarkan bagian host IPv4/IPv6 untuk response collection.
      *
+     * IPv4 disamarkan pada oktet terakhir dan IPv6 dipadatkan sebelum bagian host diganti. Nilai yang
+     * tidak dapat dikenali tetap diperlakukan secara defensif agar response collection tidak
+     * membocorkan alamat lengkap.
+     *
      * @param  string|null  $ipAddress  IP penuh yang hanya disimpan backend.
+     *
+     * @return string|null  Nilai teks yang telah dinormalisasi, atau null ketika sumber datanya tidak tersedia.
      */
     private function maskIpAddress(?string $ipAddress): ?string
     {

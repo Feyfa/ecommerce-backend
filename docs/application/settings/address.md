@@ -65,13 +65,25 @@ Required request fields:
 - `place`
 - `name`
 - `phone`
-- `alamat`
 - `enable`
+- `location_source` (`map`)
+- `latitude`, `longitude`, and `address_detail`
+
+Optional map field:
+
+- `geoapify_place_id`
 
 Validation rules:
 
 - All required fields must be present.
 - A buyer may have at most 5 buyer addresses.
+- Latitude must be between `-90` and `90` and longitude between `-180` and `180`.
+- Address detail is required.
+- The backend reverse-geocodes the coordinate with Geoapify, requires
+  `country_code=id`, and combines the detail with the provider address.
+- Client `formatted_address` and `geoapify_place_id` values are not trusted.
+- Provider/configuration failures return `503` with
+  `LOCATION_VERIFICATION_UNAVAILABLE`; the write is not applied.
 
 Side effects:
 
@@ -97,6 +109,8 @@ Validation rules:
 
 - The address must belong to the authenticated user.
 - The address must have `type = buyer`.
+- The address must be a verified pinpoint. Legacy manual rows return `409` with
+  `ADDRESS_REQUIRES_VERIFICATION` and remain unchanged.
 
 Side effects:
 
@@ -124,7 +138,7 @@ Required request fields:
 - `place`
 - `name`
 - `phone`
-- `alamat`
+- `location_source=map`, `latitude`, `longitude`, and `address_detail`
 
 Validation rules:
 
@@ -148,8 +162,10 @@ Deletes a buyer address.
 
 Side effects:
 
-- Deletes the selected address id.
-- If no enabled address remains, the newest buyer address is set to enabled.
+- Deletes only an address matching the id, authenticated `user_id`, and `type = buyer`.
+- Deletion and fallback selection are atomic with the remaining buyer-address rows.
+- If no enabled address remains, the newest verified Pinpoint address is enabled.
+- Legacy manual rows remain disabled when no verified fallback exists.
 - The response returns the refreshed address list.
 
 Success response:
@@ -161,3 +177,9 @@ Success response:
   "message": "Alamat Berhasil Dihapus"
 }
 ```
+
+## QA Coverage
+
+- [TOK-8 Pinpoint Address QA](../../qa/tok-8-pinpoint-address.md) tracks backend
+  buyer-address verification; the matching frontend checklist is available at
+  `frontend-repo:/docs/qa/tok-8-pinpoint-address.md`.

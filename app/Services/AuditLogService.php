@@ -15,6 +15,13 @@ use Illuminate\Support\Str;
  */
 class AuditLogService
 {
+    /**
+     * Menyiapkan dependency yang diperlukan oleh class.
+     *
+     * @param  UserAgentParserService  $userAgentParserService  Service user agent parser yang digunakan oleh class ini.
+     *
+     * @return void  Tidak mengembalikan nilai; dependency disimpan pada instance.
+     */
     public function __construct(
         protected UserAgentParserService $userAgentParserService
     ) {}
@@ -23,8 +30,14 @@ class AuditLogService
      * Mencatat register dan sekaligus menandai Clerk session pertama
      * supaya bootstrap berikutnya tidak membuat login yang redundant.
      *
+     * Event registration memakai session ID sebagai sumber idempotency dan disimpan bersama metadata
+     * request yang telah dibatasi. Session pertama ditandai dengan key yang sama agar bootstrap
+     * berikutnya tidak mencatat login tambahan.
+     *
      * @param  User  $user  Actor lokal yang baru berhasil dibuat.
      * @param  Request  $request  Request Clerk bootstrap yang sudah diverifikasi.
+     *
+     * @return AuditLog  Model audit log yang berhasil ditemukan atau dicatat.
      */
     public function recordRegistration(User $user, Request $request): AuditLog
     {
@@ -53,8 +66,14 @@ class AuditLogService
      * Mencatat login satu kali untuk setiap Clerk session. Registration
      * memakai session key yang sama sehingga session pertama tidak dobel.
      *
+     * Session Clerk menjadi sumber idempotency sehingga refresh atau bootstrap berulang tidak
+     * menghasilkan login ganda. Metadata perangkat dan request ID tetap dicatat untuk session baru
+     * yang benar-benar berbeda.
+     *
      * @param  User  $user  Actor lokal yang sedang login.
      * @param  Request  $request  Request bootstrap yang memuat Clerk session id.
+     *
+     * @return AuditLog|null  Model audit log yang berhasil ditemukan atau dicatat.
      */
     public function recordLogin(User $user, Request $request): ?AuditLog
     {
@@ -83,8 +102,14 @@ class AuditLogService
     /**
      * Mencatat logout user-initiated secara idempotent untuk session aktif.
      *
+     * Logout hanya dicatat sekali untuk session aktif dan menyimpan alasan user-initiated. Identifier
+     * request serta metadata perangkat dipertahankan agar event dapat ditelusuri tanpa menyimpan
+     * payload autentikasi.
+     *
      * @param  User  $user  Actor lokal yang meminta logout.
      * @param  Request  $request  Request logout sebelum session Clerk ditutup.
+     *
+     * @return AuditLog|null  Model audit log yang berhasil ditemukan atau dicatat.
      */
     public function recordLogout(User $user, Request $request): ?AuditLog
     {
@@ -113,6 +138,15 @@ class AuditLogService
 
     /**
      * Mencatat kondisi awal produk setelah produk dan seluruh gambar berhasil dibuat.
+     *
+     * Snapshot harga, stok, jumlah gambar, dan nama produk diambil setelah seluruh persistence
+     * berhasil. Audit menggunakan owner sebagai actor dan tidak menyimpan path atau identifier gambar.
+     *
+     * @param  User  $user  Model user lokal yang menjadi actor atau pemilik data.
+     * @param  Product  $product  Model produk yang menjadi target atau sumber data.
+     * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
+     *
+     * @return AuditLog  Model audit log yang berhasil ditemukan atau dicatat.
      */
     public function recordProductCreated(User $user, Product $product, Request $request): AuditLog
     {
@@ -134,8 +168,16 @@ class AuditLogService
      * Mencatat field dan metadata gambar yang berubah pada satu request update.
      * Request id menjadi bagian kunci agar retry request yang sama tetap idempotent.
      *
-     * @param  array<int, array{field: string, label: string, before: mixed, after: mixed}>  $changes
-     * @param  array<string, int|bool>  $imageChanges
+     * Request ID menjadi bagian idempotency key agar retry tidak membuat audit ganda. Snapshot produk,
+     * perubahan field, serta metadata gambar disimpan sebagai context allow-listed tanpa path storage.
+     *
+     * @param  User  $user  Model user lokal yang menjadi actor atau pemilik data.
+     * @param  Product  $product  Model produk yang menjadi target atau sumber data.
+     * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
+     * @param  array<int, array{field: string, label: string, before: mixed, after: mixed}>  $changes  Daftar perubahan field produk yang akan dicatat.
+     * @param  array<string, int|bool>  $imageChanges  Ringkasan perubahan gambar yang akan dicatat.
+     *
+     * @return AuditLog  Model audit log yang berhasil ditemukan atau dicatat.
      */
     public function recordProductUpdated(
         User $user,
@@ -167,7 +209,15 @@ class AuditLogService
      * Menyimpan snapshot terakhir sebelum row produk dihapus agar detail audit
      * tetap dapat dibaca tanpa bergantung pada product storage.
      *
-     * @param  array{name: string, price: int, stock: int, image_count: int}  $snapshot
+     * Snapshot terakhir diterima sebelum soft delete dan disimpan bersama identitas subject. Detail
+     * audit tetap dapat dibaca setelah relasi produk tidak lagi muncul pada query produk aktif.
+     *
+     * @param  User  $user  Model user lokal yang menjadi actor atau pemilik data.
+     * @param  Product  $product  Model produk yang menjadi target atau sumber data.
+     * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
+     * @param  array{name: string, price: int, stock: int, image_count: int}  $snapshot  Snapshot produk terakhir sebelum produk dinonaktifkan.
+     *
+     * @return AuditLog  Model audit log yang berhasil ditemukan atau dicatat.
      */
     public function recordProductDeleted(
         User $user,
@@ -196,7 +246,9 @@ class AuditLogService
     /**
      * Membentuk snapshot allow-listed tanpa path atau identifier gambar.
      *
-     * @return array{price: int, stock: int, image_count: int}
+     * @param  Product  $product  Model produk yang menjadi target atau sumber data.
+     *
+     * @return array{price: int, stock: int, image_count: int}  Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function productSnapshot(Product $product): array
     {
@@ -213,6 +265,10 @@ class AuditLogService
      * Insert-or-ignore dipakai bersama unique idempotency_key agar request
      * paralel tetap tidak membuat row audit duplikat.
      *
+     * Payload audit dinormalisasi dan dibatasi pada context yang diizinkan sebelum insert dilakukan.
+     * Idempotency key mencegah event duplikat pada request paralel, sedangkan metadata request hanya
+     * disimpan dalam bentuk yang dibutuhkan untuk penelusuran.
+     *
      * @param  User  $user  Actor lokal pemilik audit.
      * @param  Request  $request  Request sumber metadata audit.
      * @param  AuditEvent  $event  Event domain yang berhasil.
@@ -220,6 +276,9 @@ class AuditLogService
      * @param  string  $subjectType  Tipe object yang terkena aktivitas.
      * @param  string  $subjectId  Identifier object yang terkena aktivitas.
      * @param  array  $extraContext  Metadata tambahan yang sudah di-allow-list.
+     * @param  string|null  $requestId  Correlation ID request untuk idempotensi dan penelusuran.
+     *
+     * @return AuditLog  Model audit log yang berhasil ditemukan atau dicatat.
      */
     private function record(
         User $user,
@@ -282,6 +341,11 @@ class AuditLogService
 
     /**
      * Membentuk kunci bersama untuk register pertama dan login per session.
+     *
+     * @param  User  $user  Model user lokal yang menjadi actor atau pemilik data.
+     * @param  string  $clerkSessionId  ID session Clerk yang terkait dengan request.
+     *
+     * @return string  Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
      */
     private function authSessionKey(User $user, string $clerkSessionId): string
     {
@@ -290,6 +354,10 @@ class AuditLogService
 
     /**
      * Mengambil Clerk session id yang telah diverifikasi middleware auth.
+     *
+     * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
+     *
+     * @return string  Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
      */
     private function resolveClerkSessionId(Request $request): string
     {
@@ -298,6 +366,10 @@ class AuditLogService
 
     /**
      * Mengambil request id valid atau membuat fallback UUID untuk pemanggilan internal.
+     *
+     * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
+     *
+     * @return string  Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
      */
     private function resolveRequestId(Request $request): string
     {
@@ -311,6 +383,8 @@ class AuditLogService
      * yang dapat dibandingkan secara stabil oleh SQLite/MySQL.
      *
      * @param  CarbonInterface  $timestamp  Waktu aktivitas pada timezone aplikasi.
+     *
+     * @return string  Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
      */
     private function formatDatabaseTimestamp(CarbonInterface $timestamp): string
     {

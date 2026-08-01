@@ -88,11 +88,11 @@ Behavior:
 2. Rejects missing users with `401`.
 3. Loads the active buyer address through `CheckoutService::getAlamatBuyer()`.
 4. Rejects missing active address with `400`.
-5. Loads cart rows where `keranjangs.checkout = 1` and `keranjangs.total > 0`.
+5. Reconciles current product availability and loads cart rows where `keranjangs.checkout = 1` and `keranjangs.total > 0`.
 6. Groups checkout rows by seller.
 7. Generates courier options for each seller group.
 8. Calculates product total.
-9. Rejects empty checkout rows with `400`.
+9. Rejects empty checkout rows with `409 CHECKOUT_INVALID` before loading payment methods.
 10. Loads checkout payment methods through `PaymentService::getCheckoutPayment()`.
 11. Rejects an empty payment list with `400`.
 12. Returns address, grouped checkout rows, payments, and product total.
@@ -114,7 +114,7 @@ Each checkout group has this shape:
 ```json
 {
   "user_id_seller": "seller uuid",
-  "user_name_seller": "seller name",
+  "user_name_seller": "store name, or seller account name as fallback",
   "keranjangs": [
     {
       "k_id": "cart uuid",
@@ -162,6 +162,8 @@ Required body data:
 - `shipping_options.*.kurir_name`: selected courier name.
 - `noteds`: array of seller notes.
 - `client_snapshot`: frontend checkout comparison data.
+- `client_snapshot.alamat_id`: active address reviewed by the buyer.
+- `client_snapshot.alamat_updated_at`: version of that active address.
 - `client_snapshot.cart_item_ids`: checkout cart row ids.
 - `client_snapshot.total_product`: frontend product total.
 - `client_snapshot.total_shipping`: frontend shipping total.
@@ -198,19 +200,21 @@ High-level behavior:
 1. Reads the authenticated buyer.
 2. Validates request shape.
 3. Builds a backend checkout snapshot from current database state.
-4. Returns `409 CHECKOUT_INVALID` when checkout is no longer payable.
+4. Returns `409 SELLER_ADDRESS_REQUIRES_VERIFICATION` when the only newly unavailable checkout reason is a seller location that lost Pinpoint verification; other unrecoverable availability changes return `409 CHECKOUT_INVALID`.
 5. Returns `400` when payment or courier choices are unavailable.
 6. Compares backend snapshot with the frontend `client_snapshot`.
-7. Returns `409 CHECKOUT_CHANGED` with a refresh snapshot when totals or cart ids differ.
+7. Returns `409 CHECKOUT_CHANGED` with a refresh snapshot when totals, cart ids, or the active address differ.
 8. Generates a checkout idempotency key.
 9. Acquires a PostgreSQL advisory lock for the checkout key.
 10. Checks whether an invoice for the same checkout key already exists.
-11. Creates the supported Xendit virtual account.
-12. Saves invoice and transaction records inside a database transaction.
-13. Deletes processed checkout cart rows.
-14. Decrements product stock.
-15. Releases the advisory lock.
-16. Returns success.
+11. Starts a database transaction and locks the selected cart, product, active buyer-address, and seller-location rows.
+12. Revalidates deletion, stock, seller ownership, checked state, and verified seller location while those rows are locked.
+13. Compares locked cart quantity, product price, product and seller identity, and active buyer-address version with the initial server snapshot.
+14. Returns `409 CHECKOUT_CHANGED` with current data when a payable snapshot changed, or the relevant invalid-checkout code when it is no longer payable.
+15. Creates the supported Xendit virtual account only after the locked state matches the snapshot.
+16. Saves invoice and transaction records, deletes processed cart rows, and decrements stock atomically.
+17. If availability changed, rolls back the whole transaction and then unchecks affected cart rows in a separate update while preserving quantity.
+18. Releases the advisory lock and returns the final result.
 
 Successful response:
 
@@ -230,6 +234,7 @@ The snapshot validates:
 - active buyer address exists;
 - checkout cart rows exist;
 - checkout cart rows still have valid products;
+- checkout products are not soft-deleted and their sellers still have verified locations;
 - checkout quantity is at least `1`;
 - checkout quantity is not greater than current product stock;
 - payment method exists in `payment_lists`;
@@ -273,6 +278,7 @@ The returned snapshot includes:
 `CheckoutService::checkoutSnapshotChanged()` compares:
 
 - sorted checkout cart ids;
+- active buyer-address id and update version;
 - product total;
 - shipping total;
 - final total.
@@ -309,6 +315,8 @@ When checkout cannot be recovered on the checkout page, the controller returns:
 ```
 
 The frontend should send the buyer back to cart.
+
+Checkout never silently drops only the invalid item. One invalid selected item cancels the complete order attempt, no payment is created, no stock is decremented, and no partial transaction is stored.
 
 ## Payment Behavior
 
@@ -377,6 +385,21 @@ If found, it returns:
 
 ## Database Side Effects
 
+The invoice copies the buyer address text, latitude, longitude, and location
+source. Each seller transaction row copies the equivalent seller values. These
+snapshots remain stable if a master address is later edited or deleted.
+
+New checkout flows require verified pinpoint addresses for both parties.
+An active legacy manual buyer address returns `ADDRESS_REQUIRES_VERIFICATION`;
+a legacy manual seller address returns `SELLER_ADDRESS_REQUIRES_VERIFICATION`.
+The seller-specific response is preserved when cart read-repair detects the
+concurrent change during cart validation, checkout reload, or payment
+submission. These responses use HTTP `409` and are returned before payment
+processing.
+
+Geoapify place ids are not copied to transaction history, and location values
+do not currently affect courier price or estimation.
+
 Successful checkout writes these records inside a database transaction:
 
 - `transaction_invoices`
@@ -424,3 +447,9 @@ If stock decrement fails, the database transaction throws and checkout returns a
 - Checkout processing currently supports only BCA Virtual Account even if the payment list contains more methods.
 - The checkout key prevents duplicate processing for the same buyer and checkout cart rows.
 - PostgreSQL advisory locks are used only when `config('database.default') == 'pgsql'`.
+
+## QA Coverage
+
+- [TOK-8 Pinpoint Address QA](../../qa/tok-8-pinpoint-address.md) tracks backend
+  address and checkout verification; the matching frontend checklist is
+  available at `frontend-repo:/docs/qa/tok-8-pinpoint-address.md`.

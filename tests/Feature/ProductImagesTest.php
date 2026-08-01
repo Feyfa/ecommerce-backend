@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Alamat;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -16,6 +17,11 @@ class ProductImagesTest extends TestCase
 
     private User $seller;
 
+    /**
+     * Menyiapkan fixture dan dependency sebelum setiap pengujian.
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     protected function setUp(): void
     {
         parent::setUp();
@@ -23,10 +29,21 @@ class ProductImagesTest extends TestCase
         $this->withoutMiddleware();
         Storage::fake('public');
         $this->seller = User::factory()->create();
+        $this->createVerifiedSellerAddress($this->seller);
         $this->actingAs($this->seller);
     }
 
-    /** @test */
+    /**
+     * Memverifikasi aturan pengelolaan satu hingga lima gambar produk pada skenario seller can create
+     * a product with one image.
+     *
+     * Test menyiapkan seller dan file upload, menjalankan endpoint produk, lalu memastikan validasi
+     * manifest, urutan gambar, ownership, storage, dan database tetap konsisten.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     public function seller_can_create_a_product_with_one_image(): void
     {
         $response = $this->post('/api/product', $this->createPayload(1));
@@ -41,7 +58,17 @@ class ProductImagesTest extends TestCase
         Storage::disk('public')->assertExists($product->img);
     }
 
-    /** @test */
+    /**
+     * Memverifikasi aturan pengelolaan satu hingga lima gambar produk pada skenario seller can create
+     * a product with five images.
+     *
+     * Test menyiapkan seller dan file upload, menjalankan endpoint produk, lalu memastikan validasi
+     * manifest, urutan gambar, ownership, storage, dan database tetap konsisten.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     public function seller_can_create_a_product_with_five_images(): void
     {
         $response = $this->post('/api/product', $this->createPayload(5));
@@ -53,7 +80,17 @@ class ProductImagesTest extends TestCase
         $this->assertSame($product->images->first()->path, $product->img);
     }
 
-    /** @test */
+    /**
+     * Memverifikasi aturan pengelolaan satu hingga lima gambar produk pada skenario create rejects an
+     * empty or oversized image collection.
+     *
+     * Test menyiapkan seller dan file upload, menjalankan endpoint produk, lalu memastikan validasi
+     * manifest, urutan gambar, ownership, storage, dan database tetap konsisten.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     public function create_rejects_an_empty_or_oversized_image_collection(): void
     {
         $this->post('/api/product', [
@@ -69,7 +106,17 @@ class ProductImagesTest extends TestCase
             ->assertJsonValidationErrors(['images', 'image_order'], 'message');
     }
 
-    /** @test */
+    /**
+     * Memverifikasi aturan pengelolaan satu hingga lima gambar produk pada skenario create rejects non
+     * image and files larger than one megabyte.
+     *
+     * Test menyiapkan seller dan file upload, menjalankan endpoint produk, lalu memastikan validasi
+     * manifest, urutan gambar, ownership, storage, dan database tetap konsisten.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     public function create_rejects_non_image_and_files_larger_than_one_megabyte(): void
     {
         $payload = [
@@ -89,7 +136,17 @@ class ProductImagesTest extends TestCase
         ])->assertUnprocessable()->assertJsonValidationErrors(['images.0'], 'message');
     }
 
-    /** @test */
+    /**
+     * Memverifikasi aturan pengelolaan satu hingga lima gambar produk pada skenario create rejects
+     * malformed image manifests without server errors.
+     *
+     * Test menyiapkan seller dan file upload, menjalankan endpoint produk, lalu memastikan validasi
+     * manifest, urutan gambar, ownership, storage, dan database tetap konsisten.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     public function create_rejects_malformed_image_manifests_without_server_errors(): void
     {
         $basePayload = [
@@ -110,7 +167,17 @@ class ProductImagesTest extends TestCase
         ])->assertUnprocessable()->assertJsonValidationErrors(['images', 'image_order.0'], 'message');
     }
 
-    /** @test */
+    /**
+     * Memverifikasi aturan pengelolaan satu hingga lima gambar produk pada skenario product list
+     * rejects a malformed product cursor.
+     *
+     * Test menyiapkan seller dan file upload, menjalankan endpoint produk, lalu memastikan validasi
+     * manifest, urutan gambar, ownership, storage, dan database tetap konsisten.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     public function product_list_rejects_a_malformed_product_cursor(): void
     {
         $this->get("/api/product/{$this->seller->id}?products_current_id=invalid")
@@ -122,7 +189,17 @@ class ProductImagesTest extends TestCase
             ->assertJsonValidationErrors(['products_current_id'], 'message');
     }
 
-    /** @test */
+    /**
+     * Memverifikasi aturan pengelolaan satu hingga lima gambar produk pada skenario migration
+     * backfills a legacy product image as position one.
+     *
+     * Test menyiapkan seller dan file upload, menjalankan endpoint produk, lalu memastikan validasi
+     * manifest, urutan gambar, ownership, storage, dan database tetap konsisten.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     public function migration_backfills_a_legacy_product_image_as_position_one(): void
     {
         $product = Product::create([
@@ -144,7 +221,17 @@ class ProductImagesTest extends TestCase
         ]);
     }
 
-    /** @test */
+    /**
+     * Memverifikasi aturan pengelolaan satu hingga lima gambar produk pada skenario seller can reorder
+     * keep add and remove product images.
+     *
+     * Test menyiapkan seller dan file upload, menjalankan endpoint produk, lalu memastikan validasi
+     * manifest, urutan gambar, ownership, storage, dan database tetap konsisten.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     public function seller_can_reorder_keep_add_and_remove_product_images(): void
     {
         $product = Product::create([
@@ -180,7 +267,17 @@ class ProductImagesTest extends TestCase
         Storage::disk('public')->assertExists($first->path);
     }
 
-    /** @test */
+    /**
+     * Memverifikasi aturan pengelolaan satu hingga lima gambar produk pada skenario update rejects
+     * zero images and images from another product.
+     *
+     * Test menyiapkan seller dan file upload, menjalankan endpoint produk, lalu memastikan validasi
+     * manifest, urutan gambar, ownership, storage, dan database tetap konsisten.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     public function update_rejects_zero_images_and_images_from_another_product(): void
     {
         $product = $this->productWithImage('product-imgs/owner.jpg');
@@ -202,8 +299,18 @@ class ProductImagesTest extends TestCase
         ])->assertUnprocessable()->assertJsonValidationErrors(['images'], 'message');
     }
 
-    /** @test */
-    public function deleting_a_product_removes_all_of_its_images(): void
+    /**
+     * Memverifikasi aturan pengelolaan satu hingga lima gambar produk pada skenario soft deleting a
+     * product keeps images for existing cart context.
+     *
+     * Test menyiapkan seller dan file upload, menjalankan endpoint produk, lalu memastikan validasi
+     * manifest, urutan gambar, ownership, storage, dan database tetap konsisten.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
+    public function soft_deleting_a_product_keeps_images_for_existing_cart_context(): void
     {
         $product = $this->productWithImage('product-imgs/delete-first.jpg');
         $product->images()->create(['path' => 'product-imgs/delete-second.jpg', 'position' => 2]);
@@ -212,13 +319,23 @@ class ProductImagesTest extends TestCase
 
         $this->delete("/api/product/{$product->user_id_seller}/{$product->id}")->assertOk();
 
-        $this->assertDatabaseMissing('products', ['id' => $product->id]);
-        $this->assertDatabaseMissing('product_images', ['product_id' => $product->id]);
-        Storage::disk('public')->assertMissing('product-imgs/delete-first.jpg');
-        Storage::disk('public')->assertMissing('product-imgs/delete-second.jpg');
+        $this->assertSoftDeleted('products', ['id' => $product->id]);
+        $this->assertDatabaseHas('product_images', ['product_id' => $product->id]);
+        Storage::disk('public')->assertExists('product-imgs/delete-first.jpg');
+        Storage::disk('public')->assertExists('product-imgs/delete-second.jpg');
     }
 
-    /** @test */
+    /**
+     * Memverifikasi aturan pengelolaan satu hingga lima gambar produk pada skenario seller cannot
+     * create or update products for another seller.
+     *
+     * Test menyiapkan seller dan file upload, menjalankan endpoint produk, lalu memastikan validasi
+     * manifest, urutan gambar, ownership, storage, dan database tetap konsisten.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     public function seller_cannot_create_or_update_products_for_another_seller(): void
     {
         $otherSeller = User::factory()->create();
@@ -252,6 +369,14 @@ class ProductImagesTest extends TestCase
         ]);
     }
 
+    /**
+     * Menyusun payload produk valid dengan jumlah upload gambar yang diminta. Override digabungkan
+     * untuk membentuk kasus invalid tanpa menduplikasi fixture dasar pada setiap test.
+     *
+     * @param  int  $imageCount  Jumlah gambar yang harus dibuat pada fixture produk.
+     *
+     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     */
     private function createPayload(int $imageCount): array
     {
         $images = [];
@@ -272,6 +397,14 @@ class ProductImagesTest extends TestCase
         ];
     }
 
+    /**
+     * Membuat produk milik seller aktif beserta satu row gambar dan file storage palsu. Fixture ini
+     * menyediakan state awal yang konsisten untuk skenario reorder, update, dan soft delete.
+     *
+     * @param  string  $path  Path file storage yang digunakan oleh fixture.
+     *
+     * @return Product  Model produk yang dibuat atau digunakan sebagai fixture.
+     */
     private function productWithImage(string $path): Product
     {
         $product = Product::create([
@@ -284,5 +417,29 @@ class ProductImagesTest extends TestCase
         $product->images()->create(['path' => $path, 'position' => 1]);
 
         return $product->load('images');
+    }
+
+    /**
+     * Membuat alamat seller aktif dengan seluruh metadata pinpoint yang diwajibkan. Helper memastikan
+     * test produk melewati gate lokasi tanpa memanggil provider eksternal.
+     *
+     * @param  User  $seller  Model user seller yang menjadi actor atau fixture.
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
+    private function createVerifiedSellerAddress(User $seller): void
+    {
+        Alamat::create([
+            'user_id' => $seller->id,
+            'type' => 'seller',
+            'place' => 'Toko',
+            'alamat' => 'Blok A, Jakarta, Indonesia',
+            'latitude' => -6.2,
+            'longitude' => 106.8,
+            'formatted_address' => 'Jakarta, Indonesia',
+            'address_detail' => 'Blok A',
+            'location_source' => 'map',
+            'enable' => 1,
+        ]);
     }
 }

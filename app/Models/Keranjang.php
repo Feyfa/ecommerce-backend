@@ -2,9 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Keranjang extends Model
 {
@@ -19,17 +20,32 @@ class Keranjang extends Model
         'total',
     ];
 
-    public function product()
+    /**
+     * Mengambil produk yang disimpan pada item keranjang.
+     *
+     * @return BelongsTo  Relasi Eloquent menuju model induk yang terkait.
+     */
+    public function product(): BelongsTo
     {
-        return $this->belongsTo(Product::class, 'product_id');
+        return $this->belongsTo(Product::class, 'product_id')->withTrashed();
     }
 
-    public function buyer()
+    /**
+     * Mengambil buyer pemilik item keranjang.
+     *
+     * @return BelongsTo  Relasi Eloquent menuju model induk yang terkait.
+     */
+    public function buyer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id_buyer');
     }
 
-    public function seller()
+    /**
+     * Mengambil seller pemilik produk pada item keranjang.
+     *
+     * @return BelongsTo  Relasi Eloquent menuju model induk yang terkait.
+     */
+    public function seller(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id_seller');
     }

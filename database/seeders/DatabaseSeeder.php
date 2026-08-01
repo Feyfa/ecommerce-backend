@@ -9,7 +9,10 @@ use Illuminate\Database\Seeder;
 class DatabaseSeeder extends Seeder
 {
     /**
-     * Seed the application's database.
+     * Menjalankan seeder referensi yang diperlukan aplikasi pada environment yang sedang dipersiapkan.
+     * Urutan pemanggilan dijaga agar tabel induk tersedia sebelum data turunannya dibuat.
+     *
+     * @return void  Tidak mengembalikan nilai; data referensi ditulis langsung ke database.
      */
     public function run(): void
     {

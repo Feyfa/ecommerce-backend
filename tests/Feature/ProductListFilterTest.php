@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\Alamat;
+use App\Models\Company;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -14,6 +16,11 @@ class ProductListFilterTest extends TestCase
 
     private User $user;
 
+    /**
+     * Menyiapkan fixture dan dependency sebelum setiap pengujian.
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     protected function setUp(): void
     {
         parent::setUp();
@@ -23,7 +30,17 @@ class ProductListFilterTest extends TestCase
         $this->actingAs($this->user);
     }
 
-    /** @test */
+    /**
+     * Memverifikasi aturan filter dan pengurutan katalog produk pada skenario buyer only receives
+     * purchasable products.
+     *
+     * Test menyiapkan kombinasi produk dan seller, memanggil endpoint list dengan filter tertentu,
+     * lalu memastikan urutan, scope ownership, dan hasil pagination sesuai kontrak.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     public function buyer_only_receives_purchasable_products(): void
     {
         $seller = User::factory()->create();
@@ -39,7 +56,17 @@ class ProductListFilterTest extends TestCase
             ->assertJsonPath('products.0.p_id', $available->id);
     }
 
-    /** @test */
+    /**
+     * Memverifikasi aturan filter dan pengurutan katalog produk pada skenario buyer and seller use the
+     * same product sort options.
+     *
+     * Test menyiapkan kombinasi produk dan seller, memanggil endpoint list dengan filter tertentu,
+     * lalu memastikan urutan, scope ownership, dan hasil pagination sesuai kontrak.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     public function buyer_and_seller_use_the_same_product_sort_options(): void
     {
         $seller = User::factory()->create();
@@ -70,7 +97,17 @@ class ProductListFilterTest extends TestCase
         }
     }
 
-    /** @test */
+    /**
+     * Memverifikasi aturan filter dan pengurutan katalog produk pada skenario buyer can combine case
+     * insensitive search sort and excluded ids.
+     *
+     * Test menyiapkan kombinasi produk dan seller, memanggil endpoint list dengan filter tertentu,
+     * lalu memastikan urutan, scope ownership, dan hasil pagination sesuai kontrak.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     public function buyer_can_combine_case_insensitive_search_sort_and_excluded_ids(): void
     {
         $seller = User::factory()->create(['name' => 'Toko Pilihan']);
@@ -92,7 +129,48 @@ class ProductListFilterTest extends TestCase
             ->assertJsonCount(2, 'products');
     }
 
-    /** @test */
+    /**
+     * Memverifikasi aturan filter dan pengurutan katalog produk pada skenario buyer catalog
+     * prioritizes and searches the store name.
+     *
+     * Test menyiapkan kombinasi produk dan seller, memanggil endpoint list dengan filter tertentu,
+     * lalu memastikan urutan, scope ownership, dan hasil pagination sesuai kontrak.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
+    public function buyer_catalog_prioritizes_and_searches_the_store_name(): void
+    {
+        $seller = User::factory()->create(['name' => 'Nama Akun Seller']);
+        Company::create([
+            'user_id' => $seller->id,
+            'name' => 'SpaceX',
+        ]);
+        $product = $this->createProduct($seller, 'Roket Mini', 10000, 3);
+
+        $this->getJson($this->buyerUrl())
+            ->assertOk()
+            ->assertJsonPath('products.0.p_id', $product->id)
+            ->assertJsonPath('products.0.u_name', 'SpaceX');
+
+        $this->getJson($this->buyerUrl(['search_product' => 'spacex']))
+            ->assertOk()
+            ->assertJsonCount(1, 'products')
+            ->assertJsonPath('products.0.p_id', $product->id);
+    }
+
+    /**
+     * Memverifikasi aturan filter dan pengurutan katalog produk pada skenario buyer ignores legacy
+     * stock filter and keeps purchasable invariant.
+     *
+     * Test menyiapkan kombinasi produk dan seller, memanggil endpoint list dengan filter tertentu,
+     * lalu memastikan urutan, scope ownership, dan hasil pagination sesuai kontrak.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     public function buyer_ignores_legacy_stock_filter_and_keeps_purchasable_invariant(): void
     {
         $seller = User::factory()->create();
@@ -105,7 +183,17 @@ class ProductListFilterTest extends TestCase
             ->assertJsonPath('products.0.p_id', $available->id);
     }
 
-    /** @test */
+    /**
+     * Memverifikasi aturan filter dan pengurutan katalog produk pada skenario seller stock conditions
+     * are exclusive and all is the default.
+     *
+     * Test menyiapkan kombinasi produk dan seller, memanggil endpoint list dengan filter tertentu,
+     * lalu memastikan urutan, scope ownership, dan hasil pagination sesuai kontrak.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     public function seller_stock_conditions_are_exclusive_and_all_is_the_default(): void
     {
         $stockSix = $this->createProduct($this->user, 'Stok Enam', 10000, 6);
@@ -123,7 +211,17 @@ class ProductListFilterTest extends TestCase
         $this->assertSellerFilterReturns('empty', [$stockZero->id]);
     }
 
-    /** @test */
+    /**
+     * Memverifikasi aturan filter dan pengurutan katalog produk pada skenario seller can combine
+     * search stock sort and excluded ids.
+     *
+     * Test menyiapkan kombinasi produk dan seller, memanggil endpoint list dengan filter tertentu,
+     * lalu memastikan urutan, scope ownership, dan hasil pagination sesuai kontrak.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     public function seller_can_combine_search_stock_sort_and_excluded_ids(): void
     {
         $lowerPrice = $this->createProduct($this->user, 'Target Murah', 10000, 2);
@@ -142,7 +240,17 @@ class ProductListFilterTest extends TestCase
             ->assertJsonPath('products.0.id', $lowerPrice->id);
     }
 
-    /** @test */
+    /**
+     * Memverifikasi aturan filter dan pengurutan katalog produk pada skenario legacy stock sort values
+     * are rejected.
+     *
+     * Test menyiapkan kombinasi produk dan seller, memanggil endpoint list dengan filter tertentu,
+     * lalu memastikan urutan, scope ownership, dan hasil pagination sesuai kontrak.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     public function legacy_stock_sort_values_are_rejected(): void
     {
         foreach (['stock_highest', 'stock_lowest'] as $legacySort) {
@@ -152,7 +260,17 @@ class ProductListFilterTest extends TestCase
         }
     }
 
-    /** @test */
+    /**
+     * Memverifikasi aturan filter dan pengurutan katalog produk pada skenario buyer rejects a
+     * malformed product cursor.
+     *
+     * Test menyiapkan kombinasi produk dan seller, memanggil endpoint list dengan filter tertentu,
+     * lalu memastikan urutan, scope ownership, dan hasil pagination sesuai kontrak.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     public function buyer_rejects_a_malformed_product_cursor(): void
     {
         $this->getJson($this->buyerUrl(['products_current_id' => 'invalid']))
@@ -164,7 +282,17 @@ class ProductListFilterTest extends TestCase
             ->assertJsonValidationErrors(['products_current_id'], 'message');
     }
 
-    /** @test */
+    /**
+     * Memverifikasi aturan filter dan pengurutan katalog produk pada skenario seller cannot read
+     * another sellers product list.
+     *
+     * Test menyiapkan kombinasi produk dan seller, memanggil endpoint list dengan filter tertentu,
+     * lalu memastikan urutan, scope ownership, dan hasil pagination sesuai kontrak.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     public function seller_cannot_read_another_sellers_product_list(): void
     {
         $otherSeller = User::factory()->create();
@@ -172,7 +300,17 @@ class ProductListFilterTest extends TestCase
         $this->getJson($this->sellerUrl($otherSeller))->assertForbidden();
     }
 
-    /** @test */
+    /**
+     * Memverifikasi aturan filter dan pengurutan katalog produk pada skenario legacy buyer route is
+     * not available.
+     *
+     * Test menyiapkan kombinasi produk dan seller, memanggil endpoint list dengan filter tertentu,
+     * lalu memastikan urutan, scope ownership, dan hasil pagination sesuai kontrak.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     public function legacy_buyer_route_is_not_available(): void
     {
         $this->getJson('/api/belanja/'.$this->user->id.'?'.http_build_query([
@@ -180,6 +318,19 @@ class ProductListFilterTest extends TestCase
         ]))->assertNotFound();
     }
 
+    /**
+     * Membuat fixture produk untuk seller tertentu dengan stok, harga, nama, dan waktu update yang
+     * dapat dioverride. Data deterministik ini dipakai untuk menguji kombinasi filter serta
+     * tie-breaker sorting.
+     *
+     * @param  User  $seller  Model user seller yang menjadi actor atau fixture.
+     * @param  string  $name  Nama user, rekening, atau resource sesuai konteks operasi.
+     * @param  int  $price  Nominal uang yang digunakan oleh operasi.
+     * @param  int  $stock  Jumlah stok produk untuk skenario atau perubahan terkait.
+     * @param  string|null  $updatedAt  Waktu update produk untuk menguji urutan yang stabil.
+     *
+     * @return Product  Model produk yang dibuat atau digunakan sebagai fixture.
+     */
     private function createProduct(
         User $seller,
         string $name,
@@ -187,6 +338,19 @@ class ProductListFilterTest extends TestCase
         int $stock,
         ?string $updatedAt = null,
     ): Product {
+        Alamat::firstOrCreate(
+            ['user_id' => $seller->id, 'type' => 'seller', 'enable' => 1],
+            [
+                'place' => 'Toko',
+                'alamat' => 'Blok A, Jakarta, Indonesia',
+                'latitude' => -6.2,
+                'longitude' => 106.8,
+                'formatted_address' => 'Jakarta, Indonesia',
+                'address_detail' => 'Blok A',
+                'location_source' => 'map',
+            ],
+        );
+
         $product = Product::create([
             'user_id_seller' => $seller->id,
             'img' => 'product-imgs/test.jpg',
@@ -206,6 +370,14 @@ class ProductListFilterTest extends TestCase
         return $product;
     }
 
+    /**
+     * Menyusun URL katalog buyer dengan query string yang telah diencode. Helper menjaga setiap test
+     * memakai route dan format parameter yang sama.
+     *
+     * @param  array  $parameters  Parameter query yang akan ditambahkan ke URL pengujian.
+     *
+     * @return string  Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
+     */
     private function buyerUrl(array $parameters = []): string
     {
         return '/api/belanja?'.http_build_query([
@@ -214,6 +386,15 @@ class ProductListFilterTest extends TestCase
         ]);
     }
 
+    /**
+     * Menyusun URL daftar produk seller dengan identifier actor dan query string terkontrol. Struktur
+     * URL yang sama dipakai untuk seluruh kombinasi filter seller.
+     *
+     * @param  User  $seller  Model user seller yang menjadi actor atau fixture.
+     * @param  array  $parameters  Parameter query yang akan ditambahkan ke URL pengujian.
+     *
+     * @return string  Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
+     */
     private function sellerUrl(User $seller, array $parameters = []): string
     {
         return '/api/product/'.$seller->id.'?'.http_build_query([
@@ -222,6 +403,15 @@ class ProductListFilterTest extends TestCase
         ]);
     }
 
+    /**
+     * Memanggil endpoint seller menggunakan filter yang diberikan, memastikan response berhasil, lalu
+     * membandingkan urutan ID produk dengan hasil yang diharapkan.
+     *
+     * @param  string  $filter  Nilai filter yang digunakan oleh skenario pengujian.
+     * @param  array  $expectedIds  Urutan ID produk yang diharapkan pada response.
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     private function assertSellerFilterReturns(string $filter, array $expectedIds): void
     {
         $response = $this->getJson($this->sellerUrl($this->user, [

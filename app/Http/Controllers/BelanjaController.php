@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
@@ -11,8 +13,16 @@ class BelanjaController extends Controller
 {
     /**
      * Mengambil katalog buyer yang hanya berisi produk dengan stok yang dapat dibeli.
+     *
+     * Cursor, pencarian, exclusion list, dan sorting divalidasi sebelum scope purchasable diterapkan.
+     * Query hanya mengembalikan produk aktif dengan stok serta lokasi seller valid dan menggunakan
+     * urutan stabil untuk pagination berikutnya.
+     *
+     * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
+     *
+     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
         // --- step 1 - start - validasi cursor, pencarian, dan sorting
         $validator = Validator::make(
@@ -60,9 +70,10 @@ class BelanjaController extends Controller
             'products.price as p_price',
             'products.stock as p_stock',
             'users.id as u_id',
-            'users.name as u_name'
+            DB::raw("COALESCE(NULLIF(companies.name, ''), users.name) as u_name")
         )
             ->join('users', 'products.user_id_seller', '=', 'users.id')
+            ->leftJoin('companies', 'companies.user_id', '=', 'users.id')
             ->where('products.user_id_seller', '<>', $authenticatedUserId)
             ->whereNotIn('products.id', $products_current_id)
             ->purchasable()
@@ -70,7 +81,7 @@ class BelanjaController extends Controller
                 $searchPattern = '%'.mb_strtolower($search_product).'%';
 
                 $query->whereRaw('LOWER(products.name) LIKE ?', [$searchPattern])
-                    ->orWhereRaw('LOWER(users.name) LIKE ?', [$searchPattern]);
+                    ->orWhereRaw("LOWER(COALESCE(NULLIF(companies.name, ''), users.name)) LIKE ?", [$searchPattern]);
             })
             ->withProductSort($sort_product);
 

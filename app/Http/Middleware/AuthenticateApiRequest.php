@@ -24,14 +24,30 @@ class AuthenticateApiRequest
      */
     private const MODE_OPTIONAL_USER = 'optional-user';
 
+    /**
+     * Menyiapkan middleware dengan layanan sinkronisasi pengguna Clerk.
+     *
+     * @param  ClerkBackendClientService  $clerkBackendClientService  Service clerk backend client yang digunakan oleh class ini.
+     *
+     * @return void  Tidak mengembalikan nilai; dependency disimpan pada instance.
+     */
     public function __construct(
         protected ClerkBackendClientService $clerkBackendClientService
-    ) {
-    }
+    ) {}
 
     /**
      * Tujuan middleware ini untuk menerima request API protected
      * yang sudah membawa token sesi auth utama.
+     *
+     * Token diverifikasi melalui Clerk, local user disinkronkan, dan actor ditempelkan ke request
+     * sebelum middleware berikutnya berjalan. Mode akses tambahan diterapkan setelah autentikasi agar
+     * endpoint tidak menerima identitas dari payload client.
+     *
+     * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
+     * @param  Closure  $next  Callback middleware berikutnya pada pipeline request.
+     * @param  string  $mode  Mode akses tambahan yang diwajibkan endpoint.
+     *
+     * @return Response  Hasil proses yang telah dinormalisasi sesuai kontrak function ini.
      */
     public function handle(Request $request, Closure $next, string $mode = 'strict'): Response
     {
@@ -48,7 +64,7 @@ class AuthenticateApiRequest
             ], 500);
         }
 
-        if (!$requestState->isAuthenticated()) {
+        if (! $requestState->isAuthenticated()) {
             return response()->json([
                 'status' => 401,
                 'message' => 'Unauthorized',
@@ -87,7 +103,7 @@ class AuthenticateApiRequest
             ->where('clerk_user_id', $clerkUserId)
             ->first();
 
-        if (!$user && $mode !== self::MODE_OPTIONAL_USER) {
+        if (! $user && $mode !== self::MODE_OPTIONAL_USER) {
             return response()->json([
                 'status' => 401,
                 'message' => 'Unauthorized',
@@ -105,6 +121,11 @@ class AuthenticateApiRequest
     /**
      * Tujuan helper ini untuk memastikan auth()->user() dan request->user()
      * sama-sama mengenali user lokal yang sudah berhasil diautentikasi.
+     *
+     * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
+     * @param  User  $user  Model user lokal yang menjadi actor atau pemilik data.
+     *
+     * @return void  Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
      */
     private function setAuthenticatedUser(Request $request, User $user): void
     {

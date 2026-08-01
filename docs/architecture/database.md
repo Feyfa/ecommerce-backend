@@ -83,6 +83,15 @@ That work should not be mixed with the initial schema migration.
 
 ## Tables
 
+`alamats` keeps the final `alamat` text plus latitude, longitude, Geoapify place
+id, formatted address, user address detail, and location source. Existing rows
+default to `manual` for backward compatibility, but new writes and checkout
+eligibility require a server-verified `map` address.
+
+Checkout snapshots buyer location values into `transaction_invoices` and
+seller location values into `transaction_users` so transaction history does
+not depend on mutable address rows.
+
 ### users
 
 Stores application users. A user can act as a buyer, seller, or both depending on the application flow.
@@ -120,6 +129,7 @@ Important columns:
 - `name`: product name.
 - `price`: product price.
 - `stock`: available stock.
+- `deleted_at`: nullable soft-delete timestamp. Deleted products remain stored for cart status and transaction history.
 
 Indexes:
 
@@ -127,6 +137,8 @@ Indexes:
 - `updated_at` for recently updated product sorting.
 
 The legacy `img` column remains a compatibility cover and mirrors the path of `product_images.position = 1`.
+
+Product deletion does not cascade during the normal application flow because it is a soft delete. Existing `product_images`, `keranjangs`, and transaction references are retained.
 
 ### product_images
 
@@ -203,6 +215,12 @@ Important columns:
 - `phone`: contact phone.
 - `alamat`: full address text.
 - `enable`: active flag.
+- `latitude`, `longitude`: verified pinpoint coordinates.
+- `geoapify_place_id`: optional provider identifier for the master address.
+- `formatted_address`: provider address resolved by the backend.
+- `address_detail`: house/block/floor/landmark detail supplied by the user.
+- `location_source`: `map` for verified rows; legacy rows may remain `manual`
+  until they are verified in place.
 
 Indexes:
 

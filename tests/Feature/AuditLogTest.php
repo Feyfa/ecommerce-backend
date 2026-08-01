@@ -31,6 +31,8 @@ class AuditLogTest extends TestCase
 
     /**
      * Memastikan heading event multi-kata memakai Title Case secara konsisten.
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function test_event_titles_use_consistent_title_case(): void
     {
@@ -44,6 +46,8 @@ class AuditLogTest extends TestCase
 
     /**
      * Menyiapkan service audit dan melewati middleware Clerk eksternal.
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     protected function setUp(): void
     {
@@ -55,6 +59,8 @@ class AuditLogTest extends TestCase
 
     /**
      * Memastikan session register pertama tidak menghasilkan login redundant.
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function test_registration_and_first_session_login_are_not_duplicated(): void
     {
@@ -75,6 +81,8 @@ class AuditLogTest extends TestCase
 
     /**
      * Memastikan sync Clerk mengirim status create yang dipakai flow register.
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function test_clerk_sync_status_drives_registration_event_once(): void
     {
@@ -106,6 +114,8 @@ class AuditLogTest extends TestCase
 
     /**
      * Memastikan satu Clerk session hanya menghasilkan satu login.
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function test_login_is_recorded_once_per_clerk_session(): void
     {
@@ -124,6 +134,8 @@ class AuditLogTest extends TestCase
 
     /**
      * Memastikan logout menyimpan alasan dan metadata perangkat satu kali.
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function test_logout_is_idempotent_and_records_user_initiated_reason(): void
     {
@@ -145,6 +157,8 @@ class AuditLogTest extends TestCase
 
     /**
      * Memastikan collection terisolasi, masked, dan memakai cursor.
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function test_collection_is_owner_scoped_masked_and_cursor_paginated(): void
     {
@@ -179,6 +193,8 @@ class AuditLogTest extends TestCase
     /**
      * Memastikan timeline campuran tetap lengkap dan deterministik ketika
      * batas halaman memotong event autentikasi dan produk.
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function test_mixed_event_cursor_pagination_has_no_missing_or_duplicate_rows(): void
     {
@@ -248,6 +264,8 @@ class AuditLogTest extends TestCase
 
     /**
      * Memastikan full IP hanya bisa dibaca oleh pemilik audit.
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function test_detail_reveals_full_ip_only_to_the_owner(): void
     {
@@ -276,6 +294,8 @@ class AuditLogTest extends TestCase
 
     /**
      * Memastikan request id tersedia pada response dan row audit.
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function test_request_id_is_returned_and_persisted(): void
     {
@@ -298,6 +318,8 @@ class AuditLogTest extends TestCase
 
     /**
      * Memastikan event, rentang tanggal, dan ukuran halaman tidak valid ditolak.
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function test_event_date_and_page_size_filters_are_validated(): void
     {
@@ -348,6 +370,8 @@ class AuditLogTest extends TestCase
     /**
      * Memastikan parser tidak menebak perangkat asing sebagai Desktop dan
      * tetap membedakan Android tablet dari Android mobile.
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function test_user_agent_device_type_is_only_returned_when_supported(): void
     {
@@ -367,6 +391,8 @@ class AuditLogTest extends TestCase
 
     /**
      * Memastikan filter tanggal memakai batas hari Asia/Jakarta secara inklusif.
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function test_date_filter_uses_the_application_timezone_day_boundaries(): void
     {
@@ -394,6 +420,8 @@ class AuditLogTest extends TestCase
 
     /**
      * Membuat user lokal dengan Clerk identity unik untuk setiap test.
+     *
+     * @return User  Model user lokal yang berhasil ditemukan, dibuat, atau disinkronkan.
      */
     private function createUser(): User
     {
@@ -404,6 +432,13 @@ class AuditLogTest extends TestCase
 
     /**
      * Membuat row timeline deterministik tanpa memanggil layanan eksternal.
+     *
+     * @param  User  $user  Model user lokal yang menjadi actor atau pemilik data.
+     * @param  AuditEvent  $event  Jenis event domain yang dicatat.
+     * @param  CarbonImmutable  $occurredAt  Waktu event yang digunakan untuk menyusun fixture timeline.
+     * @param  int  $sequence  Nomor urut untuk menghasilkan fixture deterministik.
+     *
+     * @return AuditLog  Model audit log yang berhasil ditemukan atau dicatat.
      */
     private function createTimelineAudit(
         User $user,
@@ -434,6 +469,11 @@ class AuditLogTest extends TestCase
 
     /**
      * Membuat request audit terverifikasi tanpa memanggil layanan Clerk.
+     *
+     * @param  string  $sessionId  ID session Clerk yang menjadi target operasi.
+     * @param  string  $ipAddress  Alamat IP yang digunakan untuk request atau fixture audit.
+     *
+     * @return Request  Request sintetis yang telah diproses melalui middleware terkait.
      */
     private function auditRequest(string $sessionId, string $ipAddress = '127.0.0.1'): Request
     {
@@ -449,6 +489,11 @@ class AuditLogTest extends TestCase
 
     /**
      * Membuat model Clerk minimum untuk menguji local user synchronization.
+     *
+     * @param  string  $clerkUserId  ID user pada Clerk yang telah berasal dari token terverifikasi.
+     * @param  string  $email  Alamat email unik untuk identity fixture.
+     *
+     * @return ClerkUser  Model identity user yang berhasil diperoleh dari Clerk.
      */
     private function clerkUser(string $clerkUserId, string $email): ClerkUser
     {

@@ -31,4 +31,10 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'geoapify' => [
+        'key' => env('GEOAPIFY_API_KEY'),
+        'url' => env('GEOAPIFY_API_URL', 'https://api.geoapify.com/v1/geocode'),
+        'timeout' => env('GEOAPIFY_TIMEOUT', 8),
+    ],
+
 ];

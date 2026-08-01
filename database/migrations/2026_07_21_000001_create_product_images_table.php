@@ -10,6 +10,8 @@ return new class extends Migration
 {
     /**
      * Membuat penyimpanan multi-image dan menyalin referensi gambar produk lama.
+     *
+     * @return void  Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
      */
     public function up(): void
     {
@@ -53,6 +55,11 @@ return new class extends Migration
         // --- backfill product images - end - copy legacy paths without moving physical files
     }
 
+    /**
+     * Membatalkan perubahan schema database.
+     *
+     * @return void  Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
+     */
     public function down(): void
     {
         Schema::dropIfExists('product_images');

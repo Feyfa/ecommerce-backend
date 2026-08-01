@@ -12,6 +12,15 @@ use Throwable;
 
 class AuthSessionController extends Controller
 {
+    /**
+     * Menyiapkan controller dengan layanan sesi dan keamanan Clerk.
+     *
+     * @param  ClerkUserSyncService  $clerkUserSyncService  Service clerk user sync yang digunakan oleh class ini.
+     * @param  CompanyService  $companyService  Service company yang digunakan oleh class ini.
+     * @param  AuditLogService  $auditLogService  Service audit log yang digunakan oleh class ini.
+     *
+     * @return void  Tidak mengembalikan nilai; dependency disimpan pada instance.
+     */
     public function __construct(
         protected ClerkUserSyncService $clerkUserSyncService,
         protected CompanyService $companyService,
@@ -21,6 +30,14 @@ class AuthSessionController extends Controller
     /**
      * Tujuan endpoint ini untuk menjadi bootstrap auth utama baru,
      * menggantikan pola lama yang hanya mengecek token valid/tidak valid.
+     *
+     * Token Clerk digunakan untuk menyinkronkan atau membuat user lokal dalam transaksi. Event
+     * registration atau login dicatat berdasarkan status create dan session ID, lalu response
+     * menyediakan user bootstrap yang menjadi sumber auth frontend.
+     *
+     * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
+     *
+     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function show(Request $request): JsonResponse
     {
@@ -78,6 +95,10 @@ class AuthSessionController extends Controller
     /**
      * Mencatat logout user-initiated sebelum frontend menutup session Clerk.
      * Frontend tetap wajib melanjutkan sign-out jika endpoint ini gagal.
+     *
+     * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
+     *
+     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function logout(Request $request): JsonResponse
     {
