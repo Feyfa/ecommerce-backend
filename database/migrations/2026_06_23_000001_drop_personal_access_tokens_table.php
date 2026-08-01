@@ -9,6 +9,8 @@ return new class extends Migration
     /**
      * Tujuan migration ini untuk menghapus tabel token auth lama
      * setelah autentikasi aplikasi dipindahkan ke provider utama.
+     *
+     * @return void  Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
      */
     public function up(): void
     {
@@ -18,6 +20,8 @@ return new class extends Migration
     /**
      * Tujuan rollback ini untuk membuat ulang tabel token lama
      * hanya jika migration perlu dibatalkan.
+     *
+     * @return void  Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
      */
     public function down(): void
     {

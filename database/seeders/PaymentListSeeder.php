@@ -8,7 +8,11 @@ use Illuminate\Database\Seeder;
 class PaymentListSeeder extends Seeder
 {
     /**
-     * Run the database seeds.
+     * Mengisi katalog metode pembayaran dan withdrawal yang dikenali aplikasi menggunakan slug serta
+     * metadata stabil. Upsert atau insert yang digunakan menjaga hasil seeding dapat diulang tanpa
+     * membuat entri duplikat.
+     *
+     * @return void  Tidak mengembalikan nilai; data referensi ditulis langsung ke database.
      */
     public function run(): void
     {

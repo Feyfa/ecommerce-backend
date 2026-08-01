@@ -2,27 +2,49 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Keranjang;
 use App\Models\Product;
 use App\Models\ProductImage;
 use App\Services\AuditLogService;
+use App\Services\ProductAvailabilityService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator as ValidationValidator;
+use InvalidArgumentException;
+use RuntimeException;
 use Throwable;
 
 class ProductController extends Controller
 {
+    /**
+     * Menyiapkan controller dengan layanan produk, ketersediaan, dan audit log.
+     *
+     * @param  AuditLogService  $auditLogService  Service audit log yang digunakan oleh class ini.
+     * @param  ProductAvailabilityService  $productAvailabilityService  Service product availability yang digunakan oleh class ini.
+     *
+     * @return void  Tidak mengembalikan nilai; dependency disimpan pada instance.
+     */
     public function __construct(
-        protected AuditLogService $auditLogService
+        protected AuditLogService $auditLogService,
+        protected ProductAvailabilityService $productAvailabilityService,
     ) {}
 
     /**
      * Mengambil daftar produk milik seller dengan filter dan urutan yang dipilih.
+     *
+     * Filter, pencarian, sorting, cursor, dan identitas seller divalidasi sebelum query produk
+     * dibentuk. Response menggunakan urutan stabil serta menyertakan status verifikasi lokasi seller
+     * yang menentukan apakah produk baru dapat ditambahkan.
+     *
+     * @param  string  $user_id_seller  ID seller pemilik produk atau transaksi.
+     * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
+     *
+     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
-    public function index(string $user_id_seller, Request $request)
+    public function index(string $user_id_seller, Request $request): JsonResponse
     {
         // --- step 1 - start - validasi parameter seller, pagination, filter, dan sorting
         $validator = Validator::make(
@@ -77,13 +99,28 @@ class ProductController extends Controller
             ->withProductSort($sort_product);
         // --- step 3 - end - siapkan query dasar dan parameter pencarian produk
 
-        return response()->json(['status' => 200, 'products' => $products->limit(50)->get()], 200);
+        return response()->json([
+            'status' => 200,
+            'products' => $products->limit(50)->get(),
+            'seller_location_verified' => $this->productAvailabilityService
+                ->sellerHasVerifiedAddress($validate['user_id_seller']),
+        ], 200);
     }
 
     /**
      * Mengambil satu produk beserta gambar terurut milik seller terautentikasi.
+     *
+     * Function membatasi pembacaan ke produk milik seller yang terautentikasi dan memvalidasi kedua
+     * identifier. Produk dimuat bersama gambar terurut agar editor menerima manifest yang sama dengan
+     * state database.
+     *
+     * @param  string  $user_id_seller  ID seller pemilik produk atau transaksi.
+     * @param  string  $id  Identifier record yang menjadi target operasi.
+     * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
+     *
+     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
-    public function show(string $user_id_seller, string $id, Request $request)
+    public function show(string $user_id_seller, string $id, Request $request): JsonResponse
     {
         // --- step 1 - start - validasi UUID seller dan produk
         $validator = Validator::make(
@@ -120,8 +157,16 @@ class ProductController extends Controller
 
     /**
      * Membuat produk beserta satu sampai lima gambar dalam satu operasi konsisten.
+     *
+     * Seller harus terautentikasi dan memiliki lokasi toko terverifikasi sebelum produk dapat dibuat.
+     * Manifest satu sampai lima gambar divalidasi, file disimpan, lalu produk, urutan gambar, dan
+     * audit log dibuat secara transaksional dengan pembersihan file ketika proses gagal.
+     *
+     * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
+     *
+     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         // --- step 1 - start - validasi data produk, file, manifest urutan, dan seller
         $validator = $this->productValidator($request, true);
@@ -134,6 +179,14 @@ class ProductController extends Controller
 
         if ($request->user()->id !== $validate['user_id_seller']) {
             return response()->json(['status' => 403, 'message' => 'Forbidden'], 403);
+        }
+
+        if (! $this->productAvailabilityService->sellerHasVerifiedAddress($validate['user_id_seller'])) {
+            return response()->json([
+                'status' => 409,
+                'code' => ProductAvailabilityService::SELLER_LOCATION_UNVERIFIED,
+                'message' => 'Verifikasi lokasi toko dengan Pinpoint sebelum menambahkan produk.',
+            ], 409);
         }
         // --- step 1 - end - validasi data produk, file, manifest urutan, dan seller
 
@@ -148,7 +201,7 @@ class ProductController extends Controller
                 $storedPath = $orderedImage['file']->store('product-imgs');
 
                 if ($storedPath === false) {
-                    throw new \RuntimeException('Failed to store a product image.');
+                    throw new RuntimeException('Failed to store a product image.');
                 }
 
                 $storedPaths[$index] = $storedPath;
@@ -183,8 +236,17 @@ class ProductController extends Controller
 
     /**
      * Memperbarui data dan urutan gambar, lalu menjadikan posisi pertama sebagai cover legacy.
+     *
+     * Kepemilikan produk, payload, dan manifest gabungan gambar lama-baru diverifikasi sebelum
+     * perubahan. Database dan audit diperbarui dalam transaksi, sedangkan file baru atau file yang
+     * dilepas dibersihkan pada tahap yang sesuai agar rollback tidak merusak gambar lama.
+     *
+     * @param  string  $id  Identifier record yang menjadi target operasi.
+     * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
+     *
+     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
-    public function update(string $id, Request $request)
+    public function update(string $id, Request $request): JsonResponse
     {
         // --- step 1 - start - validasi UUID dan cari produk melalui seller terautentikasi
         $idValidator = Validator::make(['id' => $id], ['id' => ['required', 'uuid']]);
@@ -224,7 +286,7 @@ class ProductController extends Controller
                     $storedPath = $orderedImage['file']->store('product-imgs');
 
                     if ($storedPath === false) {
-                        throw new \RuntimeException('Failed to store a product image.');
+                        throw new RuntimeException('Failed to store a product image.');
                     }
 
                     $storedPaths[$index] = $storedPath;
@@ -292,9 +354,19 @@ class ProductController extends Controller
     }
 
     /**
-     * Menghapus product dan seluruh file gambar setelah perubahan database berhasil.
+     * Menonaktifkan produk dengan soft delete agar item keranjang lama tetap dapat dijelaskan.
+     *
+     * Produk milik seller dinonaktifkan menggunakan soft delete agar keranjang lama masih dapat
+     * menjelaskan itemnya. Snapshot audit disimpan dalam transaksi yang sama, sedangkan file gambar
+     * dipertahankan untuk konteks historis.
+     *
+     * @param  string  $user_id_seller  ID seller pemilik produk atau transaksi.
+     * @param  string  $id  Identifier record yang menjadi target operasi.
+     * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
+     *
+     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
-    public function delete(string $user_id_seller, string $id, Request $request)
+    public function delete(string $user_id_seller, string $id, Request $request): JsonResponse
     {
         // --- step 1 - start - validasi UUID seller dan produk
         $validator = Validator::make(
@@ -324,33 +396,37 @@ class ProductController extends Controller
         }
         // --- step 2 - end - pastikan seller hanya menghapus produknya sendiri
 
-        // --- step 3 - start - kumpulkan seluruh path gambar sebelum row database dihapus
-        $paths = $product->images->pluck('path')->push($product->img)->filter()->unique()->all();
+        // --- step 3 - start - simpan snapshot audit sebelum produk dinonaktifkan
         $snapshot = [
             'name' => (string) $product->name,
             ...$this->auditLogService->productSnapshot($product),
         ];
-        // --- step 3 - end - kumpulkan seluruh path gambar sebelum row database dihapus
+        // --- step 3 - end - simpan snapshot audit sebelum produk dinonaktifkan
 
-        // --- step 4 - start - hapus dependensi keranjang dan produk dalam transaksi
+        // --- step 4 - start - soft-delete produk tanpa menghapus keranjang dan gambar
         DB::transaction(function () use ($request, $product, $snapshot) {
-            Keranjang::where('product_id', $product->id)->delete();
             $product->delete();
             $this->auditLogService->recordProductDeleted($request->user(), $product, $request, $snapshot);
         });
-        // --- step 4 - end - hapus dependensi keranjang dan produk dalam transaksi
-
-        // --- step 5 - start - hapus seluruh file setelah transaksi database berhasil
-        Storage::delete($paths);
-        // --- step 5 - end - hapus seluruh file setelah transaksi database berhasil
+        // --- step 4 - end - soft-delete produk tanpa menghapus keranjang dan gambar
 
         return response()->json(['status' => 200, 'message' => 'Delete Product Success'], 200);
     }
 
     /**
      * Membuat validator product dan memastikan manifest gambar konsisten dengan file upload.
+     *
+     * Aturan create dan update dibedakan berdasarkan kebutuhan gambar serta field produk. Callback
+     * tambahan memvalidasi manifest urutan, kepemilikan gambar lama, dan korespondensi setiap upload
+     * sebelum controller menyentuh storage atau database.
+     *
+     * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
+     * @param  bool  $creating  Nilai creating yang diperlukan untuk menjalankan proses ini.
+     * @param  Product|null  $product  Model produk yang menjadi target atau sumber data.
+     *
+     * @return ValidationValidator  Validator berisi aturan dasar dan pemeriksaan lanjutan untuk payload.
      */
-    private function productValidator(Request $request, bool $creating, ?Product $product = null)
+    private function productValidator(Request $request, bool $creating, ?Product $product = null): ValidationValidator
     {
         // --- step 1 - start - susun aturan dasar untuk create atau update
         $rules = [
@@ -373,7 +449,7 @@ class ProductController extends Controller
         $validator->after(function ($validator) use ($request, $product) {
             try {
                 $this->resolveImageOrder($request, $product);
-            } catch (\InvalidArgumentException $exception) {
+            } catch (InvalidArgumentException $exception) {
                 $validator->errors()->add('images', $exception->getMessage());
             }
         });
@@ -384,6 +460,15 @@ class ProductController extends Controller
 
     /**
      * Mengubah image_order menjadi daftar gambar final dan menolak referensi yang tidak valid.
+     *
+     * Setiap token manifest dipetakan ke upload baru atau gambar lama milik produk yang sama. Function
+     * menolak duplikasi, referensi asing, upload yang tidak dicantumkan, serta jumlah gambar di luar
+     * batas sebelum file atau database diubah.
+     *
+     * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
+     * @param  Product|null  $product  Model produk yang menjadi target atau sumber data.
+     *
+     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function resolveImageOrder(Request $request, ?Product $product = null): array
     {
@@ -397,25 +482,25 @@ class ProductController extends Controller
 
         // --- step 2 - start - tolak collection malformed sebelum dilakukan iterasi
         if (! is_array($imageOrder) || ! is_array($uploadedImages)) {
-            throw new \InvalidArgumentException('Image order and uploaded images must be arrays.');
+            throw new InvalidArgumentException('Image order and uploaded images must be arrays.');
         }
 
         if (count($imageOrder) < 1 || count($imageOrder) > 5) {
-            throw new \InvalidArgumentException('Product must have between 1 and 5 images.');
+            throw new InvalidArgumentException('Product must have between 1 and 5 images.');
         }
         // --- step 2 - end - tolak collection malformed sebelum dilakukan iterasi
 
         // --- step 3 - start - ubah setiap token menjadi upload baru atau gambar lama yang valid
         foreach ($imageOrder as $token) {
             if (! is_string($token)) {
-                throw new \InvalidArgumentException('Image order contains an invalid image reference.');
+                throw new InvalidArgumentException('Image order contains an invalid image reference.');
             }
 
             if (preg_match('/^new:(\d+)$/', $token, $matches)) {
                 $index = (int) $matches[1];
 
                 if (! isset($uploadedImages[$index]) || in_array($index, $usedNewIndexes, true)) {
-                    throw new \InvalidArgumentException('Image order contains an invalid new image reference.');
+                    throw new InvalidArgumentException('Image order contains an invalid new image reference.');
                 }
 
                 $usedNewIndexes[] = $index;
@@ -425,7 +510,7 @@ class ProductController extends Controller
             }
 
             if (! $product || ! $existingImages->has($token)) {
-                throw new \InvalidArgumentException('Image order contains an image that does not belong to this product.');
+                throw new InvalidArgumentException('Image order contains an image that does not belong to this product.');
             }
 
             $image = $existingImages->get($token);
@@ -435,7 +520,7 @@ class ProductController extends Controller
 
         // --- step 4 - start - pastikan semua file upload tercantum dalam manifest final
         if (count($usedNewIndexes) !== count($uploadedImages)) {
-            throw new \InvalidArgumentException('Every uploaded image must appear exactly once in image order.');
+            throw new InvalidArgumentException('Every uploaded image must appear exactly once in image order.');
         }
         // --- step 4 - end - pastikan semua file upload tercantum dalam manifest final
 
@@ -445,7 +530,9 @@ class ProductController extends Controller
     /**
      * Mengambil nilai produk yang boleh muncul pada before/after audit.
      *
-     * @return array{name: string, price: int, stock: int}
+     * @param  Product  $product  Model produk yang menjadi target atau sumber data.
+     *
+     * @return array{name: string, price: int, stock: int}  Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function productValues(Product $product): array
     {
@@ -460,11 +547,18 @@ class ProductController extends Controller
      * Menghasilkan daftar perubahan nilai yang sebenarnya saja.
      * Request update identik tetap diaudit dengan array kosong.
      *
-     * @param  array{name: string, price: int, stock: int}  $beforeValues
-     * @return array<int, array{field: string, label: string, before: mixed, after: mixed}>
+     * Nilai sebelum update dibandingkan dengan model setelah refresh menggunakan tipe yang
+     * dinormalisasi. Hanya field yang benar-benar berubah dimasukkan ke audit context agar update
+     * identik tidak menghasilkan perubahan palsu.
+     *
+     * @param  array{name: string, price: int, stock: int}  $beforeValues  Nilai before values yang diperlukan untuk menjalankan proses ini.
+     * @param  Product  $product  Model produk yang menjadi target atau sumber data.
+     *
+     * @return array<int, array{field: string, label: string, before: mixed, after: mixed}>  Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function productChanges(array $beforeValues, Product $product): array
     {
+        // --- step 1 - start - siapkan nilai pembanding dan label audit
         $afterValues = $this->productValues($product);
         $labels = [
             'name' => 'Nama produk',
@@ -472,7 +566,9 @@ class ProductController extends Controller
             'stock' => 'Stok',
         ];
         $changes = [];
+        // --- step 1 - end - siapkan nilai pembanding dan label audit
 
+        // --- step 2 - start - kumpulkan field produk yang benar-benar berubah
         foreach ($labels as $field => $label) {
             if ($beforeValues[$field] === $afterValues[$field]) {
                 continue;
@@ -485,6 +581,7 @@ class ProductController extends Controller
                 'after' => $afterValues[$field],
             ];
         }
+        // --- step 2 - end - kumpulkan field produk yang benar-benar berubah
 
         return $changes;
     }
@@ -493,11 +590,14 @@ class ProductController extends Controller
      * Merangkum perubahan gambar tanpa menyimpan path, file, atau id internal.
      * Perubahan urutan hanya membandingkan urutan relatif gambar lama yang dipertahankan.
      *
-     * @param  array<int, array{id?: string, path?: string, file?: mixed}>  $orderedImages
-     * @return array{before_count: int, after_count: int, added_count: int, removed_count: int, cover_changed: bool, order_changed: bool}
+     * @param  Product  $product  Model produk yang menjadi target atau sumber data.
+     * @param  array<int, array{id?: string, path?: string, file?: mixed}>  $orderedImages  Nilai ordered images yang diperlukan untuk menjalankan proses ini.
+     *
+     * @return array{before_count: int, after_count: int, added_count: int, removed_count: int, cover_changed: bool, order_changed: bool}  Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function imageChanges(Product $product, array $orderedImages): array
     {
+        // --- step 1 - start - hitung urutan gambar sebelum dan sesudah update
         $beforeIds = $product->images->pluck('id')->values()->all();
         $afterExistingIds = collect($orderedImages)->pluck('id')->filter()->values()->all();
         $beforeRetainedIds = array_values(array_filter(
@@ -505,8 +605,10 @@ class ProductController extends Controller
             static fn (string $id): bool => in_array($id, $afterExistingIds, true)
         ));
         $afterCoverId = $orderedImages[0]['id'] ?? null;
+        // --- step 1 - end - hitung urutan gambar sebelum dan sesudah update
 
-        return [
+        // --- step 2 - start - bentuk ringkasan perubahan gambar untuk audit
+        $changes = [
             'before_count' => count($beforeIds),
             'after_count' => count($orderedImages),
             'added_count' => count(array_filter(
@@ -517,5 +619,8 @@ class ProductController extends Controller
             'cover_changed' => ($beforeIds[0] ?? null) !== $afterCoverId,
             'order_changed' => $beforeRetainedIds !== $afterExistingIds,
         ];
+        // --- step 2 - end - bentuk ringkasan perubahan gambar untuk audit
+
+        return $changes;
     }
 }

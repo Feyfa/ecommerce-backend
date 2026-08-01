@@ -33,6 +33,10 @@ Returns formatted seller company data for the authenticated user.
 - `type` equals `seller`;
 - `enable` equals `1`.
 
+The response includes `location_source`, latitude, longitude, Geoapify place id,
+formatted address, and seller-provided address detail so the frontend can reopen
+the saved pinpoint.
+
 Success response:
 
 ```json
@@ -51,7 +55,8 @@ Required request fields:
 - `name`
 - `email`
 - `phone`
-- `alamat`
+- `location_source` (`map`)
+- `latitude`, `longitude`, and `address_detail`
 
 Optional request fields:
 
@@ -60,7 +65,11 @@ Optional request fields:
 Validation rules:
 
 - `name` is required and must be a string.
-- `alamat` is required and must be a string.
+- Coordinates must be valid and address detail is required.
+- The backend reverse-geocodes the coordinate, accepts only Indonesia, and
+  persists the provider address instead of client address metadata.
+- Provider/configuration failures return `503` with
+  `LOCATION_VERIFICATION_UNAVAILABLE` without partially updating the profile.
 - `email` is required, must be a valid email, max 255 characters, and must not exist in another `users` row or another `companies` row.
 - `phone` is required, must be a string, max 20 characters, and must not exist in another `users` row or another `companies` row.
 
@@ -68,6 +77,7 @@ Side effects:
 
 - `companies` is updated or created by `user_id`.
 - Seller address is updated or created in `alamats` with `type = seller` and `enable = 1`.
+- The backend builds the final display address for pinpoint mode.
 
 Success response:
 
@@ -142,3 +152,9 @@ Error responses:
 
 - `400` with `Company Is Empty` when the company row does not exist.
 - `400` with `Delete Image Error, Path File Empty` when the image file path is empty or missing on disk.
+
+## QA Coverage
+
+- [TOK-8 Pinpoint Address QA](../../qa/tok-8-pinpoint-address.md) tracks backend
+  store-location verification; the matching frontend checklist is available at
+  `frontend-repo:/docs/qa/tok-8-pinpoint-address.md`.

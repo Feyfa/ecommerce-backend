@@ -19,6 +19,14 @@ class AuditLogController extends Controller
 {
     /**
      * Menampilkan timeline audit milik user aktif memakai cursor pagination.
+     *
+     * Filter event, tanggal, page size, dan cursor divalidasi sebelum query dijalankan. Query selalu
+     * dibatasi ke pemilik audit, memakai urutan cursor yang stabil, serta mengembalikan IP yang sudah
+     * disamarkan melalui resource collection.
+     *
+     * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
+     *
+     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function index(Request $request): JsonResponse
     {
@@ -75,6 +83,15 @@ class AuditLogController extends Controller
     /**
      * Menampilkan satu audit milik user aktif. Query ownership dilakukan
      * sebelum resource mengizinkan full IP masuk ke response detail.
+     *
+     * Audit hanya dapat dibuka oleh actor pemiliknya. Mode detail menggunakan resource yang boleh
+     * menampilkan IP lengkap dan context terpilih tanpa membuka metadata internal yang tidak termasuk
+     * kontrak API.
+     *
+     * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
+     * @param  string  $auditLog  Model audit log yang akan ditampilkan.
+     *
+     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function show(Request $request, string $auditLog): JsonResponse
     {
@@ -100,6 +117,8 @@ class AuditLogController extends Controller
      * Offset dipertahankan agar PostgreSQL tidak bergantung pada timezone koneksi.
      *
      * @param  string  $date  Tanggal valid berformat YYYY-MM-DD.
+     *
+     * @return string  Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
      */
     private function startOfApplicationDay(string $date): string
     {
@@ -113,6 +132,8 @@ class AuditLogController extends Controller
      * Offset dipertahankan agar seluruh aktivitas hari terakhir tetap masuk.
      *
      * @param  string  $date  Tanggal valid berformat YYYY-MM-DD.
+     *
+     * @return string  Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
      */
     private function endOfApplicationDay(string $date): string
     {
@@ -126,6 +147,8 @@ class AuditLogController extends Controller
      * dan MySQL membutuhkan format tanggal biasa untuk perbandingan stabil.
      *
      * @param  CarbonImmutable  $boundary  Batas waktu pada timezone aplikasi.
+     *
+     * @return string  Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
      */
     private function formatDatabaseBoundary(CarbonImmutable $boundary): string
     {
@@ -140,7 +163,13 @@ class AuditLogController extends Controller
      * Memastikan cursor hanya memuat parameter order timeline yang dibuat
      * Laravel sehingga payload rusak tidak jatuh menjadi first page atau 500.
      *
+     * Payload cursor didekode dan diperiksa agar hanya pasangan kolom urutan serta pointer yang
+     * dihasilkan paginator yang diterima. Cursor malformed ditolak sebagai validation error, bukan
+     * diam-diam dianggap halaman pertama.
+     *
      * @param  string  $encodedCursor  Cursor URL-safe dari response sebelumnya.
+     *
+     * @return bool  True ketika kondisi is valid cursor terpenuhi; false jika tidak.
      */
     private function isValidCursor(string $encodedCursor): bool
     {

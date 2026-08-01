@@ -2,9 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SaldoHistory extends Model
 {
@@ -20,20 +21,35 @@ class SaldoHistory extends Model
         'title',
         'price',
         'saldo_before',
-        'saldo_after'
+        'saldo_after',
     ];
 
-    public function user()
+    /**
+     * Mengambil user pemilik riwayat saldo.
+     *
+     * @return BelongsTo  Relasi Eloquent menuju model induk yang terkait.
+     */
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
     }
 
-    public function transactionUser()
+    /**
+     * Mengambil transaksi yang terkait dengan perubahan saldo.
+     *
+     * @return BelongsTo  Relasi Eloquent menuju model induk yang terkait.
+     */
+    public function transactionUser(): BelongsTo
     {
         return $this->belongsTo(TransactionUser::class, 'transaction_user_id');
     }
 
-    public function paymentUser()
+    /**
+     * Mengambil rekening pembayaran yang terkait dengan perubahan saldo.
+     *
+     * @return BelongsTo  Relasi Eloquent menuju model induk yang terkait.
+     */
+    public function paymentUser(): BelongsTo
     {
         return $this->belongsTo(PaymentUser::class, 'payment_user_id');
     }

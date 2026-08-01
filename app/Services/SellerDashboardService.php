@@ -6,42 +6,63 @@ use App\Models\Product;
 use App\Models\TransactionProduct;
 use App\Models\TransactionUser;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
 class SellerDashboardService
 {
     /**
      * Mengambil ringkasan utama dashboard penjual dari data produk dan transaksi.
+     *
+     * Service menggabungkan summary, performa 30 hari, transaksi terbaru, dan snapshot produk untuk
+     * seller yang sama. Waktu awal serta akhir bulan dihitung sekali agar seluruh metrik memakai
+     * periode konsisten.
+     *
+     * @param  string  $user_id  ID user yang menjadi scope data atau mutasi.
+     *
+     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function getDashboard(string $user_id): array
     {
-        /* GET DATE RANGE */
+        // --- step 1 - start - tentukan rentang tanggal
         $now = Carbon::now('Asia/Jakarta');
         $startOfMonth = $now->copy()->startOfMonth()->timezone('UTC');
         $endOfMonth = $now->copy()->endOfMonth()->timezone('UTC');
-        /* GET DATE RANGE */
+        // --- step 1 - end - tentukan rentang tanggal
 
-        /* GET DASHBOARD DATA */
-        return [
+        // --- step 2 - start - ambil seluruh data dashboard
+        $dashboard = [
             'summary' => $this->getSummary($user_id, $startOfMonth, $endOfMonth),
             'performance' => $this->getPerformance($user_id),
             'recent_transactions' => $this->getRecentTransactions($user_id),
             'product_snapshot' => $this->getProductSnapshot($user_id),
         ];
-        /* GET DASHBOARD DATA */
+        // --- step 2 - end - ambil seluruh data dashboard
+
+        return $dashboard;
     }
 
     /**
      * Mengambil metrik utama toko seperti total produk, pesanan baru, total terjual, dan pendapatan bulanan.
+     *
+     * Query agregat menghitung jumlah produk, order baru, unit terjual, dan pendapatan seller pada
+     * bulan berjalan. Hanya transaksi dengan status bisnis yang sesuai yang ikut pada masing-masing
+     * metrik.
+     *
+     * @param  string  $user_id  ID user yang menjadi scope data atau mutasi.
+     * @param  Carbon  $startOfMonth  Batas awal bulan untuk perhitungan metrik.
+     * @param  Carbon  $endOfMonth  Batas akhir bulan untuk perhitungan metrik.
+     *
+     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function getSummary(string $user_id, Carbon $startOfMonth, Carbon $endOfMonth): array
     {
-        /* GET BASE QUERY */
+        // --- step 1 - start - siapkan query dasar
         $doneTransactions = $this->doneTransactionQuery($user_id);
-        /* GET BASE QUERY */
+        // --- step 1 - end - siapkan query dasar
 
-        /* GET SUMMARY */
-        return [
+        // --- step 2 - start - ambil ringkasan dashboard
+        $summary = [
             'total_products' => Product::where('user_id_seller', $user_id)->count(),
             'new_orders' => $this->newOrderQuery($user_id)->count(),
             'total_sold' => (int) (clone $doneTransactions)
@@ -51,20 +72,29 @@ class SellerDashboardService
                 ->whereBetween('transaction_users.created_at', [$startOfMonth, $endOfMonth])
                 ->sum('transaction_users.product_price'),
         ];
-        /* GET SUMMARY */
+        // --- step 2 - end - ambil ringkasan dashboard
+
+        return $summary;
     }
 
     /**
      * Mengambil data grafik penjualan 30 hari terakhir dari transaksi yang sudah selesai.
+     *
+     * Transaksi selesai dikelompokkan per hari untuk rentang 30 hari. Hari tanpa transaksi tetap diisi
+     * nol agar frontend menerima rangkaian tanggal kontinu untuk grafik.
+     *
+     * @param  string  $user_id  ID user yang menjadi scope data atau mutasi.
+     *
+     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function getPerformance(string $user_id): array
     {
-        /* GET DATE RANGE */
+        // --- step 1 - start - tentukan rentang tanggal
         $startDate = Carbon::now('Asia/Jakarta')->subDays(29)->startOfDay();
         $endDate = Carbon::now('Asia/Jakarta')->endOfDay();
-        /* GET DATE RANGE */
+        // --- step 1 - end - tentukan rentang tanggal
 
-        /* GET PERFORMANCE ROWS */
+        // --- step 2 - start - ambil data performa
         $rows = $this->doneTransactionQuery($user_id)
             ->whereBetween('transaction_users.created_at', [
                 $startDate->copy()->timezone('UTC'),
@@ -78,14 +108,14 @@ class SellerDashboardService
             ->orderBy('transaction_date')
             ->get()
             ->keyBy('transaction_date');
-        /* GET PERFORMANCE ROWS */
+        // --- step 2 - end - ambil data performa
 
-        /* FORMAT PERFORMANCE */
+        // --- step 3 - start - format data performa
         $labels = [];
         $sales = [];
         $revenue = [];
 
-        for($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
+        for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
             $dateKey = $date->toDateString();
             $row = $rows->get($dateKey);
 
@@ -93,10 +123,10 @@ class SellerDashboardService
             $sales[] = (int) ($row->sales ?? 0);
             $revenue[] = (float) ($row->revenue ?? 0);
         }
-        /* FORMAT PERFORMANCE */
+        // --- step 3 - end - format data performa
 
-        /* RESPONSE */
-        return [
+        // --- step 4 - start - bentuk response
+        $performance = [
             'period' => '30_days',
             'labels' => $labels,
             'sales' => $sales,
@@ -104,16 +134,25 @@ class SellerDashboardService
             'total_sold' => array_sum($sales),
             'total_revenue' => array_sum($revenue),
         ];
-        /* RESPONSE */
+        // --- step 4 - end - bentuk response
+
+        return $performance;
     }
 
     /**
      * Mengambil transaksi terbaru seller untuk ditampilkan di dashboard.
+     *
+     * Transaksi seller terbaru dimuat bersama buyer, invoice, dan produk yang diperlukan tampilan.
+     * Jumlah hasil dibatasi agar dashboard tidak menjalankan query history penuh.
+     *
+     * @param  string  $user_id  ID user yang menjadi scope data atau mutasi.
+     *
+     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function getRecentTransactions(string $user_id): array
     {
-        /* GET RECENT TRANSACTIONS */
-        return TransactionUser::query()
+        // --- step 1 - start - ambil transaksi terbaru
+        $recentTransactions = TransactionUser::query()
             ->join('transaction_invoices', 'transaction_invoices.id', '=', 'transaction_users.transaction_invoice_id')
             ->join('users as buyer_users', 'buyer_users.id', '=', 'transaction_users.user_id_buyer')
             ->where('transaction_users.user_id_seller', $user_id)
@@ -130,13 +169,13 @@ class SellerDashboardService
             ->limit(5)
             ->get()
             ->map(function ($transaction) {
-                /* GET PRODUCT NAMES */
+                // --- step 2 - start - ambil nama produk
                 $products = TransactionProduct::query()
                     ->join('products', 'products.id', '=', 'transaction_products.product_id')
                     ->where('transaction_products.transaction_user_id', $transaction->id)
                     ->orderBy('products.name')
                     ->pluck('products.name');
-                /* GET PRODUCT NAMES */
+                // --- step 2 - end - ambil nama produk
 
                 return [
                     'id' => $transaction->id,
@@ -152,32 +191,48 @@ class SellerDashboardService
                 ];
             })
             ->toArray();
-        /* GET RECENT TRANSACTIONS */
+        // --- step 1 - end - ambil transaksi terbaru
+
+        return $recentTransactions;
     }
 
     /**
      * Mengambil ringkasan kondisi produk seller berdasarkan stok dan tanggal pembuatan.
+     *
+     * Produk dikelompokkan menjadi stok sehat, rendah, kosong, dan produk baru berdasarkan invariant
+     * yang sama dengan filter seller. Hasil agregat digunakan untuk kartu ringkasan tanpa memuat
+     * seluruh model produk.
+     *
+     * @param  string  $user_id  ID user yang menjadi scope data atau mutasi.
+     *
+     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function getProductSnapshot(string $user_id): array
     {
-        /* GET DATE RANGE */
+        // --- step 1 - start - tentukan rentang tanggal
         $newProductStart = Carbon::now('Asia/Jakarta')->subDays(30)->startOfDay()->timezone('UTC');
-        /* GET DATE RANGE */
+        // --- step 1 - end - tentukan rentang tanggal
 
-        /* GET PRODUCT SNAPSHOT */
-        return [
+        // --- step 2 - start - ambil snapshot produk
+        $snapshot = [
             'active_products' => Product::where('user_id_seller', $user_id)->where('stock', '>', 0)->count(),
             'low_stock_products' => Product::where('user_id_seller', $user_id)->whereBetween('stock', [1, 5])->count(),
             'empty_stock_products' => Product::where('user_id_seller', $user_id)->where('stock', '<=', 0)->count(),
             'new_products' => Product::where('user_id_seller', $user_id)->where('created_at', '>=', $newProductStart)->count(),
         ];
-        /* GET PRODUCT SNAPSHOT */
+        // --- step 2 - end - ambil snapshot produk
+
+        return $snapshot;
     }
 
     /**
      * Membuat base query transaksi seller yang sudah selesai dan sudah dibayar.
+     *
+     * @param  string  $user_id  ID user yang menjadi scope data atau mutasi.
+     *
+     * @return Builder  Query builder yang telah ditambahkan scope atau kondisi terkait.
      */
-    private function doneTransactionQuery(string $user_id)
+    private function doneTransactionQuery(string $user_id): Builder
     {
         return TransactionUser::query()
             ->join('transaction_invoices', 'transaction_invoices.id', '=', 'transaction_users.transaction_invoice_id')
@@ -188,8 +243,12 @@ class SellerDashboardService
 
     /**
      * Membuat base query pesanan baru yang sudah dibayar dan masih perlu diproses seller.
+     *
+     * @param  string  $user_id  ID user yang menjadi scope data atau mutasi.
+     *
+     * @return Builder  Query builder yang telah ditambahkan scope atau kondisi terkait.
      */
-    private function newOrderQuery(string $user_id)
+    private function newOrderQuery(string $user_id): Builder
     {
         return TransactionUser::query()
             ->join('transaction_invoices', 'transaction_invoices.id', '=', 'transaction_users.transaction_invoice_id')

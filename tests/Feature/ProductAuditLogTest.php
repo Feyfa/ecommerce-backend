@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\AuditEvent;
+use App\Models\Alamat;
 use App\Models\AuditLog;
 use App\Models\Product;
 use App\Models\User;
@@ -26,6 +27,11 @@ class ProductAuditLogTest extends TestCase
 
     private User $seller;
 
+    /**
+     * Menyiapkan fixture dan dependency sebelum setiap pengujian.
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     protected function setUp(): void
     {
         parent::setUp();
@@ -33,10 +39,21 @@ class ProductAuditLogTest extends TestCase
         $this->withoutMiddleware();
         Storage::fake('public');
         $this->seller = User::factory()->create();
+        $this->createVerifiedSellerAddress($this->seller);
         $this->actingAs($this->seller);
     }
 
-    /** @test */
+    /**
+     * Memverifikasi aturan audit perubahan produk pada skenario successful create records an owner
+     * scoped product snapshot.
+     *
+     * Test menyiapkan produk dan actor, menjalankan request produk, lalu memastikan response, state
+     * database, serta snapshot audit hanya memuat perubahan yang diizinkan.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     public function successful_create_records_an_owner_scoped_product_snapshot(): void
     {
         $response = $this->post('/api/product', $this->createPayload());
@@ -63,7 +80,17 @@ class ProductAuditLogTest extends TestCase
             ->assertJsonMissingPath('data.0.context');
     }
 
-    /** @test */
+    /**
+     * Memverifikasi aturan audit perubahan produk pada skenario update records only real value changes
+     * and image metadata.
+     *
+     * Test menyiapkan produk dan actor, menjalankan request produk, lalu memastikan response, state
+     * database, serta snapshot audit hanya memuat perubahan yang diizinkan.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     public function update_records_only_real_value_changes_and_image_metadata(): void
     {
         $product = $this->productWithImages();
@@ -126,7 +153,17 @@ class ProductAuditLogTest extends TestCase
         $this->assertStringNotContainsString('product-imgs/', json_encode($audit->context, JSON_THROW_ON_ERROR));
     }
 
-    /** @test */
+    /**
+     * Memverifikasi aturan audit perubahan produk pada skenario identical update is recorded without
+     * false changes.
+     *
+     * Test menyiapkan produk dan actor, menjalankan request produk, lalu memastikan response, state
+     * database, serta snapshot audit hanya memuat perubahan yang diizinkan.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     public function identical_update_is_recorded_without_false_changes(): void
     {
         $product = $this->productWithImages(1);
@@ -148,14 +185,24 @@ class ProductAuditLogTest extends TestCase
         $this->assertFalse($audit->context['image_changes']['order_changed']);
     }
 
-    /** @test */
+    /**
+     * Memverifikasi aturan audit perubahan produk pada skenario delete keeps the last snapshot after
+     * the product is gone.
+     *
+     * Test menyiapkan produk dan actor, menjalankan request produk, lalu memastikan response, state
+     * database, serta snapshot audit hanya memuat perubahan yang diizinkan.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     public function delete_keeps_the_last_snapshot_after_the_product_is_gone(): void
     {
         $product = $this->productWithImages(2);
 
         $this->delete("/api/product/{$this->seller->id}/{$product->id}")->assertOk();
 
-        $this->assertDatabaseMissing('products', ['id' => $product->id]);
+        $this->assertSoftDeleted('products', ['id' => $product->id]);
         $audit = AuditLog::query()->sole();
         $this->assertSame(AuditEvent::PRODUCT_DELETED, $audit->event);
 
@@ -170,7 +217,17 @@ class ProductAuditLogTest extends TestCase
                 ->etc());
     }
 
-    /** @test */
+    /**
+     * Memverifikasi aturan audit perubahan produk pada skenario changing the product event filter
+     * after pagination starts a fresh collection.
+     *
+     * Test menyiapkan produk dan actor, menjalankan request produk, lalu memastikan response, state
+     * database, serta snapshot audit hanya memuat perubahan yang diizinkan.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     public function changing_the_product_event_filter_after_pagination_starts_a_fresh_collection(): void
     {
         // --- step 1 - start - prepare more than one page of mixed product activity
@@ -230,7 +287,17 @@ class ProductAuditLogTest extends TestCase
         // --- step 3 - end - switch filter without reusing the previous collection cursor
     }
 
-    /** @test */
+    /**
+     * Memverifikasi aturan audit perubahan produk pada skenario failed validation and foreign product
+     * writes do not create audit rows.
+     *
+     * Test menyiapkan produk dan actor, menjalankan request produk, lalu memastikan response, state
+     * database, serta snapshot audit hanya memuat perubahan yang diizinkan.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     public function failed_validation_and_foreign_product_writes_do_not_create_audit_rows(): void
     {
         // --- step 1 - start - reject invalid create data
@@ -291,7 +358,17 @@ class ProductAuditLogTest extends TestCase
         // --- step 4 - end - verify ownership data and audit history remain unchanged
     }
 
-    /** @test */
+    /**
+     * Memverifikasi aturan audit perubahan produk pada skenario failed update and missing product do
+     * not mutate data or create audit rows.
+     *
+     * Test menyiapkan produk dan actor, menjalankan request produk, lalu memastikan response, state
+     * database, serta snapshot audit hanya memuat perubahan yang diizinkan.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     public function failed_update_and_missing_product_do_not_mutate_data_or_create_audit_rows(): void
     {
         // --- step 1 - start - reject invalid update data without changing the product
@@ -326,7 +403,17 @@ class ProductAuditLogTest extends TestCase
         $this->assertDatabaseCount('audit_logs', 0);
     }
 
-    /** @test */
+    /**
+     * Memverifikasi aturan audit perubahan produk pada skenario audit failure rolls back product
+     * database and uploaded files.
+     *
+     * Test menyiapkan produk dan actor, menjalankan request produk, lalu memastikan response, state
+     * database, serta snapshot audit hanya memuat perubahan yang diizinkan.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     public function audit_failure_rolls_back_product_database_and_uploaded_files(): void
     {
         $this->mock(AuditLogService::class, function (MockInterface $mock): void {
@@ -342,7 +429,17 @@ class ProductAuditLogTest extends TestCase
         $this->assertSame([], Storage::disk('public')->allFiles('product-imgs'));
     }
 
-    /** @test */
+    /**
+     * Memverifikasi aturan audit perubahan produk pada skenario audit failure rolls back update and
+     * preserves the previous images.
+     *
+     * Test menyiapkan produk dan actor, menjalankan request produk, lalu memastikan response, state
+     * database, serta snapshot audit hanya memuat perubahan yang diizinkan.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     public function audit_failure_rolls_back_update_and_preserves_the_previous_images(): void
     {
         $product = $this->productWithImages(2);
@@ -370,7 +467,17 @@ class ProductAuditLogTest extends TestCase
         $this->assertCount(2, Storage::disk('public')->allFiles('product-imgs'));
     }
 
-    /** @test */
+    /**
+     * Memverifikasi aturan audit perubahan produk pada skenario audit failure rolls back delete and
+     * keeps product files.
+     *
+     * Test menyiapkan produk dan actor, menjalankan request produk, lalu memastikan response, state
+     * database, serta snapshot audit hanya memuat perubahan yang diizinkan.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
     public function audit_failure_rolls_back_delete_and_keeps_product_files(): void
     {
         $product = $this->productWithImages(2);
@@ -394,6 +501,12 @@ class ProductAuditLogTest extends TestCase
         Storage::disk('public')->assertExists('product-imgs/product-1.jpg');
     }
 
+    /**
+     * Menyusun payload create produk yang valid beserta satu gambar dan manifest urutannya. Nilai
+     * default dibuat deterministik agar snapshot audit dapat dibandingkan secara ketat.
+     *
+     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     */
     private function createPayload(): array
     {
         return [
@@ -406,6 +519,14 @@ class ProductAuditLogTest extends TestCase
         ];
     }
 
+    /**
+     * Membuat produk seller beserta sejumlah gambar dan file storage palsu sesuai urutan. Fixture
+     * dipakai untuk membandingkan snapshot sebelum-sesudah pada update serta delete.
+     *
+     * @param  int  $imageCount  Jumlah gambar yang harus dibuat pada fixture produk.
+     *
+     * @return Product  Model produk yang dibuat atau digunakan sebagai fixture.
+     */
     private function productWithImages(int $imageCount = 2): Product
     {
         $product = Product::create([
@@ -426,8 +547,38 @@ class ProductAuditLogTest extends TestCase
     }
 
     /**
+     * Membuat alamat seller aktif dengan metadata pinpoint lengkap. Helper memenuhi invariant
+     * ketersediaan produk tanpa melibatkan request Geoapify pada test audit.
+     *
+     * @param  User  $seller  Model user seller yang menjadi actor atau fixture.
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
+    private function createVerifiedSellerAddress(User $seller): void
+    {
+        Alamat::create([
+            'user_id' => $seller->id,
+            'type' => 'seller',
+            'place' => 'Toko',
+            'alamat' => 'Blok A, Jakarta, Indonesia',
+            'latitude' => -6.2,
+            'longitude' => 106.8,
+            'formatted_address' => 'Jakarta, Indonesia',
+            'address_detail' => 'Blok A',
+            'location_source' => 'map',
+            'enable' => 1,
+        ]);
+    }
+
+    /**
      * Membuat row audit produk deterministik untuk skenario pagination tanpa
      * menjalankan mutation produk atau menyentuh storage nyata.
+     *
+     * @param  AuditEvent  $event  Jenis event domain yang dicatat.
+     * @param  CarbonImmutable  $occurredAt  Waktu event yang digunakan untuk menyusun fixture timeline.
+     * @param  string  $sequence  Nomor urut untuk menghasilkan fixture deterministik.
+     *
+     * @return AuditLog  Model audit log yang berhasil ditemukan atau dicatat.
      */
     private function createProductAudit(
         AuditEvent $event,

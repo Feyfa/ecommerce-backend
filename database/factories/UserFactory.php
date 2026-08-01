@@ -10,9 +10,11 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 class UserFactory extends Factory
 {
     /**
-     * Define the model's default state.
+     * Membentuk state default user lokal dengan UUID, nama, email unik, dan kredensial factory. Data
+     * yang dihasilkan digunakan sebagai fixture test tanpa bergantung pada identity provider
+     * eksternal.
      *
-     * @return array<string, mixed>
+     * @return array<string, mixed>  Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function definition(): array
     {
