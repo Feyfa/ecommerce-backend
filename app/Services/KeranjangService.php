@@ -71,6 +71,10 @@ class KeranjangService
         $totalPrice = 0;
 
         foreach ($keranjangs as $keranjang) {
+            // Samakan boolean PostgreSQL dan tiny integer MySQL dengan kontrak API berbentuk angka.
+            $keranjang->k_checked = (int) (bool) $keranjang->k_checked;
+            $keranjang->k_checkout = (int) (bool) $keranjang->k_checkout;
+
             $unavailableReason = $this->productAvailabilityService->unavailableReason(
                 productExists: $keranjang->p_exists_id !== null,
                 deletedAt: $keranjang->p_deleted_at,
