@@ -334,44 +334,11 @@ The authentication suite covers:
 
 Sensitive-field exposure is additionally constrained by the allow-listed context in `AuditLogService` and the explicit response contract in `AuditLogResource`.
 
-## TOK-16 Manual QA Checklist
+## QA Coverage
 
-Run this checklist in local or staging. Replace `⬜` with `✅` only after the action is completed and its expected result is verified. Keep evidence outside this table redacted; never capture tokens, cookies, authorization headers, or raw image storage paths.
-
-### Phase A — Main Product Audit Flow
-
-| ID | Done | Action | Expected |
-| --- | --- | --- | --- |
-| TOK-16-A1 | ✅ | Create a product with multiple valid images, then open its Audit Log detail. | Exactly one `product.created` event shows the product name, initial price, stock, and photo count without image previews or paths. |
-| TOK-16-A2 | ✅ | Update the product name, price, and stock once. | Exactly one `product.updated` event preserves accurate `Sebelum`/`Sesudah` values and the UI marks changed versus unchanged rows correctly. |
-| TOK-16-A3 | ✅ | Delete the product, then open the delete audit after confirming the product is gone. | Exactly one `product.deleted` event remains readable with the final product snapshot and deleted-product explanation. |
-
-### Phase B — Image Metadata and Idempotent Detail
-
-| ID | Done | Action | Expected |
-| --- | --- | --- | --- |
-| TOK-16-B1 | ✅ | Add one photo, remove another, change the cover, reorder retained photos, and save. | Audit text accurately reports before/after, added/removed, cover, and order metadata; it stores no photo file, path, URL, or internal image id. |
-| TOK-16-B2 | ✅ | Submit a successful update without changing product values or image order. | One update event is recorded with no false field or image changes, and the UI explains that no change was detected. |
-| TOK-16-B3 | ✅ | Repeat collection refreshes and reopen the same detail. | No duplicate event appears for the same domain operation; snapshot and metadata remain stable. |
-
-### Phase C — Validation, Ownership, and Failure Safety
-
-| ID | Done | Action | Expected |
-| --- | --- | --- | --- |
-| TOK-16-C1 | ✅ | Submit invalid create/update data and request a missing product. | Validation/not-found responses create no audit row and leave product data unchanged. |
-| TOK-16-C2 | ✅ | As Seller A, attempt to create, update, or delete a product owned by Seller B. | The operation is forbidden or not found; Seller B's data is unchanged and Seller A receives no product audit for it. |
-| TOK-16-C3 | ✅ | In local/staging, run the controlled audit-persistence failure scenario for product writes. | Database mutations roll back, new uploads are cleaned when applicable, and no successful product event is shown. |
-| TOK-16-C4 | ✅ | Inspect collection/detail responses and request Seller B's audit UUID as Seller A. | Collection IP is masked, owner detail may reveal full IP, cross-owner detail returns `404`, and no raw context or internal metadata is exposed. |
-
-### Phase D — Filters, Responsive UI, and Regression
-
-| ID | Done | Action | Expected |
-| --- | --- | --- | --- |
-| TOK-16-D1 | ✅ | Select each Product event in the grouped event filter. | Only events matching `product.created`, `product.updated`, or `product.deleted` appear for the selected filter. |
-| TOK-16-D2 | ✅ | Load more than one page, then change the Product event filter. | Each filter change discards the previous cursor and starts a new collection without stale or duplicate rows. |
-| TOK-16-D3 | ✅ | Inspect product cards and create/update/delete details on desktop and representative mobile widths. | Cards, snapshot/comparison tables, image-change card, and modal remain readable without page overflow; actions remain keyboard/touch accessible. |
-| TOK-16-D4 | ✅ | Recheck Register, Login, Logout, IP reveal, date filters, and refresh with mixed product events present. | Existing authentication audit behavior remains unchanged, owner IP reveal still works, and refresh keeps the combined timeline newest-first without duplicates. |
-| TOK-16-D5 | ✅ | Load multiple pages containing both authentication and product events. | Mixed-event pagination remains newest-first without missing or duplicate rows across page boundaries. |
+- [TOK-16 Product Audit Log QA](../../qa/tok-16-product-audit-log.md) tracks
+  backend product audit verification; the matching frontend checklist is
+  available at `frontend-repo:/docs/qa/tok-16-product-audit-log.md`.
 
 ## Manual QA Scenarios
 

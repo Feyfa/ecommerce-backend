@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Services\XenditService;
 use Carbon\Carbon;
 use Illuminate\Database\ConfigurationUrlParser;
 use Illuminate\Support\Facades\Schema;
@@ -12,14 +13,21 @@ class AppServiceProvider extends ServiceProvider
 {
     /**
      * Register any application services.
+     *
+     * @return void  Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(
+            XenditService::class,
+            fn () => new XenditService((string) config('xendit.key')),
+        );
     }
 
     /**
      * Bootstrap any application services.
+     *
+     * @return void  Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
      */
     public function boot(): void
     {
@@ -32,6 +40,12 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Menolak bootstrap environment testing sebelum koneksi database
      * yang berpotensi menghapus data development sempat dibuat.
+     *
+     * Koneksi aktif diperiksa terhadap driver, nama database, dan environment yang diizinkan sebelum
+     * test dapat menjalankan migration. Guard ini menghentikan proses lebih awal ketika konfigurasi
+     * berpotensi menunjuk database development atau database bersama.
+     *
+     * @return void  Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
      */
     private function ensureTestingDatabaseIsSafe(): void
     {

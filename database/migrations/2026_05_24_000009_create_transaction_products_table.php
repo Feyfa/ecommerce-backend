@@ -7,7 +7,11 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Run the migrations.
+     * Membuat tabel transaction_products sebagai snapshot item produk pada transaksi seller. Harga dan
+     * quantity disimpan terpisah dari model produk agar histori pesanan tidak berubah mengikuti
+     * katalog.
+     *
+     * @return void  Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
      */
     public function up(): void
     {
@@ -24,7 +28,10 @@ return new class extends Migration
     }
 
     /**
-     * Reverse the migrations.
+     * Menghapus tabel transaction_products beserta seluruh constraint dan data di dalamnya untuk
+     * membatalkan struktur yang dibuat oleh migration ini.
+     *
+     * @return void  Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
      */
     public function down(): void
     {

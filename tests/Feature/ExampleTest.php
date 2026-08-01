@@ -9,6 +9,8 @@ class ExampleTest extends TestCase
 {
     /**
      * Memastikan root backend tidak lagi menampilkan halaman welcome Laravel.
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function test_the_root_endpoint_returns_backend_health_response(): void
     {

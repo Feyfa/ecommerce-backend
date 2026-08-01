@@ -49,6 +49,8 @@ class AuditLog extends Model
 
     /**
      * Relasi actor dipakai untuk kebutuhan internal tanpa mengubah snapshot audit.
+     *
+     * @return BelongsTo  Relasi Eloquent menuju model induk yang terkait.
      */
     public function actor(): BelongsTo
     {

@@ -17,7 +17,7 @@ Current supported actions:
 - Show one seller product.
 - Create a product with one to five image uploads.
 - Update product fields and manage image additions, removals, and ordering.
-- Delete a product and all of its stored images.
+- Soft-delete a product without removing its cart or image history.
 
 ## Main Files
 
@@ -34,7 +34,10 @@ Current supported actions:
   Ordered image records owned by a product.
 
 - `app/Models/Keranjang.php`
-  Used during product deletion to remove cart rows that reference the deleted product.
+  Keeps cart rows that reference a soft-deleted product so the buyer can see its status.
+
+- `app/Services/ProductAvailabilityService.php`
+  Centralizes seller-location and product availability rules.
 
 - `database/migrations/2026_07_21_000001_create_product_images_table.php`
   Creates the ordered image table and backfills legacy product covers as position 1.
@@ -124,6 +127,8 @@ Required form data:
 
 Behavior:
 
+- Requires the seller to have an active, verified Pinpoint store location.
+- Returns `409` with `code = SELLER_LOCATION_UNVERIFIED` when that requirement is not met.
 - Stores every uploaded image in `product-imgs`.
 - Creates ordered `product_images` rows and keeps the first path in `products.img` as a compatibility cover.
 - Returns the created product.
@@ -162,9 +167,9 @@ Current validation allows update `stock` to be `0`, while create requires stock 
 Behavior:
 
 - Validates `user_id_seller` and `id` as UUID.
-- Deletes cart rows in `keranjangs` where `product_id` matches the product id.
-- Deletes every stored product image.
-- Deletes the product row.
+- Soft-deletes the product row by filling `products.deleted_at`.
+- Preserves cart rows, image records, and stored image files for buyer status display and transaction history.
+- The product immediately disappears from the buyer catalog and cannot be added to cart or checked out.
 
 ## Response Shape
 
@@ -184,6 +189,8 @@ List responses include:
   "products": []
 }
 ```
+
+Seller list responses also include `seller_location_verified`. The frontend uses it to disable product creation and show the store-location warning without hiding existing products.
 
 Create and update responses include:
 
@@ -216,7 +223,7 @@ Validation failures return `422` with `message` containing validator messages.
 - Product list pagination uses `products_current_id` instead of page numbers.
 - Search normalizes the product name and keyword to lowercase so it remains case-insensitive and testable across supported database environments.
 - Stock filtering and sorting use existing `products` columns, so they do not require extra database fields.
-- Product deletion has a cart side effect because related cart rows are removed before deleting the product.
+- Product deletion uses soft delete; existing cart rows and product images are intentionally retained.
 
 ## Known Decisions
 
@@ -226,51 +233,17 @@ Validation failures return `422` with `message` containing validator messages.
 - Products require 1 to 5 images, limited to 1024 KB per image.
 - Image position 1 is the primary product cover.
 - Update can set stock to `0`; create cannot.
+- Creating a product requires an active verified Pinpoint seller location; existing seller products remain manageable when that location later becomes invalid.
 - Product list returns a maximum of 50 products per request.
 - Product stock conditions are mutually exclusive: healthy is above 5, low is 1–5, and empty is 0 or below.
 - Buyer and seller list queries share the product sorting scope so their accepted sort values cannot drift apart.
 - The backend docs file name matches the frontend docs file name so the same feature can be compared across both repositories.
 
-## TOK-17 Manual QA Checklist
+## QA Coverage
 
-| ID | Done | Action | Expected |
-| --- | --- | --- | --- |
-| TOK-17-S1 | ✅ | Request daftar tanpa `stock_filter`, lalu gunakan `all`. | Keduanya menampilkan seluruh produk milik seller tanpa produk seller lain. |
-| TOK-17-S2 | ✅ | Siapkan stok `6`, `5`, `1`, `0`, dan negatif; jalankan `healthy`, `available`, `low`, dan `empty`. | `healthy`/alias `available` hanya stok `> 5`, `low` stok `1–5`, dan `empty` stok `<= 0`. |
-| TOK-17-S3 | ✅ | Jalankan keenam sorting valid, lalu kirim `stock_highest` dan `stock_lowest`. | Sorting valid terurut benar; kedua nilai legacy ditolak `422`. |
-| TOK-17-S4 | ✅ | Kombinasikan search, kondisi stok, sorting, dan `products_current_id`. | Seluruh kondisi diterapkan bersamaan dan ID yang sudah dimuat tidak muncul kembali. |
-| TOK-17-S5 | ✅ | Akses endpoint daftar menggunakan UUID seller lain. | Request ditolak `403` dan tidak membocorkan katalog seller tersebut. |
-
-## TOK-6 Manual QA Checklist
-
-### Phase A — Main Flow
-
-| ID | Done | Action | Expected |
-| --- | --- | --- | --- |
-| TOK-6-A1 | ✅ | Create a product with 5 valid images. | Card uses image 1; edit reloads all 5; database positions are 1–5. |
-| TOK-6-A2 | ✅ | Drag another image to position 1 and save. | Card cover and `products.img` change to the new position 1. |
-
-### Phase B — Edit Images
-
-| ID | Done | Action | Expected |
-| --- | --- | --- | --- |
-| TOK-6-B1 | ✅ | Remove 1 image, add 1 new image, reorder, and save. | Final order persists; removed file is deleted; new file is stored. |
-| TOK-6-B2 | ✅ | Remove images until 1 remains, then save. | Product saves with exactly 1 primary image. |
-| TOK-6-B3 | ✅ | Change previews, then cancel and reopen edit. | No update is sent; the last saved state returns. |
-
-### Phase C — Validation
-
-| ID | Done | Action | Expected |
-| --- | --- | --- | --- |
-| TOK-6-C1 | ✅ | Remove every image and press save. | Submit is rejected; saved data stays unchanged. |
-| TOK-6-C2 | ✅ | Select more files than the available 5 slots. | UI remains at no more than 5 images. |
-| TOK-6-C3 | ✅ | Select a non-image and an image larger than 1 MB. | Both files are rejected and not uploaded. |
-
-### Phase D — Compatibility and Cleanup
-
-| ID | Done | Action | Expected |
-| --- | --- | --- | --- |
-| TOK-6-D1 | ✅ | Open a legacy product after migration. | Legacy `products.img` appears as `product_images.position = 1`. |
-| TOK-6-D2 | ✅ | Check buyer card, cart, checkout, and transaction. | Each view still displays the current primary image. |
-| TOK-6-D3 | ✅ | Delete a disposable product with multiple images. | Product rows and all physical image files are removed. |
-| TOK-6-D4 | ✅ | Try modifying another seller's product UUID. | The request is forbidden or returns not found; no data changes. |
+- [TOK-6 Product Images QA](../../qa/tok-6-product-images.md) tracks backend
+  image validation, ordering, migration, storage, and ownership verification;
+  the matching frontend checklist is available at
+  `frontend-repo:/docs/qa/tok-6-product-images.md`.
+- [TOK-17 Product List Filtering QA](../../qa/tok-17-product-list-filtering.md)
+  tracks backend buyer and seller list filtering.

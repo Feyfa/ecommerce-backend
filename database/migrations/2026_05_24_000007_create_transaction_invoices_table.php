@@ -7,7 +7,11 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Run the migrations.
+     * Membuat tabel transaction_invoices sebagai header pesanan buyer, snapshot alamat, metode
+     * pembayaran, harga, status, dan masa berlaku. UUID invoice menjadi induk transaksi per seller
+     * dalam satu checkout.
+     *
+     * @return void  Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
      */
     public function up(): void
     {
@@ -32,7 +36,10 @@ return new class extends Migration
     }
 
     /**
-     * Reverse the migrations.
+     * Menghapus tabel transaction_invoices beserta seluruh constraint dan data di dalamnya untuk
+     * membatalkan struktur yang dibuat oleh migration ini.
+     *
+     * @return void  Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
      */
     public function down(): void
     {

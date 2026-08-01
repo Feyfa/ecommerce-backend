@@ -17,6 +17,8 @@ class TrustProxiesTest extends TestCase
 
     /**
      * Menyimpan server state agar perubahan REMOTE_ADDR tidak bocor ke test lain.
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     protected function setUp(): void
     {
@@ -28,6 +30,8 @@ class TrustProxiesTest extends TestCase
 
     /**
      * Mengembalikan trusted proxy dan server state setelah setiap test.
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     protected function tearDown(): void
     {
@@ -44,6 +48,8 @@ class TrustProxiesTest extends TestCase
 
     /**
      * Memastikan Laravel memakai IP publik yang sudah dinormalisasi oleh Nginx.
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function test_trusted_reverse_proxy_resolves_forwarded_client_ip(): void
     {
@@ -58,6 +64,8 @@ class TrustProxiesTest extends TestCase
 
     /**
      * Memastikan forwarded header diabaikan ketika proxy belum dikonfigurasi.
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function test_unconfigured_proxy_ignores_forwarded_header(): void
     {
@@ -72,6 +80,8 @@ class TrustProxiesTest extends TestCase
 
     /**
      * Memastikan IP palsu di sisi kiri chain tidak mengalahkan hop terdekat yang tidak dipercaya.
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function test_spoofed_forwarded_ip_does_not_override_untrusted_closest_hop(): void
     {
@@ -86,6 +96,12 @@ class TrustProxiesTest extends TestCase
 
     /**
      * Menjalankan middleware trusted proxy terhadap request sintetis.
+     *
+     * @param  string|null  $trustedProxies  Daftar proxy yang dipercaya middleware.
+     * @param  string  $remoteAddress  Alamat hop jaringan terdekat pada request sintetis.
+     * @param  string  $forwardedFor  Nilai header X-Forwarded-For pada request sintetis.
+     *
+     * @return string  Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
      */
     private function resolveClientIp(
         ?string $trustedProxies,

@@ -11,7 +11,13 @@ class UserAgentParserService
      * Tujuan method ini untuk mengambil ringkasan perangkat tanpa
      * menyimpan atau menampilkan detail user-agent mentah ke frontend.
      *
-     * @return array{browser: string|null, operating_system: string|null, device_type: string|null}
+     * User-agent diproses secara lokal menjadi browser, sistem operasi, dan kategori perangkat. Nilai
+     * mentah tidak disimpan dalam payload hasil sehingga consumer hanya menerima metadata yang
+     * diperlukan untuk keamanan akun.
+     *
+     * @param  string|null  $userAgent  Nilai user agent yang diperlukan untuk menjalankan proses ini.
+     *
+     * @return array{browser: string|null, operating_system: string|null, device_type: string|null}  Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function parse(?string $userAgent): array
     {
@@ -42,6 +48,8 @@ class UserAgentParserService
      * Mendeteksi browser utama yang dipakai request.
      *
      * @param  string  $userAgent  User-agent yang sudah dinormalisasi.
+     *
+     * @return string|null  Nilai teks yang telah dinormalisasi, atau null ketika sumber datanya tidak tersedia.
      */
     private function resolveBrowser(string $userAgent): ?string
     {
@@ -59,6 +67,8 @@ class UserAgentParserService
      * Mendeteksi sistem operasi utama yang dipakai request.
      *
      * @param  string  $userAgent  User-agent yang sudah dinormalisasi.
+     *
+     * @return string|null  Nilai teks yang telah dinormalisasi, atau null ketika sumber datanya tidak tersedia.
      */
     private function resolveOperatingSystem(string $userAgent): ?string
     {
@@ -75,7 +85,13 @@ class UserAgentParserService
     /**
      * Mengelompokkan perangkat menjadi Desktop, Tablet, atau Mobile.
      *
+     * Petunjuk tablet diperiksa lebih dahulu, kemudian pola mobile, dan sisanya diklasifikasikan
+     * sebagai desktop. Urutan ini mencegah perangkat tablet yang juga memuat token mobile masuk
+     * kategori yang salah.
+     *
      * @param  string  $userAgent  User-agent yang sudah dinormalisasi.
+     *
+     * @return string|null  Nilai teks yang telah dinormalisasi, atau null ketika sumber datanya tidak tersedia.
      */
     private function resolveDeviceType(string $userAgent): ?string
     {

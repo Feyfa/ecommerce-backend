@@ -15,6 +15,15 @@ class AssignRequestId
     /**
      * Menetapkan correlation id valid untuk application log, audit log,
      * dan response tanpa mempercayai header bebas dari client.
+     *
+     * Header client hanya dipakai jika memenuhi format correlation ID yang dibatasi; selain itu server
+     * membuat UUID baru. Identifier yang sama ditempelkan pada request, log context, dan response
+     * untuk menelusuri satu alur end-to-end.
+     *
+     * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
+     * @param  Closure  $next  Callback middleware berikutnya pada pipeline request.
+     *
+     * @return Response  Hasil proses yang telah dinormalisasi sesuai kontrak function ini.
      */
     public function handle(Request $request, Closure $next): Response
     {

@@ -11,8 +11,8 @@ The buyer belanja API lets an authenticated buyer browse products from other sel
 Current supported actions:
 
 - List products available for the buyer.
-- Search products by product name or seller name.
-- Always restrict the buyer catalog to products with purchasable stock.
+- Search products by product name or store name.
+- Restrict the buyer catalog to active products with stock and a verified seller location.
 - Sort products by update date, price, or name.
 - Exclude products already loaded by the frontend.
 - Add a product to the buyer cart.
@@ -59,7 +59,7 @@ Required query/body data:
 
 Optional data:
 
-- `search_product`: product or seller search keyword.
+- `search_product`: product or store search keyword.
 - `sort_product`: sorting option. Allowed values are `latest`, `oldest`, `price_highest`, `price_lowest`, `name_asc`, and `name_desc`.
 
 Behavior:
@@ -68,9 +68,9 @@ Behavior:
 - Validates `products_current_id` as a JSON array and `sort_product` against allowed values when present.
 - Excludes products owned by the authenticated user.
 - Excludes ids from `products_current_id`.
-- Applies case-insensitive matching against product or seller name with normalized `LOWER(...) LIKE` expressions.
-- Always requires `products.stock > 0`, regardless of legacy or unknown stock-filter query parameters.
-- Joins `products` with `users` to return seller identity for each card.
+- Applies case-insensitive matching against product or store name with normalized `LOWER(...) LIKE` expressions.
+- Always requires an active non-deleted product, `products.stock > 0`, and an active verified Pinpoint location for its seller.
+- Joins the seller account and company profile to return the store name for each card. The seller account name remains the fallback when the company profile has no usable name.
 - Orders by the selected sort option, defaulting to `products.updated_at DESC`.
 - Returns up to 200 products.
 
@@ -88,6 +88,8 @@ Required body data:
 
 Behavior:
 
+- Confirms that the submitted seller id owns the product.
+- Rejects soft-deleted, sold-out, and seller-location-unverified products with `409` and a machine-readable availability `code`.
 - Creates a new cart row with `checked = 0` and `total = 1` when the product is not already in the buyer cart.
 - If the same buyer already has the same seller/product in the cart, increments `total` by 1.
 - Before incrementing an existing cart row, checks current product stock.
@@ -114,7 +116,7 @@ The belanja product rows are selected with aliases used by the frontend:
   "p_price": 25000,
   "p_stock": 10,
   "u_id": "seller uuid",
-  "u_name": "seller name"
+  "u_name": "store name, or seller account name as fallback"
 }
 ```
 
@@ -135,7 +137,7 @@ Stock failures return `422` with `message.stock_maximum`.
 - Product image paths are stored in the database and resolved by the frontend through the configured storage symlink/base URL.
 - Buyer belanja pagination uses `products_current_id` instead of page numbers.
 - Search normalizes both columns and keywords to lowercase so it remains case-insensitive and testable across supported database environments.
-- Buyer stock availability is an API invariant rather than a frontend-selected filter.
+- Buyer product availability is an API invariant rather than a frontend-selected filter.
 - Sort options use direct `orderBy` clauses against product columns.
 - The primary route does not accept a user id; the authenticated token owner is the source of truth.
 
@@ -144,17 +146,14 @@ Stock failures return `422` with `message.stock_maximum`.
 - Belanja APIs are authenticated with Clerk-backed API auth.
 - Buyer belanja intentionally excludes the current user's seller products.
 - Product list returns a maximum of 200 products per request.
-- Search covers both product name and seller name.
-- Buyer does not receive sold-out products because there is no buyer workflow that can act on them.
+- Search covers both product name and the displayed store identity.
+- Buyer-facing seller identity prioritizes `companies.name` and falls back to `users.name` for legacy sellers without a populated company profile.
+- Buyer does not receive soft-deleted, sold-out, or unverified-seller products because none can be purchased.
 - Buyer and seller share the same update-date, price, and name sort contract; stock management remains a seller workflow.
-- Add-to-cart still rejects missing products and products with stock lower than `1` to handle stock changes after listing.
+- Add-to-cart revalidates all availability rules to handle changes after listing.
 - The backend docs file name matches the frontend docs file name so the same feature can be compared across both repositories.
 
-## TOK-17 Manual QA Checklist
+## QA Coverage
 
-| ID | Done | Action | Expected |
-| --- | --- | --- | --- |
-| TOK-17-B1 | ✅ | Request katalog berisi stok `1`, `0`, negatif, dan produk sendiri; coba juga URL lama yang menyertakan UUID. | Hanya produk seller lain dengan stok `> 0` yang dikembalikan; URL lama tidak tersedia. |
-| TOK-17-B2 | ✅ | Jalankan `latest`, `oldest`, kedua urutan harga, dan kedua urutan nama. | Keenam nilai diterima dan urutan hasil sesuai pilihan. |
-| TOK-17-B3 | ✅ | Kombinasikan pencarian nama produk/seller, sorting, dan `products_current_id`. | Pencarian tetap case-insensitive, ID yang sudah dimuat tidak muncul, dan hasil tetap terurut. |
-| TOK-17-B4 | ✅ | Kirim cursor invalid/non-array dan ulangi request valid dengan parameter legacy `stock_filter=empty`. | Cursor invalid ditolak `422`; request valid tetap hanya mengembalikan stok `> 0`. |
+- [TOK-17 Product List Filtering QA](../../qa/tok-17-product-list-filtering.md)
+  tracks backend product-list filtering verification.

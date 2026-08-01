@@ -9,6 +9,8 @@ return new class extends Migration
     /**
      * Menghapus penyimpanan autentikasi Laravel lama karena Clerk sekarang
      * menjadi satu-satunya sumber autentikasi dan verifikasi identitas.
+     *
+     * @return void  Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
      */
     public function up(): void
     {
@@ -29,6 +31,8 @@ return new class extends Migration
     /**
      * Mengembalikan struktur legacy untuk kebutuhan rollback. Nilai password
      * dibuat nullable karena credential lama tidak dapat dipulihkan.
+     *
+     * @return void  Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
      */
     public function down(): void
     {
