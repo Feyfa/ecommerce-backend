@@ -34,6 +34,31 @@ across the document does not leave lower-numbered IDs after higher-numbered IDs.
 
 The project may include separate frontend and deployment repositories. If a task affects another repository and that repository is available in the workspace, inspect its code and documentation as well. Do not assume that related repositories are always available or located at a specific path.
 
+## Task Branch And Release Safety
+
+Every backend implementation change must be associated with a clear Jira task
+and a branch that follows the shared release flow in
+`../deploy/docs/release-flow.md`.
+
+- Before editing code, verify the Jira work type, responsible initials, issue
+  key, and expected branch name.
+- If any of those details are unclear, stop before editing, creating a branch,
+  committing, pushing, or opening a pull request. Tell the user the expected
+  branch format and ask for the missing Jira information.
+- Never invent a Jira issue key or work-specific branch name.
+- Do not implement application work directly on `main` or `staging`.
+- Create a new task branch from the latest `main`, after checking local and
+  remote branches for an existing branch for the same Jira task.
+- The main task branch must exist and be checked out before the first code
+  change. Verify the active branch before implementation and after every
+  branch switch.
+- If the active branch is `main`, `staging`, or unrelated to the Jira task,
+  stop and create or check out the correct task branch before editing code.
+- Use the main task branch as the production source. Use the matching
+  `*-staging` branch only to integrate with `staging`.
+- Never merge `staging` or a `*-staging` task branch into `main`, and never
+  merge a regular task branch directly into `staging`.
+
 ## PHP Documentation and Comments
 
 Every named PHP function or method that is added or changed must have a PHPDoc block, even when its name, native parameter types, or native return type appear self-explanatory. New classes, interfaces, traits, and enums must also have PHPDoc that explains their primary responsibility.
@@ -117,6 +142,13 @@ Before proposing or creating a commit:
 4. Understand the API contract, business rules, persistence effects, transaction boundaries, security impact, configuration, migrations, documentation, and validation represented by that diff.
 5. Keep unrelated changes out of the commit and never include changes from another repository. Recommend splitting the scope when the diff contains independently reviewable purposes.
 6. Do not switch branches, create branches, commit, push, or open a pull request unless the user explicitly requests that action.
+
+When staging a commit, add only the explicitly reviewed files with exact paths.
+Use `git add -- <file>` for each intended file, or list several exact paths in
+one command. Never use `git add -A`, `git add .`, `git add --all`, or broad
+globs. After staging, inspect `git diff --cached --name-status`,
+`git diff --cached --stat`, and `git diff --cached` so the approval clearly
+shows which files will be committed.
 
 ### Commit Scope and Atomicity
 

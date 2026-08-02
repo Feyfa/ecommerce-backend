@@ -1,0 +1,56 @@
+name: Release Branch Policy
+
+on:
+  pull_request:
+    branches:
+      - main
+      - staging
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate source and target branches
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate release branch mapping
+        env:
+          BASE_BRANCH: ${{ github.base_ref }}
+          HEAD_BRANCH: ${{ github.head_ref }}
+        run: |
+          set -eu
+
+          case "$BASE_BRANCH" in
+            main)
+              case "$HEAD_BRANCH" in
+                *-staging|staging)
+                  echo "Staging integration branches cannot target main: $HEAD_BRANCH"
+                  exit 1
+                  ;;
+                feature/*|story/*|bug/*|task/*|hotfix/*)
+                  ;;
+                *)
+                  echo "Invalid production source branch: $HEAD_BRANCH"
+                  exit 1
+                  ;;
+              esac
+              ;;
+            staging)
+              case "$HEAD_BRANCH" in
+                feature/*-staging|story/*-staging|bug/*-staging|task/*-staging|hotfix/*-staging|hotfix/*)
+                  ;;
+                *)
+                  echo "Only staging integration branches or eligible hotfix branches may target staging: $HEAD_BRANCH"
+                  exit 1
+                  ;;
+              esac
+              ;;
+            *)
+              echo "Unsupported protected target branch: $BASE_BRANCH"
+              exit 1
+              ;;
+          esac
+
+          echo "Accepted release mapping: $HEAD_BRANCH -> $BASE_BRANCH"
