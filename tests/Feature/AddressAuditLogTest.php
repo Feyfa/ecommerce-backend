@@ -57,6 +57,11 @@ class AddressAuditLogTest extends TestCase
         $this->assertSame('address', $audit->subject_type);
         $this->assertSame($alamat->id, $audit->subject_id);
         $this->assertSame('Rumah', $audit->context['subject_name']);
+
+        // PostgreSQL jsonb does not preserve object-key order. Rebuild the
+        // payload in the contract order so this remains a strict value/type
+        // assertion on both PostgreSQL CI and SQLite in-memory tests.
+        $snapshot = $audit->context['address_snapshot'];
         $this->assertSame([
             'place' => 'Rumah',
             'recipient_name' => 'Rafeyfa Zulfiyani',
@@ -64,7 +69,14 @@ class AddressAuditLogTest extends TestCase
             'formatted_address' => 'Jalan Medan Merdeka, Gambir, Jakarta Pusat 10110, Indonesia',
             'address_detail' => 'Blok B No. 12',
             'enable' => true,
-        ], $audit->context['address_snapshot']);
+        ], [
+            'place' => $snapshot['place'],
+            'recipient_name' => $snapshot['recipient_name'],
+            'phone' => $snapshot['phone'],
+            'formatted_address' => $snapshot['formatted_address'],
+            'address_detail' => $snapshot['address_detail'],
+            'enable' => $snapshot['enable'],
+        ]);
     }
 
     /**
@@ -111,12 +123,22 @@ class AddressAuditLogTest extends TestCase
 
         sort($changedFields);
         $this->assertSame(['address_detail', 'phone'], $changedFields);
+
+        // PostgreSQL jsonb does not preserve object-key order. Rebuild the
+        // payload in the contract order so this remains a strict value/type
+        // assertion on both PostgreSQL CI and SQLite in-memory tests.
+        $phoneChange = $audit->context['changes'][0];
         $this->assertSame([
             'field' => 'phone',
             'label' => 'Nomor Telepon',
             'before' => '091818828282',
             'after' => '098765432100',
-        ], $audit->context['changes'][0]);
+        ], [
+            'field' => $phoneChange['field'],
+            'label' => $phoneChange['label'],
+            'before' => $phoneChange['before'],
+            'after' => $phoneChange['after'],
+        ]);
     }
 
     /**
