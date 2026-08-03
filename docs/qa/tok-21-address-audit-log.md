@@ -18,6 +18,12 @@ Run:
 php artisan test tests/Feature/AddressAuditLogTest.php tests/Feature/AuditLogTest.php tests/Feature/ProductAuditLogTest.php
 ```
 
+`phpunit.xml` runs these tests on SQLite in memory, while CI runs them on
+PostgreSQL. PostgreSQL `jsonb` does not preserve object-key order, so any strict
+assertion on a stored audit context must rebuild the payload in the contract
+order first. Assertions that depend on raw key order pass locally and fail only
+in CI.
+
 | ID | Status | Verification | Expected Result | Evidence |
 | --- | --- | --- | --- | --- |
 | TOK-21-BE-01 | ✅ | Add a buyer address through the pinpoint flow. | One owner-scoped `address.created` event stores the permitted snapshot. | `successful_create_records_an_owner_scoped_address_snapshot` |
