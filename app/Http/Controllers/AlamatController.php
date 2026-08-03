@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Alamat;
 use App\Models\User;
 use App\Services\AlamatService;
+use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,13 +14,17 @@ use Illuminate\Support\Facades\Validator;
 class AlamatController extends Controller
 {
     /**
-     * Menyiapkan controller dengan layanan alamat.
+     * Menyiapkan controller dengan layanan alamat dan pencatatan audit.
      *
      * @param  AlamatService  $alamatService  Layanan pengelolaan dan verifikasi alamat.
+     * @param  AuditLogService  $auditLogService  Service audit log yang digunakan oleh class ini.
      *
      * @return void  Tidak mengembalikan nilai; dependency disimpan pada instance.
      */
-    public function __construct(protected AlamatService $alamatService) {}
+    public function __construct(
+        protected AlamatService $alamatService,
+        protected AuditLogService $auditLogService
+    ) {}
 
     /**
      * Menampilkan daftar alamat milik buyer.
@@ -122,7 +127,7 @@ class AlamatController extends Controller
                     ->update(['enable' => 0]);
             }
 
-            Alamat::create(array_merge([
+            $alamat = Alamat::create(array_merge([
                 'user_id' => $user_id,
                 'type' => 'buyer',
                 'place' => $request->place,
@@ -130,6 +135,10 @@ class AlamatController extends Controller
                 'phone' => $request->phone,
                 'enable' => $enableAddress,
             ], $locationAttributes));
+
+            // Audit ikut di dalam transaction agar kegagalan pencatatan membatalkan
+            // alamat baru dan tidak meninggalkan mutasi tanpa jejak.
+            $this->auditLogService->recordAddressCreated($request->user(), $alamat, $request);
 
             return false;
         });
@@ -185,7 +194,7 @@ class AlamatController extends Controller
         // --- step 2 - start - hapus alamat dan pilih fallback terverifikasi secara atomik
         // Batasi pencarian berdasarkan buyer terautentikasi agar UUID yang terekspos
         // tidak dapat digunakan untuk menghapus alamat milik user lain.
-        $alamatDeleted = DB::transaction(function () use ($id, $user_id): bool {
+        $alamatDeleted = DB::transaction(function () use ($id, $user_id, $request): bool {
             User::where('id', $user_id)->lockForUpdate()->first();
             $buyerAddresses = Alamat::where('user_id', $user_id)
                 ->where('type', 'buyer')
@@ -197,17 +206,32 @@ class AlamatController extends Controller
                 return false;
             }
 
+            // Snapshot diambil sebelum penghapusan agar detail audit tetap terbaca
+            // setelah row alamatnya tidak ada lagi.
+            $snapshot = $this->auditLogService->addressSnapshot($alamat);
+            $replacement = null;
+
             $alamat->delete();
 
             if (! $buyerAddresses->where('id', '!=', $id)->contains('enable', true)) {
                 // Alamat manual legacy tidak boleh aktif otomatis karena checkout baru hanya
                 // menerima lokasi yang telah diverifikasi melalui Pinpoint.
-                $buyerAddresses
+                $replacementAlamat = $buyerAddresses
                     ->where('id', '!=', $id)
                     ->sortByDesc('created_at')
-                    ->first(fn (Alamat $candidate) => $this->alamatService->isVerifiedPinpoint($candidate))
-                    ?->update(['enable' => 1]);
+                    ->first(fn (Alamat $candidate) => $this->alamatService->isVerifiedPinpoint($candidate));
+
+                $replacementAlamat?->update(['enable' => 1]);
+                $replacement = $replacementAlamat ? $this->addressReference($replacementAlamat) : null;
             }
+
+            $this->auditLogService->recordAddressDeleted(
+                $request->user(),
+                $alamat,
+                $request,
+                $snapshot,
+                $replacement,
+            );
 
             return true;
         });
@@ -262,7 +286,7 @@ class AlamatController extends Controller
         // --- step 1 - end - validasi user
 
         // --- step 2 - start - pilih alamat terverifikasi secara atomik
-        $selectionResult = DB::transaction(function () use ($user_id, $id): string {
+        $selectionResult = DB::transaction(function () use ($user_id, $id, $request): string {
             User::where('id', $user_id)->lockForUpdate()->first();
             $buyerAddresses = Alamat::where('user_id', $user_id)
                 ->where('type', 'buyer')
@@ -278,9 +302,22 @@ class AlamatController extends Controller
                 return 'unverified';
             }
 
+            // Alamat utama sebelumnya dibaca sebelum kolom enable ditimpa agar audit
+            // dapat menjelaskan perpindahan tujuan pengiriman.
+            $previousAlamat = $buyerAddresses
+                ->where('id', '!=', $id)
+                ->firstWhere('enable', true);
+
             Alamat::whereIn('id', $buyerAddresses->pluck('id')->all())
                 ->update(['enable' => 0]);
             $alamat->update(['enable' => 1]);
+
+            $this->auditLogService->recordAddressSelected(
+                $request->user(),
+                $alamat,
+                $request,
+                $previousAlamat ? $this->addressReference($previousAlamat) : null,
+            );
 
             return 'selected';
         });
@@ -372,15 +409,26 @@ class AlamatController extends Controller
         }
         // --- step 3 - end - periksa keberadaan alamat
 
-        // --- step 4 - start - perbarui alamat
+        // --- step 4 - start - perbarui alamat bersama audit perubahannya secara atomik
         $locationAttributes = $this->alamatService->locationAttributes($request);
-        $alamat->fill(array_merge([
-            'place' => $request->place,
-            'name' => $request->name,
-            'phone' => $request->phone,
-        ], $locationAttributes));
-        $alamat->save();
-        // --- step 4 - end - perbarui alamat
+        $beforeValues = $this->auditLogService->addressSnapshot($alamat);
+
+        DB::transaction(function () use ($alamat, $request, $locationAttributes, $beforeValues): void {
+            $alamat->fill(array_merge([
+                'place' => $request->place,
+                'name' => $request->name,
+                'phone' => $request->phone,
+            ], $locationAttributes));
+            $alamat->save();
+
+            $this->auditLogService->recordAddressUpdated(
+                $request->user(),
+                $alamat,
+                $request,
+                $this->addressChanges($beforeValues, $alamat),
+            );
+        });
+        // --- step 4 - end - perbarui alamat bersama audit perubahannya secara atomik
 
         // --- step 5 - start - ambil daftar alamat
         $alamats = Alamat::where('user_id', $user_id)
@@ -401,5 +449,68 @@ class AlamatController extends Controller
         // --- step 5 - end - ambil daftar alamat
 
         return response()->json(['result' => 'success', 'alamats' => $alamats, 'message' => 'Alamat Berhasil Diubah']);
+    }
+
+    /**
+     * Membentuk referensi ringkas satu alamat untuk context audit.
+     *
+     * Referensi hanya memuat identitas dan label alamat sehingga event perpindahan atau penggantian
+     * alamat utama dapat dijelaskan tanpa menduplikasi seluruh snapshot alamat lain.
+     *
+     * @param  Alamat  $alamat  Model alamat yang menjadi target atau sumber data.
+     *
+     * @return array{id: string, place: string, recipient_name: string}  Data terstruktur yang dihasilkan oleh proses ini.
+     */
+    private function addressReference(Alamat $alamat): array
+    {
+        return [
+            'id' => (string) $alamat->id,
+            'place' => (string) $alamat->place,
+            'recipient_name' => (string) $alamat->name,
+        ];
+    }
+
+    /**
+     * Membandingkan snapshot alamat sebelum dan sesudah update untuk membentuk daftar perubahan audit.
+     *
+     * Hanya field yang benar-benar berubah dimasukkan sehingga update identik menghasilkan daftar
+     * kosong dan tidak mengarang perubahan. Label disimpan bersama nilainya agar frontend tidak perlu
+     * memetakan ulang nama field.
+     *
+     * @param  array<string, mixed>  $beforeValues  Snapshot alamat sebelum update diterapkan.
+     * @param  Alamat  $alamat  Model alamat yang menjadi target atau sumber data.
+     *
+     * @return array<int, array{field: string, label: string, before: mixed, after: mixed}>  Data terstruktur yang dihasilkan oleh proses ini.
+     */
+    private function addressChanges(array $beforeValues, Alamat $alamat): array
+    {
+        // --- step 1 - start - siapkan nilai pembanding dan label audit
+        $afterValues = $this->auditLogService->addressSnapshot($alamat);
+        $labels = [
+            'place' => 'Label Alamat',
+            'recipient_name' => 'Nama Penerima',
+            'phone' => 'Nomor Telepon',
+            'formatted_address' => 'Lokasi',
+            'address_detail' => 'Detail Alamat',
+        ];
+        $changes = [];
+        // --- step 1 - end - siapkan nilai pembanding dan label audit
+
+        // --- step 2 - start - kumpulkan field alamat yang benar-benar berubah
+        foreach ($labels as $field => $label) {
+            if ($beforeValues[$field] === $afterValues[$field]) {
+                continue;
+            }
+
+            $changes[] = [
+                'field' => $field,
+                'label' => $label,
+                'before' => $beforeValues[$field],
+                'after' => $afterValues[$field],
+            ];
+        }
+        // --- step 2 - end - kumpulkan field alamat yang benar-benar berubah
+
+        return $changes;
     }
 }

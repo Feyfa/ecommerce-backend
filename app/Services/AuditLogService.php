@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\AuditEvent;
+use App\Models\Alamat;
 use App\Models\AuditLog;
 use App\Models\Product;
 use App\Models\User;
@@ -241,6 +242,169 @@ class AuditLogService
                 ],
             ],
         );
+    }
+
+    /**
+     * Mencatat alamat pengiriman buyer yang baru dibuat beserta snapshot awalnya.
+     *
+     * Snapshot diambil setelah alamat tersimpan sehingga status alamat utama sudah final. Audit
+     * memakai pemilik alamat sebagai actor dan tidak menyimpan koordinat pinpoint.
+     *
+     * @param  User  $user  Model user lokal yang menjadi actor atau pemilik data.
+     * @param  Alamat  $alamat  Model alamat yang menjadi target atau sumber data.
+     * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
+     *
+     * @return AuditLog  Model audit log yang berhasil ditemukan atau dicatat.
+     */
+    public function recordAddressCreated(User $user, Alamat $alamat, Request $request): AuditLog
+    {
+        return $this->record(
+            user: $user,
+            request: $request,
+            event: AuditEvent::ADDRESS_CREATED,
+            idempotencySource: "address-created|{$alamat->id}",
+            subjectType: 'address',
+            subjectId: (string) $alamat->id,
+            extraContext: [
+                'subject_name' => (string) $alamat->place,
+                'address_snapshot' => $this->addressSnapshot($alamat),
+            ],
+        );
+    }
+
+    /**
+     * Mencatat field alamat yang berubah pada satu request update.
+     *
+     * Request ID menjadi bagian idempotency key agar retry request yang sama tidak membuat audit
+     * ganda, sementara dua update berbeda tetap menjadi dua event terpisah. Update yang tidak
+     * mengubah nilai apa pun tetap dicatat dengan daftar perubahan kosong.
+     *
+     * @param  User  $user  Model user lokal yang menjadi actor atau pemilik data.
+     * @param  Alamat  $alamat  Model alamat yang menjadi target atau sumber data.
+     * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
+     * @param  array<int, array{field: string, label: string, before: mixed, after: mixed}>  $changes  Daftar perubahan field alamat yang akan dicatat.
+     *
+     * @return AuditLog  Model audit log yang berhasil ditemukan atau dicatat.
+     */
+    public function recordAddressUpdated(
+        User $user,
+        Alamat $alamat,
+        Request $request,
+        array $changes
+    ): AuditLog {
+        $requestId = $this->resolveRequestId($request);
+
+        return $this->record(
+            user: $user,
+            request: $request,
+            event: AuditEvent::ADDRESS_UPDATED,
+            idempotencySource: "address-updated|{$alamat->id}|{$requestId}",
+            subjectType: 'address',
+            subjectId: (string) $alamat->id,
+            extraContext: [
+                'subject_name' => (string) $alamat->place,
+                'address_snapshot' => $this->addressSnapshot($alamat),
+                'changes' => array_values($changes),
+            ],
+            requestId: $requestId,
+        );
+    }
+
+    /**
+     * Menyimpan snapshot terakhir sebelum row alamat dihapus agar detail audit
+     * tetap dapat dibaca setelah alamatnya tidak ada lagi.
+     *
+     * Snapshot diterima dari pemanggil karena diambil sebelum penghapusan. Alamat pengganti dicatat
+     * ketika sistem otomatis mengaktifkan alamat lain sebagai alamat utama.
+     *
+     * @param  User  $user  Model user lokal yang menjadi actor atau pemilik data.
+     * @param  Alamat  $alamat  Model alamat yang baru saja dihapus beserta identitasnya.
+     * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
+     * @param  array<string, mixed>  $snapshot  Snapshot alamat terakhir sebelum row dihapus.
+     * @param  array{id: string, place: string, recipient_name: string}|null  $replacement  Alamat utama pengganti ketika sistem memilihnya otomatis.
+     *
+     * @return AuditLog  Model audit log yang berhasil ditemukan atau dicatat.
+     */
+    public function recordAddressDeleted(
+        User $user,
+        Alamat $alamat,
+        Request $request,
+        array $snapshot,
+        ?array $replacement = null
+    ): AuditLog {
+        return $this->record(
+            user: $user,
+            request: $request,
+            event: AuditEvent::ADDRESS_DELETED,
+            idempotencySource: "address-deleted|{$alamat->id}",
+            subjectType: 'address',
+            subjectId: (string) $alamat->id,
+            extraContext: [
+                'subject_name' => $snapshot['place'],
+                'address_snapshot' => $snapshot,
+                'replacement_address' => $replacement,
+            ],
+        );
+    }
+
+    /**
+     * Mencatat perpindahan alamat pengiriman utama milik buyer.
+     *
+     * Alamat utama sebelumnya ikut disimpan agar pemilik akun dapat menelusuri perpindahan tujuan
+     * pengiriman. Request ID menjadi bagian idempotency key sehingga memilih ulang alamat yang sama
+     * pada request berbeda tetap menjadi event terpisah.
+     *
+     * @param  User  $user  Model user lokal yang menjadi actor atau pemilik data.
+     * @param  Alamat  $alamat  Model alamat yang menjadi target atau sumber data.
+     * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
+     * @param  array{id: string, place: string, recipient_name: string}|null  $previous  Alamat utama sebelum perpindahan, atau null ketika belum ada.
+     *
+     * @return AuditLog  Model audit log yang berhasil ditemukan atau dicatat.
+     */
+    public function recordAddressSelected(
+        User $user,
+        Alamat $alamat,
+        Request $request,
+        ?array $previous = null
+    ): AuditLog {
+        $requestId = $this->resolveRequestId($request);
+
+        return $this->record(
+            user: $user,
+            request: $request,
+            event: AuditEvent::ADDRESS_SELECTED,
+            idempotencySource: "address-selected|{$alamat->id}|{$requestId}",
+            subjectType: 'address',
+            subjectId: (string) $alamat->id,
+            extraContext: [
+                'subject_name' => (string) $alamat->place,
+                'address_snapshot' => $this->addressSnapshot($alamat),
+                'previous_address' => $previous,
+            ],
+            requestId: $requestId,
+        );
+    }
+
+    /**
+     * Membentuk snapshot alamat allow-listed tanpa koordinat pinpoint.
+     *
+     * Koordinat, place ID Geoapify, dan sumber lokasi sengaja tidak disimpan karena tidak menambah
+     * informasi bagi pemilik akun sekaligus merupakan data paling sensitif pada row alamat.
+     *
+     * @param  Alamat  $alamat  Model alamat yang menjadi target atau sumber data.
+     *
+     * @return array{place: string, recipient_name: string, phone: string, formatted_address: string, address_detail: string, enable: bool}  Data terstruktur yang dihasilkan oleh proses ini.
+     */
+    public function addressSnapshot(Alamat $alamat): array
+    {
+        return [
+            'place' => (string) $alamat->place,
+            'recipient_name' => (string) $alamat->name,
+            'phone' => (string) $alamat->phone,
+            'formatted_address' => (string) $alamat->formatted_address,
+            'address_detail' => (string) $alamat->address_detail,
+            'enable' => (bool) $alamat->enable,
+        ];
     }
 
     /**

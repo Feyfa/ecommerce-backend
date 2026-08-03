@@ -13,6 +13,10 @@ enum AuditEvent: string
     case PRODUCT_CREATED = 'product.created';
     case PRODUCT_UPDATED = 'product.updated';
     case PRODUCT_DELETED = 'product.deleted';
+    case ADDRESS_CREATED = 'address.created';
+    case ADDRESS_UPDATED = 'address.updated';
+    case ADDRESS_DELETED = 'address.deleted';
+    case ADDRESS_SELECTED = 'address.selected';
 
     /**
      * Tujuan method ini untuk menjaga title user-facing tetap konsisten
@@ -29,6 +33,10 @@ enum AuditEvent: string
             self::PRODUCT_CREATED => 'Produk Ditambahkan',
             self::PRODUCT_UPDATED => 'Produk Diperbarui',
             self::PRODUCT_DELETED => 'Produk Dihapus',
+            self::ADDRESS_CREATED => 'Alamat Ditambahkan',
+            self::ADDRESS_UPDATED => 'Alamat Diperbarui',
+            self::ADDRESS_DELETED => 'Alamat Dihapus',
+            self::ADDRESS_SELECTED => 'Alamat Dipilih',
         };
     }
 
@@ -47,6 +55,10 @@ enum AuditEvent: string
             self::PRODUCT_CREATED => 'Produk berhasil ditambahkan.',
             self::PRODUCT_UPDATED => 'Produk berhasil diperbarui.',
             self::PRODUCT_DELETED => 'Produk berhasil dihapus.',
+            self::ADDRESS_CREATED => 'Alamat pengiriman berhasil ditambahkan.',
+            self::ADDRESS_UPDATED => 'Alamat pengiriman berhasil diperbarui.',
+            self::ADDRESS_DELETED => 'Alamat pengiriman berhasil dihapus.',
+            self::ADDRESS_SELECTED => 'Alamat pengiriman utama berhasil diubah.',
         };
     }
 
@@ -64,6 +76,10 @@ enum AuditEvent: string
             self::PRODUCT_CREATED => 'Produk Ditambahkan',
             self::PRODUCT_UPDATED => 'Produk Diperbarui',
             self::PRODUCT_DELETED => 'Produk Dihapus',
+            self::ADDRESS_CREATED => 'Alamat Ditambahkan',
+            self::ADDRESS_UPDATED => 'Alamat Diperbarui',
+            self::ADDRESS_DELETED => 'Alamat Dihapus',
+            self::ADDRESS_SELECTED => 'Alamat Dipilih',
         };
     }
 
@@ -82,6 +98,10 @@ enum AuditEvent: string
             self::PRODUCT_CREATED,
             self::PRODUCT_UPDATED,
             self::PRODUCT_DELETED => 'product',
+            self::ADDRESS_CREATED,
+            self::ADDRESS_UPDATED,
+            self::ADDRESS_DELETED,
+            self::ADDRESS_SELECTED => 'address',
         };
     }
 }

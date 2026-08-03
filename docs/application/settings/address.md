@@ -178,8 +178,27 @@ Success response:
 }
 ```
 
+## Audit Side Effects
+
+Every successful buyer-address mutation records one audit event inside the same
+database transaction as the mutation itself, so a failed audit write rolls the
+address change back:
+
+| Route | Event | Recorded context |
+| --- | --- | --- |
+| `POST /api/alamat/buyer` | `address.created` | initial address snapshot |
+| `PUT /api/alamat/buyer/{id}` | `address.updated` | snapshot plus the fields that really changed |
+| `DELETE /api/alamat/buyer/{id}` | `address.deleted` | final snapshot and any automatically promoted replacement |
+| `PUT /api/alamat-enable/buyer/{id}` | `address.selected` | new main address and the previous one |
+
+Snapshots never include latitude, longitude, or the Geoapify place id. Reads are
+not audited, and seller store locations remain outside this scope. See
+[Audit Log](audit-log.md) for the storage and masking rules.
+
 ## QA Coverage
 
 - [TOK-8 Pinpoint Address QA](../../qa/tok-8-pinpoint-address.md) tracks backend
   buyer-address verification; the matching frontend checklist is available at
   `frontend-repo:/docs/qa/tok-8-pinpoint-address.md`.
+- [TOK-21 Address Audit Log QA](../../qa/tok-21-address-audit-log.md) tracks the
+  audit behavior of these mutations.

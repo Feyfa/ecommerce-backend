@@ -1,16 +1,16 @@
 # Audit Log
 
-This document explains the backend Audit Log foundation from `TOK-1` and the product activity extension under `TOK-16`.
+This document explains the backend Audit Log foundation from `TOK-1`, the product activity extension under `TOK-16`, and the buyer address activity extension under `TOK-21`.
 
 ## Status
 
-Implemented. The backend stores and serves successful authentication and seller product create, update, and delete activity.
+Implemented. The backend stores and serves successful authentication, seller product, and buyer address activity.
 
 ## Purpose
 
 Audit Log gives an authenticated user a trustworthy history of important activity on their own account. Laravel owns audit persistence and access control; the browser must not be treated as the source of actor identity or event success.
 
-Phase 1 established the reusable authentication audit foundation. `TOK-16` extends the same owner-scoped timeline to product management. Profile, address, bank account, checkout, transaction, and other business events remain outside the current scope.
+Phase 1 established the reusable authentication audit foundation. `TOK-16` extends the same owner-scoped timeline to product management, and `TOK-21` extends it to buyer shipping addresses. Seller store location, profile, bank account, checkout, transaction, and other business events remain outside the current scope.
 
 ## Supported Scope
 
@@ -23,6 +23,10 @@ auth.logged_out
 product.created
 product.updated
 product.deleted
+address.created
+address.updated
+address.deleted
+address.selected
 ```
 
 Rules:
@@ -37,6 +41,10 @@ Rules:
 - Product reads are not audited. Only successful create, update, and delete operations are recorded.
 - Product audit persistence is part of the same database transaction as the domain mutation; an audit failure rolls back the database change.
 - Product image audit data is metadata only. It never stores image files, paths, URLs, or internal image identifiers.
+- Address reads are not audited. Only successful create, update, delete, and main-address selection operations are recorded.
+- Address audit persistence is part of the same database transaction as the address mutation; an audit failure rolls back the address change.
+- Address audit data never stores latitude, longitude, or the Geoapify place id. Those values add nothing for the account owner and are the most sensitive part of an address row.
+- Only buyer addresses are audited. Seller store locations owned by `CompanyController` remain outside this scope.
 
 ## Authentication Context
 
@@ -66,6 +74,8 @@ database/migrations/2026_07_13_000002_create_audit_logs_table.php
 
 All event creation should pass through one audit service so event naming, request metadata, IP handling, sensitive-data filtering, and idempotency remain consistent.
 
+`AuditLogResource` selects its domain-specific payload through a `match` on the event category rather than a chain of conditions. A new audited domain adds one branch and one private payload method instead of extending shared logic in place.
+
 ## Database Structure
 
 The `audit_logs` table contains:
@@ -76,7 +86,7 @@ The `audit_logs` table contains:
 | `actor_user_id` | Nullable local user UUID. User-facing queries are scoped through this value. |
 | `actor_clerk_user_id` | Snapshot of the Clerk user identifier for investigation and identity correlation. |
 | `event` | Stable machine-readable event name such as `auth.logged_in`. |
-| `category` | Event group. Supported values currently include `authentication` and `product`. |
+| `category` | Event group. Supported values currently include `authentication`, `product`, and `address`. |
 | `subject_type` | Optional subject type such as `user` or `session`. |
 | `subject_id` | Optional identifier of the affected subject. |
 | `context` | Sanitized PostgreSQL JSONB metadata. |
@@ -178,6 +188,18 @@ Seller product writes derive the actor from the authenticated request, never fro
 - Delete stores the final safe snapshot before the product row disappears, so the audit detail remains readable afterward.
 - Create/update file uploads are cleaned up when the database transaction, including audit persistence, fails. Obsolete product files continue to be removed only after a successful commit.
 
+### Buyer Address Create, Update, Delete, and Select
+
+Buyer address writes derive the actor and the address owner from the authenticated request. A UUID taken from the URL never selects an address outside the authenticated buyer.
+
+- Create stores the label, recipient name, phone, verified location, address detail, and main-address status after the address row is persisted.
+- Update stores only actual before/after changes for label, recipient name, phone, location, and address detail. An identical successful update still produces an event with an empty `changes` array.
+- Delete stores the final safe snapshot taken before the row is removed, so the audit detail remains readable afterward. When the deletion forces the system to promote another verified address, that replacement is recorded as `replacement_address`.
+- Select stores the newly chosen main address together with `previous_address`, so a change of delivery destination can be traced.
+- Every address audit row is written inside the same transaction as its mutation, so a failed audit leaves the address data unchanged.
+
+The `address.updated` idempotency key includes the request id so two separate successful updates remain two timeline events, while a retried request does not duplicate one. Create and delete use the address id alone.
+
 ## Authentication Method
 
 The UI may distinguish Google, email/password, or passkey only when the backend can verify the method from reliable Clerk data. The Clerk Backend session model installed in this project does not expose a verified sign-in method, so phase 1 currently omits method-specific wording.
@@ -203,9 +225,23 @@ Audit context must be intentionally allow-listed. It must never contain:
 - backup codes;
 - passkey credential material;
 - API keys;
-- complete request payloads by default.
+- complete request payloads by default;
+- pinpoint coordinates or map provider place identifiers.
 
 The database stores the full source IP for the owner-visible detail flow. Collection responses expose a masked value. Full IP access must use an authenticated owner-scoped detail endpoint.
+
+### Personal Data in Address Events
+
+Address personal data follows the same rule as the IP address: the database keeps the full value, and masking is a presentation decision made by `AuditLogResource`.
+
+| Field | Collection response | Detail response |
+| --- | --- | --- |
+| `recipient_name` | first name plus an initial | full value |
+| `phone` | first four and last three digits | full value |
+| `address_detail` | omitted | full value |
+| `formatted_address` | full value | full value |
+
+Before/after values inside `changes` are masked with the same rules, so a masked field cannot be reconstructed from the change list. Storing already-masked values is intentionally avoided because it would destroy information the owner is entitled to read on the detail route.
 
 ### Client IP Behind Reverse Proxies
 
@@ -258,7 +294,7 @@ Rules:
 - derive ownership from the authenticated local user;
 - never accept an arbitrary `user_id` for the user-facing endpoint;
 - default `per_page` to 20 and cap it at 50;
-- whitelist all currently supported authentication and product events;
+- whitelist all currently supported authentication, product, and address events;
 - validate date ranges;
 - reject malformed cursor payloads;
 - order by `occurred_at DESC, id DESC`;
