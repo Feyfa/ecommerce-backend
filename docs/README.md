@@ -77,6 +77,9 @@ alias path as inline code for a file owned by another repository.
 - [TOK-17 Product List Filtering QA](qa/tok-17-product-list-filtering.md)
   Tracks automated backend verification for buyer and seller product-list filtering.
 
+- [TOK-21 Address Audit Log QA](qa/tok-21-address-audit-log.md)
+  Tracks automated backend verification for buyer address audit persistence, personal-data masking, rollback, and ownership.
+
 - [Commit Guidelines](development/commit-guidelines.md)
   Explains how to keep commits focused on one purpose and separate unrelated changes.
 
