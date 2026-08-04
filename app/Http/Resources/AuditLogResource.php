@@ -57,6 +57,7 @@ class AuditLogResource extends JsonResource
         $data += match ($event->category()) {
             'product' => $this->productPayload($context),
             'address' => $this->addressPayload($context, $request),
+            'profile' => $this->profilePayload($context, $request),
             default => [],
         };
         // --- step 2 - end - full IP hanya boleh keluar pada route detail yang sudah owner-scoped
@@ -122,6 +123,80 @@ class AuditLogResource extends JsonResource
             'replacement_address' => $this->presentAddressReference($context['replacement_address'] ?? null, $isDetailRoute),
         ];
         // --- step 2 - end - susun payload alamat sesuai mode response
+    }
+
+    /**
+     * Membentuk payload tambahan untuk audit Profil Pengguna.
+     *
+     * Nomor telepon diperlakukan sebagai data sensitif: collection hanya menerima nilai tersamarkan,
+     * sedangkan detail yang telah owner-scoped dapat mengirim nilai penuh untuk kontrol reveal di UI.
+     * Snapshot tidak memuat nama, email, path, URL, maupun file foto profil.
+     *
+     * @param  array<string, mixed>  $context  Context audit yang telah dinormalisasi menjadi array.
+     * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
+     *
+     * @return array<string, mixed> Data profil yang aman untuk mode response saat ini.
+     */
+    private function profilePayload(array $context, Request $request): array
+    {
+        $isDetailRoute = $request->routeIs('audit-logs.show');
+        $snapshot = $context['profile_snapshot'] ?? null;
+
+        return [
+            'subject' => [
+                'type' => $this->subject_type,
+                'id' => $this->subject_id,
+                'name' => $context['subject_name'] ?? null,
+            ],
+            'profile_snapshot' => is_array($snapshot)
+                ? $this->presentProfileSnapshot($snapshot, $isDetailRoute)
+                : null,
+            'changes' => array_map(
+                fn (array $change): array => $this->presentProfileChange($change, $isDetailRoute),
+                $context['changes'] ?? []
+            ),
+        ];
+    }
+
+    /**
+     * Menyesuaikan snapshot profil untuk collection atau detail owner-scoped.
+     *
+     * @param  array<string, mixed>  $snapshot  Snapshot profil yang tersimpan pada context audit.
+     * @param  bool  $isDetailRoute  True ketika response berasal dari route detail owner-scoped.
+     *
+     * @return array<string, mixed> Data snapshot sesuai mode response.
+     */
+    private function presentProfileSnapshot(array $snapshot, bool $isDetailRoute): array
+    {
+        return [
+            'phone' => $isDetailRoute
+                ? ($snapshot['phone'] ?? null)
+                : $this->maskPhone($snapshot['phone'] ?? null),
+            'tanggal_lahir' => $snapshot['tanggal_lahir'] ?? null,
+            'jenis_kelamin' => $snapshot['jenis_kelamin'] ?? null,
+            'has_profile_image' => (bool) ($snapshot['has_profile_image'] ?? false),
+        ];
+    }
+
+    /**
+     * Menyamarkan perubahan nomor telepon saat payload dipakai pada collection.
+     *
+     * @param  array{field: string, label: string, before: mixed, after: mixed}  $change  Satu baris perubahan profil.
+     * @param  bool  $isDetailRoute  True ketika response berasal dari route detail owner-scoped.
+     *
+     * @return array{field: string, label: string, before: mixed, after: mixed} Data perubahan yang aman untuk mode response.
+     */
+    private function presentProfileChange(array $change, bool $isDetailRoute): array
+    {
+        if ($isDetailRoute || ($change['field'] ?? '') !== 'phone') {
+            return $change;
+        }
+
+        return [
+            ...$change,
+            'before' => $this->maskPhone(is_string($change['before'] ?? null) ? $change['before'] : null),
+            'after' => $this->maskPhone(is_string($change['after'] ?? null) ? $change['after'] : null),
+        ];
     }
 
     /**
