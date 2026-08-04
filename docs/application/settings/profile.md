@@ -73,6 +73,17 @@ Success response:
 }
 ```
 
+### Audit Log
+
+Each successful profile settings update records `profile.updated` with the
+user-facing title `Pengaturan Pengguna Diperbarui`. The audit snapshot includes
+only `phone`, `tanggal_lahir`, and `jenis_kelamin`; `name` and `email` are
+excluded because they are managed by the authentication provider.
+
+An update without value changes still records one event with an empty `changes`
+list. Phone numbers are masked in the Audit Log collection and exposed in full
+only through the owner-scoped detail response.
+
 Validation error response:
 
 ```json
@@ -103,9 +114,10 @@ Validation rules:
 
 Side effects:
 
-- Deletes the previous file from the public disk when it exists.
 - Stores the new image under `user-imgs`.
 - Updates `users.img`.
+- Records `profile.image_uploaded` with title `Foto Profil Diperbarui`.
+- Deletes the previous file only after the user update and audit persistence succeed.
 
 Success response:
 
@@ -134,6 +146,10 @@ Side effects:
 
 - Sets `users.img` to `null`.
 - Deletes the file from the public disk.
+- Records `profile.image_deleted` with title `Foto Profil Dihapus`.
+
+Profile photo audit stores only `has_profile_image`; path, URL, and historical
+image preview are never stored or exposed through Audit Log.
 
 Success response:
 

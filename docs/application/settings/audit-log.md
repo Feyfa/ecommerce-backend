@@ -10,7 +10,7 @@ Implemented. The backend stores and serves successful authentication, seller pro
 
 Audit Log gives an authenticated user a trustworthy history of important activity on their own account. Laravel owns audit persistence and access control; the browser must not be treated as the source of actor identity or event success.
 
-Phase 1 established the reusable authentication audit foundation. `TOK-16` extends the same owner-scoped timeline to product management, and `TOK-21` extends it to buyer shipping addresses. Seller store location, profile, bank account, checkout, transaction, and other business events remain outside the current scope.
+Phase 1 established the reusable authentication audit foundation. `TOK-16` extends the same owner-scoped timeline to product management, `TOK-21` extends it to buyer shipping addresses, and `TOK-22` extends it to Pengaturan Pengguna and profile photo actions. Seller store location, bank account, checkout, transaction, and other business events remain outside the current scope.
 
 ## Supported Scope
 
@@ -27,6 +27,9 @@ address.created
 address.updated
 address.deleted
 address.selected
+profile.updated
+profile.image_uploaded
+profile.image_deleted
 ```
 
 Rules:
@@ -45,6 +48,9 @@ Rules:
 - Address audit persistence is part of the same database transaction as the address mutation; an audit failure rolls back the address change.
 - Address audit data never stores latitude, longitude, or the Geoapify place id. Those values add nothing for the account owner and are the most sensitive part of an address row.
 - Only buyer addresses are audited. Seller store locations owned by `CompanyController` remain outside this scope.
+- Profile settings audit records only phone, birth date, and gender. Name and email are synchronized by authentication and are excluded.
+- An unchanged profile settings save records one `profile.updated` event with an empty `changes` list.
+- Profile photo upload and deletion record distinct events. Audit context stores only `has_profile_image`, never an image path, URL, or historical file.
 
 ## Authentication Context
 

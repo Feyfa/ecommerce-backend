@@ -386,6 +386,90 @@ class AuditLogService
     }
 
     /**
+     * Mencatat perubahan section Pengaturan Pengguna pada profil akun.
+     *
+     * Snapshot sesudah perubahan disimpan bersama daftar field yang benar-benar berubah. Request ID
+     * menjaga retry request tetap idempoten, sedangkan update identik tetap menghasilkan event dengan
+     * daftar perubahan kosong agar riwayat simpan tidak mengarang perubahan.
+     *
+     * @param  User  $user  Model user lokal yang memperbarui profilnya.
+     * @param  Request  $request  Request terautentikasi beserta metadata operasi.
+     * @param  array<int, array{field: string, label: string, before: mixed, after: mixed}>  $changes  Daftar perubahan field profil.
+     *
+     * @return AuditLog  Model audit log yang berhasil ditemukan atau dicatat.
+     */
+    public function recordProfileUpdated(User $user, Request $request, array $changes): AuditLog
+    {
+        $requestId = $this->resolveRequestId($request);
+
+        return $this->record(
+            user: $user,
+            request: $request,
+            event: AuditEvent::PROFILE_UPDATED,
+            idempotencySource: "profile-updated|{$user->id}|{$requestId}",
+            subjectType: 'user',
+            subjectId: (string) $user->id,
+            extraContext: [
+                'subject_name' => (string) $user->name,
+                'profile_snapshot' => $this->profileSnapshot($user),
+                'changes' => array_values($changes),
+            ],
+            requestId: $requestId,
+        );
+    }
+
+    /**
+     * Mencatat unggah atau penghapusan foto profil tanpa menyimpan path, URL, atau file gambar.
+     *
+     * Event hanya menyimpan status keberadaan foto setelah operasi agar riwayat tetap berguna tanpa
+     * menjadikan audit log sebagai penyimpanan media atau membuka referensi storage internal.
+     *
+     * @param  User  $user  Model user lokal yang mengubah foto profilnya.
+     * @param  Request  $request  Request terautentikasi beserta metadata operasi.
+     * @param  AuditEvent  $event  Event foto profil yang telah berhasil diselesaikan.
+     *
+     * @return AuditLog  Model audit log yang berhasil ditemukan atau dicatat.
+     */
+    public function recordProfileImageChanged(User $user, Request $request, AuditEvent $event): AuditLog
+    {
+        $requestId = $this->resolveRequestId($request);
+
+        return $this->record(
+            user: $user,
+            request: $request,
+            event: $event,
+            idempotencySource: "{$event->value}|{$user->id}|{$requestId}",
+            subjectType: 'user',
+            subjectId: (string) $user->id,
+            extraContext: [
+                'subject_name' => (string) $user->name,
+                'profile_snapshot' => $this->profileSnapshot($user),
+            ],
+            requestId: $requestId,
+        );
+    }
+
+    /**
+     * Membentuk snapshot Pengaturan Pengguna tanpa nama, email, atau path foto profil.
+     *
+     * Nama dan email dikelola oleh autentikasi dan bukan mutasi section ini. Foto cukup direpresentasikan
+     * dengan status aman agar URL atau path storage tidak masuk ke context audit.
+     *
+     * @param  User  $user  Model user yang nilai profilnya akan direkam.
+     *
+     * @return array{phone: string, tanggal_lahir: string|null, jenis_kelamin: string|null, has_profile_image: bool} Data profil yang diizinkan untuk audit.
+     */
+    public function profileSnapshot(User $user): array
+    {
+        return [
+            'phone' => (string) $user->phone,
+            'tanggal_lahir' => filled($user->tanggal_lahir) ? (string) $user->tanggal_lahir : null,
+            'jenis_kelamin' => $user->jenis_kelamin,
+            'has_profile_image' => filled($user->img),
+        ];
+    }
+
+    /**
      * Membentuk snapshot alamat allow-listed tanpa koordinat pinpoint.
      *
      * Koordinat, place ID Geoapify, dan sumber lokasi sengaja tidak disimpan karena tidak menambah

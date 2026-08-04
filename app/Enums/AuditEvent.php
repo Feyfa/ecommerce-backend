@@ -17,6 +17,9 @@ enum AuditEvent: string
     case ADDRESS_UPDATED = 'address.updated';
     case ADDRESS_DELETED = 'address.deleted';
     case ADDRESS_SELECTED = 'address.selected';
+    case PROFILE_UPDATED = 'profile.updated';
+    case PROFILE_IMAGE_UPLOADED = 'profile.image_uploaded';
+    case PROFILE_IMAGE_DELETED = 'profile.image_deleted';
 
     /**
      * Tujuan method ini untuk menjaga title user-facing tetap konsisten
@@ -37,6 +40,9 @@ enum AuditEvent: string
             self::ADDRESS_UPDATED => 'Alamat Diperbarui',
             self::ADDRESS_DELETED => 'Alamat Dihapus',
             self::ADDRESS_SELECTED => 'Alamat Dipilih',
+            self::PROFILE_UPDATED => 'Pengaturan Pengguna Diperbarui',
+            self::PROFILE_IMAGE_UPLOADED => 'Foto Profil Diperbarui',
+            self::PROFILE_IMAGE_DELETED => 'Foto Profil Dihapus',
         };
     }
 
@@ -59,6 +65,9 @@ enum AuditEvent: string
             self::ADDRESS_UPDATED => 'Alamat pengiriman berhasil diperbarui.',
             self::ADDRESS_DELETED => 'Alamat pengiriman berhasil dihapus.',
             self::ADDRESS_SELECTED => 'Alamat pengiriman utama berhasil diubah.',
+            self::PROFILE_UPDATED => 'Pengaturan pengguna berhasil diperbarui.',
+            self::PROFILE_IMAGE_UPLOADED => 'Foto profil berhasil diperbarui.',
+            self::PROFILE_IMAGE_DELETED => 'Foto profil berhasil dihapus.',
         };
     }
 
@@ -80,6 +89,9 @@ enum AuditEvent: string
             self::ADDRESS_UPDATED => 'Alamat Diperbarui',
             self::ADDRESS_DELETED => 'Alamat Dihapus',
             self::ADDRESS_SELECTED => 'Alamat Dipilih',
+            self::PROFILE_UPDATED => 'Pengaturan Pengguna Diperbarui',
+            self::PROFILE_IMAGE_UPLOADED => 'Foto Profil Diperbarui',
+            self::PROFILE_IMAGE_DELETED => 'Foto Profil Dihapus',
         };
     }
 
@@ -102,6 +114,9 @@ enum AuditEvent: string
             self::ADDRESS_UPDATED,
             self::ADDRESS_DELETED,
             self::ADDRESS_SELECTED => 'address',
+            self::PROFILE_UPDATED,
+            self::PROFILE_IMAGE_UPLOADED,
+            self::PROFILE_IMAGE_DELETED => 'profile',
         };
     }
 }
