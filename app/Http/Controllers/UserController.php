@@ -2,16 +2,30 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\AuditEvent;
 use App\Models\User;
+use App\Services\AuditLogService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
+    /**
+     * Menyiapkan service audit untuk mencatat perubahan profil yang sukses.
+     *
+     * @param  AuditLogService  $auditLogService  Service yang membatasi context dan metadata audit.
+     *
+     * @return void  Tidak mengembalikan nilai; dependency disimpan pada instance.
+     */
+    public function __construct(
+        private readonly AuditLogService $auditLogService
+    ) {}
+
     /**
      * Menghapus gambar profil pengguna yang terautentikasi.
      *
@@ -49,20 +63,28 @@ class UserController extends Controller
         }
         // --- step 2 - end - validasi user terautentikasi
 
-        // --- step 3 - start - hapus gambar lama jika tersedia
-        if ($validate['img']) {
-            if (Storage::disk('public')->exists($validate['img'])) {
-                // --- step 4 - start - perbarui data di database
+        // --- step 3 - start - pastikan file aktif tersedia sebelum mengubah profil
+        if ($validate['img'] && Storage::disk('public')->exists($validate['img'])) {
+            // --- step 4 - start - hapus referensi gambar dan catat audit secara atomik
+            DB::transaction(function () use ($user, $request): void {
                 $user->img = null;
                 $user->save();
-                // --- step 4 - end - perbarui data di database
 
-                Storage::disk('public')->delete($validate['img']);
+                $this->auditLogService->recordProfileImageChanged(
+                    $user,
+                    $request,
+                    AuditEvent::PROFILE_IMAGE_DELETED,
+                );
+            });
+            // --- step 4 - end - hapus referensi gambar dan catat audit secara atomik
 
-                return response()->json(['status' => 200, 'message' => 'Foto profil berhasil dihapus.', 'user' => $user], 200);
-            }
+            // --- step 5 - start - hapus file setelah perubahan database dan audit berhasil
+            Storage::disk('public')->delete($validate['img']);
+            // --- step 5 - end - hapus file setelah perubahan database dan audit berhasil
+
+            return response()->json(['status' => 200, 'message' => 'Foto profil berhasil dihapus.', 'user' => $user], 200);
         }
-        // --- step 3 - end - hapus gambar lama jika tersedia
+        // --- step 3 - end - pastikan file aktif tersedia sebelum mengubah profil
 
         return response()->json(['status' => 404, 'message' => 'File foto profil tidak ditemukan.'], 404);
     }
@@ -113,21 +135,36 @@ class UserController extends Controller
         }
         // --- step 2 - end - validasi user terautentikasi
 
-        // --- step 3 - start - hapus gambar lama jika tersedia
-        if ($user->img) {
-            if (Storage::disk('public')->exists($user->img)) {
-                Storage::disk('public')->delete($user->img);
-            }
-        }
-        // --- step 3 - end - hapus gambar lama jika tersedia
-
-        // --- step 4 - start - unggah gambar dan perbarui database
+        // --- step 3 - start - unggah file baru sebelum mengganti referensi profil
+        $previousImage = $user->img;
         $filename = $request->id.'-'.Carbon::now()->timestamp.'.'.$request->file('file')->getClientOriginalExtension();
         $path = Storage::disk('public')->putFileAs('user-imgs', $request->file('file'), $filename);
+        // --- step 3 - end - unggah file baru sebelum mengganti referensi profil
 
-        $user->img = $path;
-        $user->save();
-        // --- step 4 - end - unggah gambar dan perbarui database
+        // --- step 4 - start - ganti referensi gambar dan catat audit secara atomik
+        try {
+            DB::transaction(function () use ($user, $path, $request): void {
+                $user->img = $path;
+                $user->save();
+
+                $this->auditLogService->recordProfileImageChanged(
+                    $user,
+                    $request,
+                    AuditEvent::PROFILE_IMAGE_UPLOADED,
+                );
+            });
+        } catch (\Throwable $exception) {
+            Storage::disk('public')->delete($path);
+
+            throw $exception;
+        }
+        // --- step 4 - end - ganti referensi gambar dan catat audit secara atomik
+
+        // --- step 5 - start - bersihkan file sebelumnya setelah transaksi berhasil
+        if ($previousImage && Storage::disk('public')->exists($previousImage)) {
+            Storage::disk('public')->delete($previousImage);
+        }
+        // --- step 5 - end - bersihkan file sebelumnya setelah transaksi berhasil
 
         return response()->json(['status' => 200, 'message' => 'Foto profil berhasil diunggah.', 'user' => $user], 200);
     }
@@ -203,13 +240,65 @@ class UserController extends Controller
         $validate = $validator->validate();
         // --- step 3 - end - validasi request dan ambil data
 
-        // --- step 4 - start - perbarui data user
-        $user->jenis_kelamin = $request->jenis_kelamin;
-        $user->tanggal_lahir = $request->tanggal_lahir;
-        $user->phone = $validate['phone'];
-        $user->save();
-        // --- step 4 - end - perbarui data user
+        // --- step 4 - start - perbarui Pengaturan Pengguna bersama audit secara atomik
+        $beforeValues = $this->auditLogService->profileSnapshot($user);
+
+        DB::transaction(function () use ($user, $request, $validate, $beforeValues): void {
+            $user->jenis_kelamin = $request->jenis_kelamin;
+            $user->tanggal_lahir = $request->tanggal_lahir;
+            $user->phone = $validate['phone'];
+            $user->save();
+
+            $this->auditLogService->recordProfileUpdated(
+                $user,
+                $request,
+                $this->profileChanges($beforeValues, $user),
+            );
+        });
+        // --- step 4 - end - perbarui Pengaturan Pengguna bersama audit secara atomik
 
         return response()->json(['status' => 200, 'message' => 'User Update Successfully', 'user' => $user], 200);
+    }
+
+    /**
+     * Membandingkan snapshot Pengaturan Pengguna sebelum dan sesudah disimpan.
+     *
+     * Nama dan email tidak masuk karena dikelola autentikasi, bukan form Pengaturan Pengguna. Field
+     * yang tetap sama tidak dicatat di daftar perubahan, tetapi snapshot akhir tetap memungkinkan UI
+     * menampilkannya sebagai status Tetap.
+     *
+     * @param  array{phone: string, tanggal_lahir: string|null, jenis_kelamin: string|null, has_profile_image: bool}  $beforeValues  Snapshot sebelum mutasi.
+     * @param  User  $user  Profil setelah mutasi disimpan.
+     *
+     * @return array<int, array{field: string, label: string, before: mixed, after: mixed}> Daftar field yang benar-benar berubah.
+     */
+    private function profileChanges(array $beforeValues, User $user): array
+    {
+        // --- step 1 - start - siapkan snapshot sesudah perubahan dan label field yang diaudit
+        $afterValues = $this->auditLogService->profileSnapshot($user);
+        $labels = [
+            'phone' => 'Nomor Telepon',
+            'tanggal_lahir' => 'Tanggal Lahir',
+            'jenis_kelamin' => 'Jenis Kelamin',
+        ];
+        $changes = [];
+        // --- step 1 - end - siapkan snapshot sesudah perubahan dan label field yang diaudit
+
+        // --- step 2 - start - kumpulkan hanya nilai before dan after yang berbeda
+        foreach ($labels as $field => $label) {
+            if ($beforeValues[$field] === $afterValues[$field]) {
+                continue;
+            }
+
+            $changes[] = [
+                'field' => $field,
+                'label' => $label,
+                'before' => $beforeValues[$field],
+                'after' => $afterValues[$field],
+            ];
+        }
+        // --- step 2 - end - kumpulkan hanya nilai before dan after yang berbeda
+
+        return $changes;
     }
 }
