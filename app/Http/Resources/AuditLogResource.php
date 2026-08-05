@@ -58,6 +58,7 @@ class AuditLogResource extends JsonResource
             'product' => $this->productPayload($context),
             'address' => $this->addressPayload($context, $request),
             'profile' => $this->profilePayload($context, $request),
+            'company' => $this->companyPayload($context, $request),
             default => [],
         };
         // --- step 2 - end - full IP hanya boleh keluar pada route detail yang sudah owner-scoped
@@ -159,6 +160,39 @@ class AuditLogResource extends JsonResource
     }
 
     /**
+     * Membentuk payload tambahan untuk audit Profil Toko.
+     *
+     * Nomor telepon diperlakukan sebagai data sensitif: collection hanya menerima nilai tersamarkan,
+     * sedangkan detail yang telah owner-scoped dapat mengirim nilai penuh untuk kontrol reveal di UI.
+     * Snapshot tidak memuat koordinat, place id, path, URL, maupun file foto toko.
+     *
+     * @param  array<string, mixed>  $context  Context audit yang telah dinormalisasi menjadi array.
+     * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
+     *
+     * @return array<string, mixed> Data profil toko yang aman untuk mode response saat ini.
+     */
+    private function companyPayload(array $context, Request $request): array
+    {
+        $isDetailRoute = $request->routeIs('audit-logs.show');
+        $snapshot = $context['company_snapshot'] ?? null;
+
+        return [
+            'subject' => [
+                'type' => $this->subject_type,
+                'id' => $this->subject_id,
+                'name' => $context['subject_name'] ?? null,
+            ],
+            'company_snapshot' => is_array($snapshot)
+                ? $this->presentCompanySnapshot($snapshot, $isDetailRoute)
+                : null,
+            'changes' => array_map(
+                fn (array $change): array => $this->presentCompanyChange($change, $isDetailRoute),
+                $context['changes'] ?? []
+            ),
+        ];
+    }
+
+    /**
      * Menyesuaikan snapshot profil untuk collection atau detail owner-scoped.
      *
      * @param  array<string, mixed>  $snapshot  Snapshot profil yang tersimpan pada context audit.
@@ -187,6 +221,50 @@ class AuditLogResource extends JsonResource
      * @return array{field: string, label: string, before: mixed, after: mixed} Data perubahan yang aman untuk mode response.
      */
     private function presentProfileChange(array $change, bool $isDetailRoute): array
+    {
+        if ($isDetailRoute || ($change['field'] ?? '') !== 'phone') {
+            return $change;
+        }
+
+        return [
+            ...$change,
+            'before' => $this->maskPhone(is_string($change['before'] ?? null) ? $change['before'] : null),
+            'after' => $this->maskPhone(is_string($change['after'] ?? null) ? $change['after'] : null),
+        ];
+    }
+
+    /**
+     * Menyesuaikan snapshot profil toko untuk collection atau detail owner-scoped.
+     *
+     * @param  array<string, mixed>  $snapshot  Snapshot profil toko yang tersimpan pada context audit.
+     * @param  bool  $isDetailRoute  True ketika response berasal dari route detail owner-scoped.
+     *
+     * @return array<string, mixed> Data snapshot sesuai mode response.
+     */
+    private function presentCompanySnapshot(array $snapshot, bool $isDetailRoute): array
+    {
+        return [
+            'name' => $snapshot['name'] ?? null,
+            'email' => $snapshot['email'] ?? null,
+            'phone' => $isDetailRoute
+                ? ($snapshot['phone'] ?? null)
+                : $this->maskPhone($snapshot['phone'] ?? null),
+            'description' => $snapshot['description'] ?? null,
+            'formatted_address' => $snapshot['formatted_address'] ?? null,
+            'address_detail' => $snapshot['address_detail'] ?? null,
+            'has_company_image' => (bool) ($snapshot['has_company_image'] ?? false),
+        ];
+    }
+
+    /**
+     * Menyamarkan perubahan nomor telepon toko saat payload dipakai pada collection.
+     *
+     * @param  array{field: string, label: string, before: mixed, after: mixed}  $change  Satu baris perubahan profil toko.
+     * @param  bool  $isDetailRoute  True ketika response berasal dari route detail owner-scoped.
+     *
+     * @return array{field: string, label: string, before: mixed, after: mixed} Data perubahan yang aman untuk mode response.
+     */
+    private function presentCompanyChange(array $change, bool $isDetailRoute): array
     {
         if ($isDetailRoute || ($change['field'] ?? '') !== 'phone') {
             return $change;
