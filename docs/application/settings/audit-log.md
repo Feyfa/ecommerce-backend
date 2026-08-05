@@ -1,16 +1,16 @@
 # Audit Log
 
-This document explains the backend Audit Log foundation from `TOK-1`, the product activity extension under `TOK-16`, and the buyer address activity extension under `TOK-21`.
+This document explains the backend Audit Log foundation from `TOK-1`, the product activity extension under `TOK-16`, the buyer address activity extension under `TOK-21`, the Pengaturan Pengguna extension under `TOK-22`, and the Profil Toko extension under `TOK-23`.
 
 ## Status
 
-Implemented. The backend stores and serves successful authentication, seller product, and buyer address activity.
+Implemented. The backend stores and serves successful authentication, seller product, buyer address, profile, and company/store profile activity.
 
 ## Purpose
 
 Audit Log gives an authenticated user a trustworthy history of important activity on their own account. Laravel owns audit persistence and access control; the browser must not be treated as the source of actor identity or event success.
 
-Phase 1 established the reusable authentication audit foundation. `TOK-16` extends the same owner-scoped timeline to product management, `TOK-21` extends it to buyer shipping addresses, and `TOK-22` extends it to Pengaturan Pengguna and profile photo actions. Seller store location, bank account, checkout, transaction, and other business events remain outside the current scope.
+Phase 1 established the reusable authentication audit foundation. `TOK-16` extends the same owner-scoped timeline to product management, `TOK-21` extends it to buyer shipping addresses, `TOK-22` extends it to Pengaturan Pengguna and profile photo actions, and `TOK-23` extends it to Profil Toko updates and store photo actions. Bank account, checkout, transaction, and other business events remain outside the current scope.
 
 ## Supported Scope
 
@@ -30,6 +30,9 @@ address.selected
 profile.updated
 profile.image_uploaded
 profile.image_deleted
+company.updated
+company.image_uploaded
+company.image_deleted
 ```
 
 Rules:
@@ -47,10 +50,14 @@ Rules:
 - Address reads are not audited. Only successful create, update, delete, and main-address selection operations are recorded.
 - Address audit persistence is part of the same database transaction as the address mutation; an audit failure rolls back the address change.
 - Address audit data never stores latitude, longitude, or the Geoapify place id. Those values add nothing for the account owner and are the most sensitive part of an address row.
-- Only buyer addresses are audited. Seller store locations owned by `CompanyController` remain outside this scope.
+- Only buyer addresses are audited as `address.*` events. Seller store locations are audited through `company.*` events from `CompanyController`.
 - Profile settings audit records only phone, birth date, and gender. Name and email are synchronized by authentication and are excluded.
 - An unchanged profile settings save records one `profile.updated` event with an empty `changes` list.
 - Profile photo upload and deletion record distinct events. Audit context stores only `has_profile_image`, never an image path, URL, or historical file.
+- Company profile audit records name, email, phone, description, formatted address, and address detail. Latitude, longitude, and Geoapify place id are excluded.
+- An unchanged Profil Toko save records one `company.updated` event with an empty `changes` list, including the first `updateOrCreate` path that creates the company row.
+- Company photo upload and deletion record distinct events. Audit context stores only `has_company_image`, never an image path, URL, or historical file.
+- Company audit persistence is part of the same database transaction as the company mutation; an audit failure rolls back the database change.
 
 ## Authentication Context
 
@@ -92,7 +99,7 @@ The `audit_logs` table contains:
 | `actor_user_id` | Nullable local user UUID. User-facing queries are scoped through this value. |
 | `actor_clerk_user_id` | Snapshot of the Clerk user identifier for investigation and identity correlation. |
 | `event` | Stable machine-readable event name such as `auth.logged_in`. |
-| `category` | Event group. Supported values currently include `authentication`, `product`, and `address`. |
+| `category` | Event group. Supported values currently include `authentication`, `product`, `address`, `profile`, and `company`. |
 | `subject_type` | Optional subject type such as `user` or `session`. |
 | `subject_id` | Optional identifier of the affected subject. |
 | `context` | Sanitized PostgreSQL JSONB metadata. |
@@ -300,7 +307,7 @@ Rules:
 - derive ownership from the authenticated local user;
 - never accept an arbitrary `user_id` for the user-facing endpoint;
 - default `per_page` to 20 and cap it at 50;
-- whitelist all currently supported authentication, product, and address events;
+- whitelist all currently supported authentication, product, address, profile, and company events;
 - validate date ranges;
 - reject malformed cursor payloads;
 - order by `occurred_at DESC, id DESC`;
@@ -381,6 +388,9 @@ Sensitive-field exposure is additionally constrained by the allow-listed context
 - [TOK-16 Product Audit Log QA](../../qa/tok-16-product-audit-log.md) tracks
   backend product audit verification; the matching frontend checklist is
   available at `frontend-repo:/docs/qa/tok-16-product-audit-log.md`.
+- [TOK-23 Company Audit Log QA](../../qa/tok-23-company-audit-log.md) tracks
+  backend Profil Toko audit verification; the matching frontend checklist is
+  available at `frontend-repo:/docs/qa/tok-23-company-audit-log.md`.
 
 ## Manual QA Scenarios
 

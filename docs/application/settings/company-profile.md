@@ -78,6 +78,7 @@ Side effects:
 - `companies` is updated or created by `user_id`.
 - Seller address is updated or created in `alamats` with `type = seller` and `enable = 1`.
 - The backend builds the final display address for pinpoint mode.
+- A successful save records one owner-scoped `company.updated` audit event in the same database transaction. The audit snapshot stores name, email, phone, description, formatted address, address detail, and `has_company_image`. Latitude, longitude, and Geoapify place id are never stored. An identical save still records the event with an empty `changes` list.
 
 Success response:
 
@@ -115,9 +116,10 @@ Validation rules:
 
 Side effects:
 
-- Deletes the previous company image from the public disk when it exists.
+- Deletes the previous company image from the public disk when it exists, only after the database update and audit succeed.
 - Stores the new image under `company-imgs`.
 - Updates or creates `companies.img` for the authenticated user.
+- Records one owner-scoped `company.image_uploaded` audit event. Context stores only `has_company_image`, never an image path or URL.
 
 Success response:
 
@@ -135,8 +137,9 @@ Deletes the authenticated seller company image.
 
 Side effects:
 
-- Deletes the existing company image from the public disk.
-- Sets `companies.img` to `null`.
+- Sets `companies.img` to `null` and records `company.image_deleted` in the same database transaction.
+- Deletes the existing company image from the public disk only after that transaction succeeds.
+- Audit context stores only `has_company_image`, never an image path or URL.
 
 Success response:
 
@@ -151,10 +154,13 @@ Success response:
 Error responses:
 
 - `400` with `Company Is Empty` when the company row does not exist.
-- `400` with `Delete Image Error, Path File Empty` when the image file path is empty or missing on disk.
+- `400` with `File foto toko tidak ditemukan.` when the image file path is empty or missing on disk.
 
 ## QA Coverage
 
 - [TOK-8 Pinpoint Address QA](../../qa/tok-8-pinpoint-address.md) tracks backend
   store-location verification; the matching frontend checklist is available at
   `frontend-repo:/docs/qa/tok-8-pinpoint-address.md`.
+- [TOK-23 Company Audit Log QA](../../qa/tok-23-company-audit-log.md) tracks
+  backend Profil Toko audit verification; the matching frontend checklist is
+  available at `frontend-repo:/docs/qa/tok-23-company-audit-log.md`.

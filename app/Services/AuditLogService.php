@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\AuditEvent;
 use App\Models\Alamat;
 use App\Models\AuditLog;
+use App\Models\Company;
 use App\Models\Product;
 use App\Models\User;
 use Carbon\CarbonInterface;
@@ -466,6 +467,108 @@ class AuditLogService
             'tanggal_lahir' => filled($user->tanggal_lahir) ? (string) $user->tanggal_lahir : null,
             'jenis_kelamin' => $user->jenis_kelamin,
             'has_profile_image' => filled($user->img),
+        ];
+    }
+
+    /**
+     * Mencatat pembaruan Profil Toko bersama snapshot allow-listed dan daftar perubahan nyata.
+     *
+     * Snapshot sesudah perubahan disimpan bersama daftar field yang benar-benar berubah. Request ID
+     * menjaga retry request tetap idempoten, sedangkan update identik tetap menghasilkan event dengan
+     * daftar perubahan kosong agar riwayat simpan tidak mengarang perubahan.
+     *
+     * @param  User  $user  Model user lokal yang memperbarui profil toko.
+     * @param  Request  $request  Request terautentikasi beserta metadata operasi.
+     * @param  Company  $company  Model perusahaan setelah mutasi disimpan.
+     * @param  array<int, array{field: string, label: string, before: mixed, after: mixed}>  $changes  Daftar perubahan field profil toko.
+     * @param  Alamat|null  $sellerAddress  Alamat seller yang menyertai profil toko, jika ada.
+     *
+     * @return AuditLog  Model audit log yang berhasil ditemukan atau dicatat.
+     */
+    public function recordCompanyUpdated(
+        User $user,
+        Request $request,
+        Company $company,
+        array $changes,
+        ?Alamat $sellerAddress = null,
+    ): AuditLog {
+        $requestId = $this->resolveRequestId($request);
+
+        return $this->record(
+            user: $user,
+            request: $request,
+            event: AuditEvent::COMPANY_UPDATED,
+            idempotencySource: "company-updated|{$user->id}|{$requestId}",
+            subjectType: 'company',
+            subjectId: (string) $company->id,
+            extraContext: [
+                'subject_name' => (string) $company->name,
+                'company_snapshot' => $this->companySnapshot($company, $sellerAddress),
+                'changes' => array_values($changes),
+            ],
+            requestId: $requestId,
+        );
+    }
+
+    /**
+     * Mencatat unggah atau penghapusan foto toko tanpa menyimpan path, URL, atau file gambar.
+     *
+     * Event hanya menyimpan status keberadaan foto setelah operasi agar riwayat tetap berguna tanpa
+     * menjadikan audit log sebagai penyimpanan media atau membuka referensi storage internal.
+     *
+     * @param  User  $user  Model user lokal yang mengubah foto tokonya.
+     * @param  Request  $request  Request terautentikasi beserta metadata operasi.
+     * @param  Company  $company  Model perusahaan setelah mutasi foto disimpan.
+     * @param  AuditEvent  $event  Event foto toko yang telah berhasil diselesaikan.
+     * @param  Alamat|null  $sellerAddress  Alamat seller yang menyertai profil toko, jika ada.
+     *
+     * @return AuditLog  Model audit log yang berhasil ditemukan atau dicatat.
+     */
+    public function recordCompanyImageChanged(
+        User $user,
+        Request $request,
+        Company $company,
+        AuditEvent $event,
+        ?Alamat $sellerAddress = null,
+    ): AuditLog {
+        $requestId = $this->resolveRequestId($request);
+
+        return $this->record(
+            user: $user,
+            request: $request,
+            event: $event,
+            idempotencySource: "{$event->value}|{$user->id}|{$requestId}",
+            subjectType: 'company',
+            subjectId: (string) $company->id,
+            extraContext: [
+                'subject_name' => (string) $company->name,
+                'company_snapshot' => $this->companySnapshot($company, $sellerAddress),
+            ],
+            requestId: $requestId,
+        );
+    }
+
+    /**
+     * Membentuk snapshot Profil Toko tanpa koordinat, place id, atau path foto toko.
+     *
+     * Lokasi hanya menyimpan teks alamat yang berguna bagi pemilik akun. Foto cukup direpresentasikan
+     * dengan status aman agar URL atau path storage tidak masuk ke context audit.
+     *
+     * @param  Company  $company  Model perusahaan yang nilai profilnya akan direkam.
+     * @param  Alamat|null  $sellerAddress  Alamat seller terkait, atau null ketika belum tersedia.
+     *
+     * @return array{name: string, email: string, phone: string, description: string, formatted_address: string, address_detail: string, has_company_image: bool} Data profil toko yang diizinkan untuk audit.
+     */
+    public function companySnapshot(Company $company, ?Alamat $sellerAddress = null): array
+    {
+        return [
+            'name' => (string) $company->name,
+            'email' => (string) $company->email,
+            'phone' => (string) $company->phone,
+            'description' => (string) $company->description,
+            'formatted_address' => (string) ($sellerAddress?->formatted_address ?? ''),
+            'address_detail' => (string) ($sellerAddress?->address_detail ?? ''),
+            'has_company_image' => filled($company->img),
         ];
     }
 

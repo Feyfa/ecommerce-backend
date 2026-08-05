@@ -20,6 +20,9 @@ enum AuditEvent: string
     case PROFILE_UPDATED = 'profile.updated';
     case PROFILE_IMAGE_UPLOADED = 'profile.image_uploaded';
     case PROFILE_IMAGE_DELETED = 'profile.image_deleted';
+    case COMPANY_UPDATED = 'company.updated';
+    case COMPANY_IMAGE_UPLOADED = 'company.image_uploaded';
+    case COMPANY_IMAGE_DELETED = 'company.image_deleted';
 
     /**
      * Tujuan method ini untuk menjaga title user-facing tetap konsisten
@@ -43,6 +46,9 @@ enum AuditEvent: string
             self::PROFILE_UPDATED => 'Pengaturan Pengguna Diperbarui',
             self::PROFILE_IMAGE_UPLOADED => 'Foto Profil Diperbarui',
             self::PROFILE_IMAGE_DELETED => 'Foto Profil Dihapus',
+            self::COMPANY_UPDATED => 'Profil Toko Diperbarui',
+            self::COMPANY_IMAGE_UPLOADED => 'Foto Toko Diperbarui',
+            self::COMPANY_IMAGE_DELETED => 'Foto Toko Dihapus',
         };
     }
 
@@ -68,6 +74,9 @@ enum AuditEvent: string
             self::PROFILE_UPDATED => 'Pengaturan pengguna berhasil diperbarui.',
             self::PROFILE_IMAGE_UPLOADED => 'Foto profil berhasil diperbarui.',
             self::PROFILE_IMAGE_DELETED => 'Foto profil berhasil dihapus.',
+            self::COMPANY_UPDATED => 'Profil toko berhasil diperbarui.',
+            self::COMPANY_IMAGE_UPLOADED => 'Foto toko berhasil diperbarui.',
+            self::COMPANY_IMAGE_DELETED => 'Foto toko berhasil dihapus.',
         };
     }
 
@@ -92,6 +101,9 @@ enum AuditEvent: string
             self::PROFILE_UPDATED => 'Pengaturan Pengguna Diperbarui',
             self::PROFILE_IMAGE_UPLOADED => 'Foto Profil Diperbarui',
             self::PROFILE_IMAGE_DELETED => 'Foto Profil Dihapus',
+            self::COMPANY_UPDATED => 'Profil Toko Diperbarui',
+            self::COMPANY_IMAGE_UPLOADED => 'Foto Toko Diperbarui',
+            self::COMPANY_IMAGE_DELETED => 'Foto Toko Dihapus',
         };
     }
 
@@ -117,6 +129,9 @@ enum AuditEvent: string
             self::PROFILE_UPDATED,
             self::PROFILE_IMAGE_UPLOADED,
             self::PROFILE_IMAGE_DELETED => 'profile',
+            self::COMPANY_UPDATED,
+            self::COMPANY_IMAGE_UPLOADED,
+            self::COMPANY_IMAGE_DELETED => 'company',
         };
     }
 }
