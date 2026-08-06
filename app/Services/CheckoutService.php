@@ -693,7 +693,9 @@ class CheckoutService
      * @param  string  $checkout_key  Kunci idempotensi yang mewakili satu snapshot checkout.
      * @param  array  $dataXendit  Response pembayaran Xendit yang telah berhasil dibuat.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array  Data terstruktur yang memuat status, pesan, dan id invoice yang baru dibuat. Id
+     *                invoice dikembalikan agar pemanggil dapat menandai transaksi hasil checkout tanpa
+     *                menebak data terbaru buyer. Satu invoice mencakup seluruh seller pada checkout ini.
      */
     public function saveCheckoutToDatabase(string $user_id_buyer = '', array $checkouts = [], array $kurirs = [], array $noteds = [], ?Alamat $alamat_buyer = null, string $payment_method = '', string $payment_slug = '', string $payment_name = '', string $expired_at = '', int $price = 0, string $checkout_key = '', array $dataXendit = []): array
     {
@@ -807,6 +809,7 @@ class CheckoutService
         return [
             'status' => 'success',
             'message' => 'Save Chekcout To Database Successfully',
+            'transaction_invoice_id' => $transactionInvoice->id,
         ];
     }
 
