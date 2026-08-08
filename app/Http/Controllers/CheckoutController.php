@@ -132,6 +132,8 @@ class CheckoutController extends Controller
      * @param  Request  $request  Data pembayaran dan snapshot checkout.
      *
      * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     *                       Respons sukses menyertakan id invoice yang dibuat agar frontend dapat menandai
+     *                       transaksi hasil checkout ini pada halaman transaksi buyer.
      */
     public function processCheckout(Request $request): JsonResponse
     {
@@ -242,7 +244,7 @@ class CheckoutController extends Controller
             // --- step 6 - end - siapkan data payment
 
             // --- step 7 - start - proses checkout secara atomik
-            DB::transaction(function () use (
+            $transactionInvoiceId = DB::transaction(function () use (
                 $user_id_buyer,
                 $checkoutSnapshot,
                 $expired_at_transaction,
@@ -322,6 +324,10 @@ class CheckoutController extends Controller
                         ),
                     );
                 }
+
+                // Id invoice dikembalikan dari dalam transaksi database supaya frontend dapat menandai
+                // transaksi hasil checkout ini secara langsung, bukan menebak data terbaru buyer.
+                return $saveCheckoutToDatabase['transaction_invoice_id'] ?? '';
             });
             // --- step 7 - end - proses checkout secara atomik
         } catch (CheckoutAvailabilityException $e) {
@@ -364,6 +370,10 @@ class CheckoutController extends Controller
             }
         }
 
-        return response()->json(['status' => 'success', 'message' => 'Pembayaran Berhasil']);
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Pembayaran Berhasil',
+            'transaction_invoice_id' => $transactionInvoiceId ?? '',
+        ]);
     }
 }

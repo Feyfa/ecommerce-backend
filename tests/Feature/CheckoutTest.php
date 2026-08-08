@@ -6,10 +6,13 @@ use App\Exceptions\CheckoutChangedException;
 use App\Models\Alamat;
 use App\Models\Company;
 use App\Models\Keranjang;
+use App\Models\PaymentList;
 use App\Models\Product;
+use App\Models\TransactionInvoice;
 use App\Models\User;
 use App\Services\CheckoutService;
 use App\Services\PaymentService;
+use App\Services\XenditService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery\MockInterface;
 use Tests\TestCase;
@@ -414,13 +417,95 @@ class CheckoutTest extends TestCase
     }
 
     /**
+     * Memverifikasi aturan checkout buyer pada skenario successful checkout returns the created
+     * invoice id.
+     *
+     * Test menyiapkan buyer, alamat seller terverifikasi, cart, serta metode pembayaran, memalsukan
+     * pembuatan virtual account, lalu memastikan response sukses membawa id invoice yang benar benar
+     * tersimpan. Id tersebut adalah kontrak yang dipakai frontend untuk menandai transaksi hasil
+     * checkout, sehingga menebak data terbaru buyer tidak lagi diperlukan.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
+    public function successful_checkout_returns_the_created_invoice_id(): void
+    {
+        $this->withoutMiddleware();
+
+        // --- step 1 - start - siapkan checkout yang valid beserta metode pembayaran
+        $fixture = $this->createCheckoutLockFixture();
+        $buyer = $fixture['buyer'];
+        $buyerAddress = $fixture['buyerAddress'];
+        $cart = $fixture['cart'];
+
+        PaymentList::create([
+            'type' => 'incoming',
+            'method' => 'va',
+            'slug' => 'bca',
+            'name' => 'BCA Virtual Account',
+        ]);
+        // --- step 1 - end - siapkan checkout yang valid beserta metode pembayaran
+
+        // --- step 2 - start - palsukan pembuatan virtual account agar test tidak memanggil provider
+        $this->mock(XenditService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('createVirtualAccount')
+                ->once()
+                ->andReturn([
+                    'status' => 'success',
+                    'data' => [
+                        'account_number' => '381659999724432',
+                        'external_id' => 'va-bca-checkout-test',
+                    ],
+                ]);
+        });
+        // --- step 2 - end - palsukan pembuatan virtual account agar test tidak memanggil provider
+
+        // --- step 3 - start - proses checkout dan periksa identitas pesanan pada response
+        $response = $this->actingAs($buyer)
+            ->postJson('/api/checkout/process', [
+                'payment_slug' => 'bca',
+                'shipping_options' => [[
+                    'user_id_seller' => $fixture['seller']->id,
+                    'kurir_name' => 'JNT',
+                ]],
+                'noteds' => [[
+                    'user_id_seller' => $fixture['seller']->id,
+                    'noted' => '',
+                ]],
+                'client_snapshot' => [
+                    'alamat_id' => $buyerAddress->id,
+                    'alamat_updated_at' => $buyerAddress->updated_at?->toJSON(),
+                    'cart_item_ids' => [$cart->id],
+                    'total_product' => 10000,
+                    'total_shipping' => 15000,
+                    'total_all' => 25000,
+                ],
+            ])
+            ->assertOk()
+            ->assertJson([
+                'status' => 'success',
+                'message' => 'Pembayaran Berhasil',
+            ]);
+        // --- step 3 - end - proses checkout dan periksa identitas pesanan pada response
+
+        // --- step 4 - start - pastikan id invoice pada response cocok dengan baris yang tersimpan
+        $invoice = TransactionInvoice::where('user_id_buyer', $buyer->id)->firstOrFail();
+
+        $this->assertDatabaseHas('transaction_users', ['transaction_invoice_id' => $invoice->id]);
+
+        $response->assertJsonPath('transaction_invoice_id', $invoice->id);
+        // --- step 4 - end - pastikan id invoice pada response cocok dengan baris yang tersimpan
+    }
+
+    /**
      * Membuat snapshot checkout minimal beserta row database yang cocok untuk pengujian row lock.
      *
      * Fixture memuat alamat buyer dan seller terverifikasi, satu produk tersedia, serta satu cart
      * aktif. Snapshot mempertahankan nilai awal agar setiap test dapat mengubah satu state mutable
      * dan membuktikan bahwa perubahan tersebut terdeteksi sebelum pembayaran.
      *
-     * @return array{buyer: User, buyerAddress: Alamat, product: Product, cart: Keranjang, snapshot: array<string, mixed>} Fixture checkout dan snapshot awalnya.
+     * @return array{buyer: User, seller: User, buyerAddress: Alamat, product: Product, cart: Keranjang, snapshot: array<string, mixed>} Fixture checkout dan snapshot awalnya.
      */
     private function createCheckoutLockFixture(): array
     {
@@ -468,6 +553,7 @@ class CheckoutTest extends TestCase
 
         return [
             'buyer' => $buyer,
+            'seller' => $seller,
             'buyerAddress' => $buyerAddress,
             'product' => $product,
             'cart' => $cart,
