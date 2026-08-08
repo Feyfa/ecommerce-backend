@@ -221,9 +221,14 @@ Successful response:
 ```json
 {
   "status": "success",
-  "message": "Pembayaran Berhasil"
+  "message": "Pembayaran Berhasil",
+  "transaction_invoice_id": "a270374b-c2cc-41aa-955d-00d034142d87"
 }
 ```
+
+`transaction_invoice_id` identifies the invoice created by this checkout so the frontend can mark the
+resulting transactions instead of guessing the buyer's newest data. One checkout creates a single invoice
+and one transaction per seller, so this one id already covers every store in a multi-store checkout.
 
 ## Backend Snapshot
 
