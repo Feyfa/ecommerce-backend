@@ -229,6 +229,33 @@ git log -1 --format=full
 
 Verify that the commit is in the correct repository, the summary and body are accurate, sections and bullet points have the intended line breaks, no literal `\n` text was stored, and validation claims match checks that were actually run. If the message is malformed and the commit has not been pushed, correct it when doing so is safe.
 
-## GitHub Pull Requests
+## GitHub Tool Selection
 
-When the user asks to create, open, update, or otherwise operate a pull request, use the GitHub API through the connected GitHub integration. Do not use the GitHub website through browser automation for pull request operations unless the API is unavailable or the user explicitly requests browser-based interaction.
+Before performing any GitHub operation, identify the repository and whether the
+requested operation concerns a pull request or GitHub Actions. Tool selection is
+mandatory and must follow the rules below; do not choose a different tool merely
+because it is available.
+
+### GitHub Pull Requests
+
+When the user asks to inspect, create, open, update, review, merge, or otherwise
+operate a pull request, use the GitHub API through the connected GitHub
+integration only. Do not use `gh`, Chrome, browser automation, or the GitHub web
+UI for backend pull request operations.
+
+If the connected GitHub integration is unavailable, stop and report the
+limitation. Use another tool only when the user explicitly authorizes that
+fallback.
+
+### GitHub Actions
+
+When the user explicitly asks to inspect, run, dispatch, monitor, rerun, or
+otherwise operate a GitHub Actions workflow, use the GitHub CLI (`gh`) only. Do
+not use the connected GitHub integration, Chrome, browser automation, or the
+GitHub web UI for backend GitHub Actions operations unless the user explicitly
+requests browser-based work.
+
+Before an Actions operation that changes remote state, verify that `gh` is
+authenticated with the correct GitHub account and has the required repository
+and workflow permissions. If `gh` is unavailable or authentication fails, stop
+and report the limitation; do not silently switch to another tool.
