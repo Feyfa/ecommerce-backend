@@ -92,7 +92,7 @@ High-level behavior:
 7. Left joins seller companies.
 8. Applies buyer or seller ownership filter.
 9. Applies search and date filters.
-10. Builds status counts from the filtered base query.
+10. Builds status counts from the filtered base query. For buyer `pending_payment`, the count uses distinct invoices because one payment can cover several seller rows.
 11. Applies selected status filter.
 12. Sorts by `transaction_users.created_at`.
 13. Paginates the rows.
@@ -144,9 +144,17 @@ Each transaction row includes:
 - `product_price`: product subtotal for the seller transaction row.
 - `noted`: buyer note for the seller transaction row.
 - `alamat_buyer`: buyer address snapshot.
-- `total_price`: invoice total price.
+- `total_price`: total harga yang ditampilkan untuk row tersebut. Pada row reguler per toko nilainya adalah subtotal produk ditambah ongkir toko; pada invoice pending buyer yang dikelompokkan nilainya adalah total invoice.
 - `expired_at`: formatted payment expiry date.
 - `products`: purchased product rows.
+
+### Buyer Pending Invoice Shape
+
+For `user_type=buyer&status_filter=pending_payment`, an invoice covering more than one seller is returned as one row per invoice rather than one row per seller transaction. The invoice row keeps the payment fields above and adds:
+
+- `packages`: every seller transaction covered by the invoice, including its seller display name, products, courier, shipping price, estimate, note, and product subtotal.
+
+Search and date filtering decide whether an invoice is included. Once one package matches, the API returns every package belonging to that invoice so the buyer can inspect the complete bill. A pending invoice that covers only one seller keeps the regular transaction row shape. This grouped shape is limited to buyer pending payments; buyer paid/waiting/completed responses and all seller responses remain one row per seller transaction, with each buyer row showing that seller package's product subtotal plus shipping price.
 
 `payment_account` is only selected for buyer responses.
 
