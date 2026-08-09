@@ -8,14 +8,16 @@ This repository contains the backend application and API.
 
 Repository documentation is available in the `docs/` directory.
 
-Before changing code or configuration:
+Before answering or acting on a project-specific request, including analysis or changes:
 
 1. Identify the feature and areas related to the task.
 2. Search for and read the relevant documentation in `docs/`. Do not read every document unless the task requires it.
-3. Inspect the related implementation, configuration, dependencies, database structures, and tests to verify that the documentation still reflects the current codebase.
+3. Inspect the related implementation, configuration, dependencies, database structures, tests, and repository state to verify that the documentation still reflects the current codebase.
 4. Follow the architecture, patterns, and coding style already used in this repository.
 5. Preserve the existing writing and coding style, including whitespace and formatting. Do not reformat or change style unless the task explicitly requests it or the change is required for correctness.
 6. Update the relevant documentation when a change affects behavior, API contracts, the database, configuration, deployment, or the developer workflow.
+7. Treat the current implementation and repository state as the primary evidence. Separate verified facts from unresolved assumptions and do not use unverified assumptions as the basis for a change or Git operation.
+8. If the user interrupts, corrects, or asks for the instructions or situation to be reread, stop and repeat this preflight against the current state before continuing.
 
 Review the relevant documentation before modifying endpoints, business logic, database schemas, migrations, authentication, authorization, queues, configuration, or API contracts.
 
@@ -59,6 +61,19 @@ and a branch that follows the shared release flow in
   `*-staging` branch only to integrate with `staging`.
 - Never merge `staging` or a `*-staging` task branch into `main`, and never
   merge a regular task branch directly into `staging`.
+- Before creating or refreshing a `*-staging` task branch, switch to the local
+  `staging` branch and run `git pull --ff-only origin staging` as separate
+  commands. Use the updated local `staging` branch as the merge source.
+- Do not create or reset a local task staging branch from `origin/staging`. Do
+  not use `git switch -c/-C <task>-staging origin/staging` or
+  `git checkout -b/-B <task>-staging origin/staging` for this workflow.
+- When a local merge must produce an integration commit, use
+  `git merge --no-ff --no-edit <local-branch>` and let Git generate the merge
+  message. Do not pass a custom `-m` message to `git merge`.
+- Execute one Git command per terminal invocation. Do not chain Git commands
+  with `&&`, `;`, command substitution, or a multiline shell block. Wait for
+  each result before running the next command, and run status or log checks as
+  separate commands.
 
 ## PHP Documentation and Comments
 
