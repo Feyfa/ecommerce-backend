@@ -130,6 +130,142 @@ class ProductListFilterTest extends TestCase
     }
 
     /**
+     * Memastikan batas harga minimum, maksimum, dan gabungannya diterapkan secara inklusif.
+     *
+     * Katalog buyer harus tetap mengembalikan produk pada nilai batas tepat agar harga yang dimasukkan
+     * pengguna memiliki arti yang sama pada kedua sisi rentang.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
+    public function buyer_can_filter_products_by_inclusive_price_range(): void
+    {
+        $seller = User::factory()->create();
+        $lower = $this->createProduct($seller, 'Harga Bawah', 10000, 3);
+        $middle = $this->createProduct($seller, 'Harga Tengah', 20000, 3);
+        $upper = $this->createProduct($seller, 'Harga Atas', 30000, 3);
+
+        $this->getJson($this->buyerUrl(['min_price' => 20000, 'sort_product' => 'price_lowest']))
+            ->assertOk()
+            ->assertJsonPath('products.0.p_id', $middle->id)
+            ->assertJsonPath('products.1.p_id', $upper->id);
+
+        $this->getJson($this->buyerUrl(['max_price' => 20000, 'sort_product' => 'price_lowest']))
+            ->assertOk()
+            ->assertJsonPath('products.0.p_id', $lower->id)
+            ->assertJsonPath('products.1.p_id', $middle->id);
+
+        $this->getJson($this->buyerUrl([
+            'min_price' => 20000,
+            'max_price' => 20000,
+            'sort_product' => 'price_lowest',
+        ]))
+            ->assertOk()
+            ->assertJsonCount(1, 'products')
+            ->assertJsonPath('products.0.p_id', $middle->id);
+    }
+
+    /**
+     * Memastikan filter terakhir ditambahkan memakai waktu pembuatan produk dan seluruh pilihan rentangnya.
+     *
+     * Setiap pilihan harus membatasi query sebelum sorting. Produk yang hanya baru diperbarui tidak boleh ikut
+     * ketika waktu pembuatannya berada di luar periode yang dipilih buyer.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
+    public function buyer_can_filter_products_by_recently_added_period(): void
+    {
+        $seller = User::factory()->create();
+        $sevenDays = $this->createProduct($seller, 'Tujuh Hari', 10000, 3, now()->subDays(6)->toDateTimeString());
+        $fourteenDays = $this->createProduct($seller, 'Empat Belas Hari', 20000, 3, now()->subDays(10)->toDateTimeString());
+        $oneMonth = $this->createProduct($seller, 'Satu Bulan', 30000, 3, now()->subDays(29)->toDateTimeString());
+        $threeMonths = $this->createProduct($seller, 'Tiga Bulan', 40000, 3, now()->subDays(89)->toDateTimeString());
+        $olderProduct = $this->createProduct($seller, 'Produk Lama', 50000, 3, now()->subDays(91)->toDateTimeString());
+
+        DB::table('products')->where('id', $olderProduct->id)->update(['updated_at' => now()]);
+
+        $expectedProducts = [
+            '7' => [$sevenDays->id],
+            '14' => [$sevenDays->id, $fourteenDays->id],
+            '30' => [$sevenDays->id, $fourteenDays->id, $oneMonth->id],
+            '90' => [$sevenDays->id, $fourteenDays->id, $oneMonth->id, $threeMonths->id],
+        ];
+
+        foreach ($expectedProducts as $addedWithin => $expectedIds) {
+            $response = $this->getJson($this->buyerUrl([
+                'added_within' => $addedWithin,
+                'sort_product' => 'name_asc',
+            ]));
+
+            $response->assertOk();
+            $this->assertEqualsCanonicalizing($expectedIds, collect($response->json('products'))->pluck('p_id')->all());
+        }
+    }
+
+    /**
+     * Memastikan filter harga dapat digabungkan dengan pencarian, sorting, dan cursor produk buyer.
+     *
+     * Setiap kondisi harus mempersempit query yang sama tanpa mengembalikan produk yang sudah ada
+     * pada batch sebelumnya atau produk di luar rentang harga aktif.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
+    public function buyer_can_combine_price_filter_with_search_sort_and_excluded_ids(): void
+    {
+        $seller = User::factory()->create();
+        $excluded = $this->createProduct($seller, 'Target Murah', 10000, 3);
+        $remaining = $this->createProduct($seller, 'Target Sedang', 20000, 3);
+        $this->createProduct($seller, 'Target Mahal', 30000, 3);
+        $this->createProduct($seller, 'Target Lama', 15000, 3, now()->subDays(8)->toDateTimeString());
+
+        $this->getJson($this->buyerUrl([
+            'search_product' => 'target',
+            'min_price' => 10000,
+            'max_price' => 20000,
+            'added_within' => '7',
+            'sort_product' => 'price_highest',
+            'products_current_id' => json_encode([$excluded->id]),
+        ]))
+            ->assertOk()
+            ->assertJsonCount(1, 'products')
+            ->assertJsonPath('products.0.p_id', $remaining->id);
+    }
+
+    /**
+     * Memastikan nilai harga buyer yang negatif atau memiliki rentang terbalik ditolak.
+     *
+     * Validasi menjaga query katalog tidak menerima nominal yang tidak masuk akal dan batas maksimum
+     * selalu sama dengan atau lebih besar dari batas minimum.
+     *
+     * @test
+     *
+     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
+    public function buyer_rejects_invalid_price_filter_values(): void
+    {
+        $this->getJson($this->buyerUrl(['min_price' => -1]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['min_price'], 'message');
+
+        $this->getJson($this->buyerUrl(['max_price' => -1]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['max_price'], 'message');
+
+        $this->getJson($this->buyerUrl(['min_price' => 20000, 'max_price' => 10000]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['max_price'], 'message');
+
+        $this->getJson($this->buyerUrl(['added_within' => '5']))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['added_within'], 'message');
+    }
+
+    /**
      * Memverifikasi aturan filter dan pengurutan katalog produk pada skenario buyer catalog
      * prioritizes and searches the store name.
      *
