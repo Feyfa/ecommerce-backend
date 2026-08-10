@@ -14,6 +14,8 @@ Current supported actions:
 - Search products by product name or store name.
 - Restrict the buyer catalog to active products with stock and a verified seller location.
 - Sort products by update date, price, or name.
+- Filter products by inclusive minimum and maximum price boundaries.
+- Filter products by when they were first added to the catalog.
 - Exclude products already loaded by the frontend.
 - Add a product to the buyer cart.
 - Increase cart quantity when the same product is added again.
@@ -25,7 +27,7 @@ Current supported actions:
   Defines the authenticated belanja and keranjang API routes.
 
 - `app/Http/Controllers/BelanjaController.php`
-  Handles buyer product list, purchasable-stock restriction, search, and sort behavior.
+  Handles buyer product list, purchasable-stock restriction, search, price and recently-added filtering, and sort behavior.
 
 - `app/Http/Controllers/KeranjangController.php`
   Handles add-to-cart behavior used from the belanja page.
@@ -60,21 +62,26 @@ Required query/body data:
 Optional data:
 
 - `search_product`: product or store search keyword.
+- `min_price`: minimum inclusive product price as a Rupiah whole number greater than or equal to zero.
+- `max_price`: maximum inclusive product price as a Rupiah whole number greater than or equal to zero and not lower than `min_price`.
+- `added_within`: recently-added period in days. Allowed values are `7`, `14`, `30`, and `90`.
 - `sort_product`: sorting option. Allowed values are `latest`, `oldest`, `price_highest`, `price_lowest`, `name_asc`, and `name_desc`.
 
 Behavior:
 
 - Derives the current user id from the authenticated request instead of client input.
-- Validates `products_current_id` as a JSON array and `sort_product` against allowed values when present.
+- Validates `products_current_id` as a JSON array, optional price boundaries as non-negative whole numbers, `added_within` against supported periods, and `sort_product` against allowed values when present.
 - Excludes products owned by the authenticated user.
 - Excludes ids from `products_current_id`.
 - Applies case-insensitive matching against product or store name with normalized `LOWER(...) LIKE` expressions.
+- Applies `products.price >= min_price` and `products.price <= max_price` when each optional boundary is present. Both boundaries are inclusive.
+- Applies `products.created_at >= now()->subDays(added_within)` when a recently-added period is present. This intentionally uses the creation date, not the last update date.
 - Always requires an active non-deleted product, `products.stock > 0`, and an active verified Pinpoint location for its seller.
 - Joins the seller account and company profile to return the store name for each card. The seller account name remains the fallback when the company profile has no usable name.
 - Orders by the selected sort option, defaulting to `products.updated_at DESC`.
 - Returns up to 200 products.
 
-This endpoint is used by the frontend for initial list loading, search, sorting, and infinite scroll.
+This endpoint is used by the frontend for initial list loading, search, price and recently-added filtering, sorting, and infinite scroll. Both filters run in the backend query before sorting and the `200`-product limit; the response shape remains unchanged.
 
 ### Add To Cart
 
@@ -138,6 +145,8 @@ Stock failures return `422` with `message.stock_maximum`.
 - Buyer belanja pagination uses `products_current_id` instead of page numbers.
 - Search normalizes both columns and keywords to lowercase so it remains case-insensitive and testable across supported database environments.
 - Buyer product availability is an API invariant rather than a frontend-selected filter.
+- Price filtering is independent from sorting. Invalid negative, non-integer, or inverted price ranges return `422` validation responses.
+- Recently-added filtering is independent from sorting and accepts only the fixed 7, 14, 30, and 90 day periods.
 - Sort options use direct `orderBy` clauses against product columns.
 - The primary route does not accept a user id; the authenticated token owner is the source of truth.
 
@@ -150,10 +159,13 @@ Stock failures return `422` with `message.stock_maximum`.
 - Buyer-facing seller identity prioritizes `companies.name` and falls back to `users.name` for legacy sellers without a populated company profile.
 - Buyer does not receive soft-deleted, sold-out, or unverified-seller products because none can be purchased.
 - Buyer and seller share the same update-date, price, and name sort contract; stock management remains a seller workflow.
+- Buyer catalog filtering accepts `min_price`, `max_price`, and `added_within`; it does not introduce stock, category, promotion, shipping, COD, rating, or store-type filters.
 - Add-to-cart revalidates all availability rules to handle changes after listing.
 - The backend docs file name matches the frontend docs file name so the same feature can be compared across both repositories.
 
 ## QA Coverage
 
+- [TOK-30 Buyer Catalog Filters QA](../../qa/tok-30-buyer-catalog-filters.md)
+  tracks automated price and recently-added filter verification.
 - [TOK-17 Product List Filtering QA](../../qa/tok-17-product-list-filtering.md)
   tracks backend product-list filtering verification.
