@@ -18,6 +18,8 @@ class Product extends Model
 
     public const SORT_OPTIONS = ['latest', 'oldest', 'price_lowest', 'price_highest', 'name_asc', 'name_desc'];
 
+    public const RECENTLY_ADDED_FILTER_OPTIONS = ['7', '14', '30', '90'];
+
     protected $fillable = [
         'user_id_seller',
         'img',
