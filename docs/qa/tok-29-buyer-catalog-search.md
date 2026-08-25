@@ -12,12 +12,11 @@ QA record date: August 25, 2026.
 Revision under review:
 
 - branch: `task/jd-tok-29`;
-- base commit: `4989aa5093428dadba5e5c97aa917350536b0190`;
-- TOK-29 changes: uncommitted working tree at the time this record was created.
+- final task commit: `10e339ab4be860f96a31835d6ef12bd60b8ea8a1`;
+- staging merge commit: `43448dde`.
 
-Replace the working-tree note with the final commit after the reviewed changes
-are committed. Statuses below describe only evidence available for this exact
-local revision; they do not imply that staging or production has been tested.
+Statuses below distinguish local, staging, and production evidence. Production
+must not be inferred from successful local or staging verification.
 
 Status legend: ✅ verified, ⬜ not verified yet.
 
@@ -84,9 +83,10 @@ php artisan test --compact tests/Integration/PostgresOutboxLockingTest.php
 
 | ID | Status | Verification | Expected Result | Evidence |
 | --- | --- | --- | --- | --- |
-| TOK-29-BE-21 | ⬜ | Commit, push, integrate, and deploy the frontend, backend, and deployment changes to staging using the documented maintenance rollout. | PostgreSQL, Redis, Meilisearch, backend API, `backend-worker`, and the single `backend-scheduler` become healthy using staging-only configuration. | Pending commit, push, staging integration, migration, and deployment. |
-| TOK-29-BE-22 | ⬜ | Drain legacy queue work, run the migration, start scheduler/worker, perform the controlled reindex, and inspect both delivery layers. | Outbox has no overdue pending/failed rows, the queue reports `[0] OK`, no unresolved worker failure remains, settings report `maxTotalHits: 10000` with final `id:asc`, and buyer search matches the additive `limit_reached` contract. | Pending staging deployment; follow `deploy-repo:/docs/deployment.md`. |
-| TOK-29-BE-23 | ⬜ | Stop Redis, update a product, and complete checkout; then restore Redis and observe recovery. | Mutations still succeed, outbox rows remain pending while Meilisearch is stale, scheduler publishes after Redis returns, worker converges the projection, rows become `published`, and both queue/failure lists are clear. | Pending staging end-to-end QA. Also verify company and Clerk seller events, container status, and worker/scheduler logs. |
+| TOK-29-BE-21 | ✅ | Commit, push, integrate, and deploy the frontend, backend, and deployment changes to staging using the documented maintenance rollout. | PostgreSQL, Redis, Meilisearch, backend API, `backend-worker`, and the single `backend-scheduler` become healthy using staging-only configuration. | Backend PR #99 and frontend PR #105 merged to `staging`. The manual Deploy Staging workflow succeeded after the shared Meilisearch health probe was corrected to use IPv4, and the Migrate Staging workflow completed successfully. Runtime inspection on August 25, 2026 showed PostgreSQL, Redis, Meilisearch, backend API, worker, scheduler, frontend, and proxy containers running; Redis and Meilisearch reported healthy. Production was not touched. |
+| TOK-29-BE-22 | ✅ | Drain legacy queue work, run the migration, start scheduler/worker, perform the controlled reindex, and inspect both delivery layers. | Outbox has no overdue pending/failed rows, the queue reports `[0] OK`, no unresolved worker failure remains, settings report `maxTotalHits: 10000` with final `id:asc`, and buyer search matches the additive `limit_reached` contract. | The staging migration and `buyer-search:reindex` completed on August 25, 2026. PostgreSQL and Meilisearch each contained four eligible products, the index reported `isIndexing: false`, `pagination.maxTotalHits=10000`, and final `id:asc`; outbox status was clear, `buyer-catalog-search` reported `[0] OK`, and `queue:failed` reported no failed jobs. Authenticated read-only requests with `per_page=1` returned distinct products on page 1 and page 2 with correct `has_more` transitions and `limit_reached: false`. |
+| TOK-29-BE-23 | ✅ | Stop Redis, update a product, and complete checkout; then restore Redis and observe recovery. | Mutations still succeed, outbox rows remain pending while Meilisearch is stale, scheduler publishes after Redis returns, worker converges the projection, rows become `published`, and both queue/failure lists are clear. | Controlled staging recovery QA passed on August 25, 2026. With Redis stopped, the seller updated `Boneka Annabelle` stock from 9 to 10 through the normal UI and received `200`; PostgreSQL committed stock 10, its outbox remained `pending`, and Meilisearch remained at stock 9. Redis recovery published the row after two attempts and converged Meilisearch to stock 10, after which the seller restored stock 9 and the healthy pipeline converged in one attempt. In a separate Redis outage, the buyer checked out one `Sepatu Sneaker` through Xendit sandbox and `POST /api/checkout/process` returned `200`. PostgreSQL atomically reduced stock from 7 to 6 and stored the pending invoice and transaction while Meilisearch remained at stock 7; the checkout outbox stayed `pending` after its unavailable-Redis publish attempt. After Redis restarted, the scheduler published the row on its second attempt, the worker completed the queued synchronization, and Meilisearch converged to stock 6. Final checks showed no pending or failed outbox rows, `[0] OK` on `buyer-catalog-search`, no failed jobs, and healthy Redis, worker, scheduler, and Meilisearch services. The sandbox invoice was intentionally left unpaid and production was not touched. |
+| TOK-29-BE-24 | ✅ | Stop Meilisearch while requesting the authenticated staging buyer catalog, then restore it. | The endpoint returns the safe `503` contract and the deployed catalog recovers without fallback, reindex, duplicate cards, or data loss. | Controlled staging failure-and-recovery QA passed on August 25, 2026. With only the staging Meilisearch container stopped, `/api/belanja` returned `503` with `BUYER_PRODUCT_SEARCH_UNAVAILABLE`, and the frontend displayed **Pencarian produk tidak tersedia** rather than a genuine empty state. Restarting the container restored healthy status and the next request returned `200` with the catalog. The index retained all four documents, outbox remained clear, the queue returned `[0] OK`, and no failed job appeared. Production was not touched. |
 
 ## Not Covered
 
@@ -94,9 +94,9 @@ php artisan test --compact tests/Integration/PostgresOutboxLockingTest.php
 - The opt-in PostgreSQL concurrency test exists but has not been executed
   against an isolated PostgreSQL testing database in this revision; SQLite
   skips it by design.
-- Real Docker scheduler/outbox recovery with Redis stopped remains pending for
-  staging. Automated tests cover its state machine without contacting
-  development services.
+- Staging Docker recovery with Redis stopped is verified for product update and
+  checkout flows. Staging company/Clerk seller-event verification remains
+  pending separately.
 - Meilisearch durability does not replace PostgreSQL backup verification; the
   index remains a rebuildable projection.
 - The matching frontend browser checklist is maintained at
