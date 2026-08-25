@@ -1,171 +1,118 @@
 # Buyer Belanja
 
-This document explains the current buyer belanja feature from the backend side.
+Buyer catalog search uses Meilisearch. PostgreSQL remains the source of truth
+for products, carts, checkout, and the rebuildable search projection.
 
-The goal is to keep a lightweight map of the API behavior and cart side effects so future work can understand the buyer shopping feature without reading every controller first.
-
-## Purpose
-
-The buyer belanja API lets an authenticated buyer browse products from other sellers and add available products to their cart.
-
-Current supported actions:
-
-- List products available for the buyer.
-- Search products by product name or store name.
-- Restrict the buyer catalog to active products with stock and a verified seller location.
-- Sort products by update date, price, or name.
-- Filter products by inclusive minimum and maximum price boundaries.
-- Filter products by when they were first added to the catalog.
-- Exclude products already loaded by the frontend.
-- Add a product to the buyer cart.
-- Increase cart quantity when the same product is added again.
-- Prevent adding beyond current product stock.
-
-## Main Files
-
-- `routes/api.php`
-  Defines the authenticated belanja and keranjang API routes.
-
-- `app/Http/Controllers/BelanjaController.php`
-  Handles buyer product list, purchasable-stock restriction, search, price and recently-added filtering, and sort behavior.
-
-- `app/Http/Controllers/KeranjangController.php`
-  Handles add-to-cart behavior used from the belanja page.
-
-- `app/Models/Product.php`
-  Source product data for belanja cards.
-
-- `app/Models/Keranjang.php`
-  Stores buyer cart rows.
-
-## Routes
-
-All current buyer belanja routes are inside the Clerk-authenticated API group.
+## API contract
 
 ```text
 GET  /api/belanja
 POST /api/keranjang
 ```
 
-`POST /api/keranjang` is shared with the cart feature, but it is the write endpoint used by the belanja page.
+`GET /api/belanja` accepts:
 
-## Request Behavior
+- `page`: page number, minimum `1`, default `1`.
+- `per_page`: cards per page, from `1` through `50`, default `24`.
+- `search_product`: product or displayed-store keyword.
+- `min_price` and `max_price`: inclusive Rupiah price limits.
+- `added_within`: `7`, `14`, `30`, or `90` days.
+- `sort_product`: `relevance`, `latest`, `oldest`, `price_lowest`,
+  `price_highest`, `name_asc`, or `name_desc`.
 
-### List Belanja Products
-
-`GET /api/belanja`
-
-Required query/body data:
-
-- `products_current_id`: JSON encoded array of product ids already loaded by the frontend.
-
-Optional data:
-
-- `search_product`: product or store search keyword.
-- `min_price`: minimum inclusive product price as a Rupiah whole number greater than or equal to zero.
-- `max_price`: maximum inclusive product price as a Rupiah whole number greater than or equal to zero and not lower than `min_price`.
-- `added_within`: recently-added period in days. Allowed values are `7`, `14`, `30`, and `90`.
-- `sort_product`: sorting option. Allowed values are `latest`, `oldest`, `price_highest`, `price_lowest`, `name_asc`, and `name_desc`.
-
-Behavior:
-
-- Derives the current user id from the authenticated request instead of client input.
-- Validates `products_current_id` as a JSON array, optional price boundaries as non-negative whole numbers, `added_within` against supported periods, and `sort_product` against allowed values when present.
-- Excludes products owned by the authenticated user.
-- Excludes ids from `products_current_id`.
-- Applies case-insensitive matching against product or store name with normalized `LOWER(...) LIKE` expressions.
-- Applies `products.price >= min_price` and `products.price <= max_price` when each optional boundary is present. Both boundaries are inclusive.
-- Applies `products.created_at >= now()->subDays(added_within)` when a recently-added period is present. This intentionally uses the creation date, not the last update date.
-- Always requires an active non-deleted product, `products.stock > 0`, and an active verified Pinpoint location for its seller.
-- Joins the seller account and company profile to return the store name for each card. The seller account name remains the fallback when the company profile has no usable name.
-- Orders by the selected sort option, defaulting to `products.updated_at DESC`.
-- Returns up to 200 products.
-
-This endpoint is used by the frontend for initial list loading, search, price and recently-added filtering, sorting, and infinite scroll. Both filters run in the backend query before sorting and the `200`-product limit; the response shape remains unchanged.
-
-### Add To Cart
-
-`POST /api/keranjang`
-
-Required body data:
-
-- `user_id_seller`: UUID of the seller whose product is added to the cart.
-- `user_id_buyer`: UUID.
-- `product_id`: UUID.
-
-Behavior:
-
-- Confirms that the submitted seller id owns the product.
-- Rejects soft-deleted, sold-out, and seller-location-unverified products with `409` and a machine-readable availability `code`.
-- Creates a new cart row with `checked = 0` and `total = 1` when the product is not already in the buyer cart.
-- If the same buyer already has the same seller/product in the cart, increments `total` by 1.
-- Before incrementing an existing cart row, checks current product stock.
-- Returns `422` with `stock_maximum` when cart total is already equal to or greater than product stock.
-
-## Response Shape
-
-Successful belanja list responses use this shape:
+A keyword without an explicit sort defaults to `relevance`; no keyword defaults
+to `latest`. Relevance does not send a Meilisearch sort expression, so native
+typo tolerance and ranking remain effective.
 
 ```json
 {
   "status": 200,
-  "products": []
+  "products": [],
+  "page": 1,
+  "per_page": 24,
+  "has_more": false,
+  "limit_reached": false
 }
 ```
 
-The belanja product rows are selected with aliases used by the frontend:
+`has_more` indicates whether an actual lookahead document exists. The additive
+`limit_reached` flag distinguishes normal exhaustion from reaching the
+configured 10,000-result browsing boundary. A boundary response returns
+`has_more: false` and `limit_reached: true`; it does not claim that PostgreSQL
+contains no other matching products.
 
-```json
-{
-  "p_id": "product uuid",
-  "p_img": "product-imgs/example.jpg",
-  "p_name": "Product Name",
-  "p_price": 25000,
-  "p_stock": 10,
-  "u_id": "seller uuid",
-  "u_name": "store name, or seller account name as fallback"
-}
+Each product card contains `p_id`, `p_img`, `p_name`, `p_price`, `p_stock`,
+`u_id`, and `u_name`. The old `products_current_id` request contract is removed.
+
+When Meilisearch is unavailable, the endpoint returns `503` with
+`BUYER_PRODUCT_SEARCH_UNAVAILABLE`. It intentionally does not fall back to a
+PostgreSQL `LIKE` query.
+
+## Search document and access rules
+
+`BuyerProductSearchService` owns the buyer document: product and seller IDs,
+product name, displayed store name, image, price, stock, timestamps, and
+computed purchasability. Store name prioritizes `companies.name` and falls back
+to `users.name`.
+
+Only active, in-stock products from sellers with a verified map location are
+indexed. Every search also excludes the requesting buyer's seller ID. Cart and
+checkout still revalidate PostgreSQL, preventing stale search results from being
+purchased.
+
+Index settings are Laravel-owned in `config/buyer_product_search.php`. They
+contain searchable, filterable, and sortable fields, ranking rules, a 10,000
+`maxTotalHits` boundary, and these synonym groups:
+
+```text
+hp ↔ handphone ↔ ponsel
+spt ↔ sepatu
+lptp ↔ laptop
+tv ↔ televisi
+powerbank ↔ power bank
+charger ↔ cas
+sneakers ↔ snikers
 ```
 
-Successful add-to-cart responses use this shape:
+Every explicit product sort uses `id:asc` as its final criterion. Relevance
+keeps native text ranking and uses the same ID rule only after all relevance
+rules tie. This gives offset pagination a deterministic order when products
+share a price, normalized name, or timestamp.
 
-```json
-{
-  "status": 200,
-  "message": "Item Has Been Added To Basket"
-}
+## Synchronization and operations
+
+Product creation, updates, availability changes, and soft deletion record an
+outbox message in the same PostgreSQL transaction. Laravel Scheduler publishes
+due messages to Redis, then `SyncBuyerProductSearchJob` loads current PostgreSQL
+state and upserts or removes the document. `WithoutOverlapping` serializes work
+for one product; terminal worker failures are stored in `failed_jobs` and
+logged.
+
+Store identity and seller-location updates record seller outbox messages that
+eventually run `SyncSellerBuyerCatalogSearchJob` to reproject the seller catalog.
+
+Configure and rebuild the index after Meilisearch is ready:
+
+```bash
+php artisan buyer-search:reindex
 ```
 
-Stock failures return `422` with `message.stock_maximum`.
+Run the dedicated worker:
 
-## Data Notes
+```bash
+php artisan queue:work redis --queue=buyer-catalog-search --sleep=1 --tries=3 --backoff=5 --timeout=60
+```
 
-- Product ids and user ids are UUIDs.
-- Product image paths are stored in the database and resolved by the frontend through the configured storage symlink/base URL.
-- Buyer belanja pagination uses `products_current_id` instead of page numbers.
-- Search normalizes both columns and keywords to lowercase so it remains case-insensitive and testable across supported database environments.
-- Buyer product availability is an API invariant rather than a frontend-selected filter.
-- Price filtering is independent from sorting. Invalid negative, non-integer, or inverted price ranges return `422` validation responses.
-- Recently-added filtering is independent from sorting and accepts only the fixed 7, 14, 30, and 90 day periods.
-- Sort options use direct `orderBy` clauses against product columns.
-- The primary route does not accept a user id; the authenticated token owner is the source of truth.
+Run `php artisan schedule:work` in another local terminal. Inspect publisher
+state with `php artisan outbox:status`; inspect worker failures with
+`php artisan queue:failed`. See
+[Transactional Outbox](../../architecture/outbox.md) for retry and recovery
+commands.
 
-## Known Decisions
+## Environment
 
-- Belanja APIs are authenticated with Clerk-backed API auth.
-- Buyer belanja intentionally excludes the current user's seller products.
-- Product list returns a maximum of 200 products per request.
-- Search covers both product name and the displayed store identity.
-- Buyer-facing seller identity prioritizes `companies.name` and falls back to `users.name` for legacy sellers without a populated company profile.
-- Buyer does not receive soft-deleted, sold-out, or unverified-seller products because none can be purchased.
-- Buyer and seller share the same update-date, price, and name sort contract; stock management remains a seller workflow.
-- Buyer catalog filtering accepts `min_price`, `max_price`, and `added_within`; it does not introduce stock, category, promotion, shipping, COD, rating, or store-type filters.
-- Add-to-cart revalidates all availability rules to handle changes after listing.
-- The backend docs file name matches the frontend docs file name so the same feature can be compared across both repositories.
-
-## QA Coverage
-
-- [TOK-30 Buyer Catalog Filters QA](../../qa/tok-30-buyer-catalog-filters.md)
-  tracks automated price and recently-added filter verification.
-- [TOK-17 Product List Filtering QA](../../qa/tok-17-product-list-filtering.md)
-  tracks backend product-list filtering verification.
+Local native development uses Homebrew Redis and Meilisearch with
+`QUEUE_CONNECTION=redis`, `REDIS_CLIENT=phpredis`, `MEILISEARCH_HOST`, and
+`MEILISEARCH_KEY`. Laravel binds the official Meilisearch PHP SDK directly;
+Scout is not used. Staging and production use internal Docker hostnames `redis`
+and `meilisearch` through `deploy/env/*/backend.env`.

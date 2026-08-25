@@ -349,7 +349,10 @@ Phase 1 has:
 - no scheduled cleanup;
 - no queue requirement.
 
-If a retention policy is introduced later, the backend command and deployment scheduler must be designed together. The current deployment does not run an application scheduler.
+If a retention policy is introduced later, its backend command and schedule
+must be designed together. The deployment scheduler currently runs only the
+documented transactional-outbox publication and cleanup tasks; it does not
+prune audit logs.
 
 ## Automated Verification
 

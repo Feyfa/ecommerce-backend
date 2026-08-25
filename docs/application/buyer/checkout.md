@@ -213,8 +213,9 @@ High-level behavior:
 14. Returns `409 CHECKOUT_CHANGED` with current data when a payable snapshot changed, or the relevant invalid-checkout code when it is no longer payable.
 15. Creates the supported Xendit virtual account only after the locked state matches the snapshot.
 16. Saves invoice and transaction records, deletes processed cart rows, and decrements stock atomically.
-17. If availability changed, rolls back the whole transaction and then unchecks affected cart rows in a separate update while preserving quantity.
-18. Releases the advisory lock and returns the final result.
+17. If availability changed during the transaction, rolls back the whole transaction and then unchecks affected cart rows in a separate update while preserving quantity.
+18. Records one buyer-catalog outbox message per unique product whose stock changed before committing the transaction.
+19. Releases the advisory lock and returns the final result.
 
 Successful response:
 
@@ -438,9 +439,18 @@ Successful checkout writes these records inside a database transaction:
 After transaction records are saved:
 
 - processed checkout rows are deleted from `keranjangs`;
-- product stock is decremented atomically with `where stock >= qty`.
+- product stock is decremented atomically with `where stock >= qty`;
+- each unique changed product records one outbox message in the same database
+  transaction;
+- Laravel Scheduler publishes committed messages to the `buyer-catalog-search` queue, so
+  Redis downtime does not lose synchronization intent or ask the buyer to
+  repeat an already persisted payment operation.
 
-If stock decrement fails, the database transaction throws and checkout returns an error.
+If stock decrement fails, the database transaction throws, checkout returns an
+error, and no buyer-catalog outbox message remains. Cart and checkout continue
+to trust PostgreSQL while the asynchronous search projection catches up. See
+[Buyer Belanja](belanja.md) for the projection contract and
+[Transactional Outbox](../../architecture/outbox.md) for recovery operations.
 
 ## Known Decisions
 

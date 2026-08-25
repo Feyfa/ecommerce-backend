@@ -6,6 +6,7 @@ use App\Exceptions\CheckoutAvailabilityException;
 use App\Exceptions\CheckoutChangedException;
 use App\Models\User;
 use App\Services\CheckoutService;
+use App\Services\OutboxRecorderService;
 use App\Services\PaymentService;
 use App\Services\XenditService;
 use Carbon\Carbon;
@@ -23,13 +24,13 @@ class CheckoutController extends Controller
      * @param  CheckoutService  $checkoutService  Layanan penyusunan checkout.
      * @param  XenditService  $xenditService  Layanan integrasi pembayaran Xendit.
      * @param  PaymentService  $paymentService  Layanan metode pembayaran.
-     *
-     * @return void  Tidak mengembalikan nilai; dependency disimpan pada instance.
+     * @param  OutboxRecorderService  $outboxRecorder  Recorder durable untuk perubahan stok katalog buyer.
      */
     public function __construct(
         protected CheckoutService $checkoutService,
         protected XenditService $xenditService,
         protected PaymentService $paymentService,
+        protected OutboxRecorderService $outboxRecorder,
     ) {}
 
     /**
@@ -39,7 +40,7 @@ class CheckoutController extends Controller
      * snapshot harga, kurir, catatan, dan metode pembayaran dari database. Snapshot dan checkout key
      * dikembalikan agar frontend dapat mendeteksi perubahan sebelum pembayaran.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function getDataCheckout(): JsonResponse
     {
@@ -131,9 +132,9 @@ class CheckoutController extends Controller
      *
      * @param  Request  $request  Data pembayaran dan snapshot checkout.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
-     *                       Respons sukses menyertakan id invoice yang dibuat agar frontend dapat menandai
-     *                       transaksi hasil checkout ini pada halaman transaksi buyer.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     *                      Respons sukses menyertakan id invoice yang dibuat agar frontend dapat menandai
+     *                      transaksi hasil checkout ini pada halaman transaksi buyer.
      */
     public function processCheckout(Request $request): JsonResponse
     {
@@ -325,11 +326,14 @@ class CheckoutController extends Controller
                     );
                 }
 
+                $this->recordCheckoutProductOutbox($checkoutSnapshot['data']['checkouts'] ?? []);
+
                 // Id invoice dikembalikan dari dalam transaksi database supaya frontend dapat menandai
                 // transaksi hasil checkout ini secara langsung, bukan menebak data terbaru buyer.
                 return $saveCheckoutToDatabase['transaction_invoice_id'] ?? '';
             });
             // --- step 7 - end - proses checkout secara atomik
+
         } catch (CheckoutAvailabilityException $e) {
             // Transaksi database sudah rollback pada titik ini, sehingga perubahan cart
             // disimpan terpisah dan tidak ikut dibatalkan bersama pesanan.
@@ -375,5 +379,39 @@ class CheckoutController extends Controller
             'message' => 'Pembayaran Berhasil',
             'transaction_invoice_id' => $transactionInvoiceId ?? '',
         ]);
+    }
+
+    /**
+     * Mencatat outbox Meilisearch untuk setiap produk yang stoknya berubah saat checkout.
+     *
+     * Method dipanggil di dalam transaksi checkout. ID produk dibuat unik agar beberapa baris
+     * checkout untuk produk yang sama tidak menghasilkan intent publikasi duplikat.
+     *
+     * @param  array<int, array<string, mixed>>  $checkouts  Kelompok checkout authoritative yang sudah diproses.
+     *
+     * @return void Setiap produk unik dicatat pada outbox transaksi aktif.
+     */
+    private function recordCheckoutProductOutbox(array $checkouts): void
+    {
+        // --- step 1 - start - kumpulkan ID produk checkout secara unik
+        $productIds = [];
+
+        foreach ($checkouts as $checkout) {
+            foreach (($checkout['keranjangs'] ?? []) as $keranjang) {
+                $productId = (string) ($keranjang['p_id'] ?? '');
+
+                if ($productId !== '') {
+                    $productIds[$productId] = true;
+                }
+            }
+        }
+        // --- step 1 - end - kumpulkan ID produk checkout secara unik
+
+        // --- step 2 - start - catat proyeksi terbaru bersama commit checkout
+        $this->outboxRecorder->recordProductSyncMany(
+            array_keys($productIds),
+            OutboxRecorderService::SOURCE_CHECKOUT_STOCK_CHANGED,
+        );
+        // --- step 2 - end - catat proyeksi terbaru bersama commit checkout
     }
 }

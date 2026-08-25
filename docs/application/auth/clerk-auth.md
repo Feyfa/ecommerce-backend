@@ -291,6 +291,17 @@ The backend should not treat all Clerk profile fields as mandatory sync targets.
 
 This avoids over-coupling the local application user model to Clerk profile behavior.
 
+When synchronization changes the local user name, the backend records a seller
+outbox message in the same user transaction. This keeps buyer-facing store
+labels current for sellers whose product documents fall back to `users.name`;
+a non-empty `companies.name` remains the preferred store label. Laravel
+Scheduler publishes the committed message to the dedicated
+`buyer-catalog-search` queue, and
+the seller job reprojects the catalog. If Redis is unavailable, Clerk sync
+remains successful and the pending message is retried automatically. See
+[Buyer Belanja](../buyer/belanja.md) for the document rule and
+[Transactional Outbox](../../architecture/outbox.md) for delivery recovery.
+
 ## Webhook Usage
 
 Webhook is still useful, but its role is limited and specific.
