@@ -64,9 +64,171 @@ Backend `.env`:
 ```env
 APP_URL=https://api.ecommerce.dev
 FRONTEND_URL=https://app.ecommerce.dev
+
+QUEUE_CONNECTION=redis
+QUEUE_FAILED_DRIVER=database-uuids
+REDIS_CLIENT=phpredis
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+REDIS_PASSWORD=null
+
+MEILISEARCH_HOST=http://127.0.0.1:7700
+MEILISEARCH_KEY=
+BUYER_PRODUCT_SEARCH_INDEX=buyer_products
+BUYER_PRODUCT_SEARCH_MAX_TOTAL_HITS=10000
 ```
 
-## Automated Test Database Safety
+Keep `MEILISEARCH_KEY` empty only when the local Meilisearch process also runs
+without a master key. If local Meilisearch is started with a master key, the
+same value must be present in the backend `.env`. Never reuse a staging or
+production key for local development.
+
+The backend uses the official Meilisearch PHP SDK directly. The connection is
+defined in `config/meilisearch.php`; no Scout driver or prefix is required.
+
+## Local Search Services
+
+Buyer catalog search requires Redis, Meilisearch, a dedicated Laravel queue
+worker, and Laravel Scheduler. PostgreSQL stores business data and durable
+outbox messages; the scheduler publishes due messages to Redis; the worker
+updates the rebuildable Meilisearch projection. PostgreSQL remains the source
+of truth.
+
+The backend uses the PhpRedis extension. Verify the CLI and the PHP runtime used
+by PHP-FPM both load it:
+
+```bash
+php -m | grep -i redis
+```
+
+If the CLI and PHP-FPM use different `php.ini` files, enable the extension in
+both environments before starting the worker.
+
+### macOS
+
+Install and run both services through Homebrew:
+
+```bash
+brew install redis meilisearch
+brew services start redis
+brew services start meilisearch
+```
+
+Verify the local endpoints:
+
+```bash
+redis-cli ping
+curl http://127.0.0.1:7700/health
+```
+
+The expected responses are `PONG` and a Meilisearch JSON response whose status
+is `available`.
+
+### Windows
+
+Redis Open Source does not provide a regular native Windows installation in its
+current official installation guide. For the native-development workflow, run
+Redis and Meilisearch inside WSL2 rather than installing an unofficial Windows
+Redis build. Install WSL2 from an Administrator PowerShell terminal if needed:
+
+```powershell
+wsl --install
+```
+
+Inside the installed Ubuntu distribution, follow the Linux installation below.
+Windows normally exposes services running inside WSL2 through `localhost`, so
+the Windows-hosted Laravel runtime can keep `REDIS_HOST=127.0.0.1` and
+`MEILISEARCH_HOST=http://127.0.0.1:7700`. If local forwarding has been disabled,
+restore WSL localhost forwarding instead of committing a machine-specific WSL
+IP address to project configuration.
+
+Enable a PHP Redis extension build compatible with the installed Windows PHP
+runtime, or use the extension manager provided by Laragon or Herd. Confirm it
+with `php -m` before running Laravel queue commands.
+
+### Linux (Ubuntu or Debian)
+
+Install Redis from its official APT repository:
+
+```bash
+sudo apt-get install lsb-release curl gpg
+curl -fsSL https://packages.redis.io/gpg | sudo gpg --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg
+sudo chmod 644 /usr/share/keyrings/redis-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/redis.list
+sudo apt-get update
+sudo apt-get install redis
+sudo systemctl enable --now redis-server
+```
+
+Install Meilisearch from its official APT repository:
+
+```bash
+echo "deb [trusted=yes] https://apt.fury.io/meilisearch/ /" | sudo tee /etc/apt/sources.list.d/fury.list
+sudo apt-get update
+sudo apt-get install meilisearch
+```
+
+Run Meilisearch in a dedicated development terminal:
+
+```bash
+meilisearch
+```
+
+Then verify `redis-cli ping` and `curl http://127.0.0.1:7700/health` as shown in
+the macOS section. Other Linux distributions should follow the current official
+Redis and Meilisearch installation guides instead of translating these APT
+commands without checking their package manager.
+
+Official installation references:
+
+- [Redis Open Source installation](https://redis.io/docs/latest/operate/oss_and_stack/install/install-stack/)
+- [Meilisearch local installation](https://www.meilisearch.com/docs/resources/self_hosting/getting_started/install_locally)
+- [Microsoft WSL installation](https://learn.microsoft.com/windows/wsl/install)
+- [Microsoft WSL networking](https://learn.microsoft.com/windows/wsl/networking)
+
+### Initialize And Run Buyer Search
+
+After PostgreSQL migrations are current and Redis and Meilisearch are healthy,
+start the dedicated worker from the backend repository in a separate terminal:
+
+```bash
+php artisan queue:work redis --queue=buyer-catalog-search --sleep=1 --tries=3 --backoff=5 --timeout=60
+```
+
+Start Laravel Scheduler in another terminal so committed outbox messages are
+published every minute:
+
+```bash
+php artisan schedule:work
+```
+
+For immediate local processing or troubleshooting, use:
+
+```bash
+php artisan outbox:status
+php artisan outbox:publish
+```
+
+Build the buyer catalog index on first setup, after index loss, or after changing
+Laravel-owned Meilisearch settings:
+
+```bash
+php artisan buyer-search:reindex
+```
+
+Keep the worker running until it processes all dispatched product jobs. Check
+for terminal failures before testing the buyer catalog:
+
+```bash
+php artisan queue:failed
+```
+
+Open the buyer shopping page only after the worker has populated the index. An
+empty index produces an empty catalog, while an unreachable Meilisearch process
+causes `/api/belanja` to return `503` with
+`BUYER_PRODUCT_SEARCH_UNAVAILABLE`.
+
+## Automated Test Resource Safety
 
 Local PHPUnit runs use an isolated SQLite in-memory database configured by `phpunit.xml`. They must never reuse the PostgreSQL development database from `.env`, because database-resetting traits such as `RefreshDatabase` recreate the active test schema.
 
@@ -77,13 +239,58 @@ Local PHPUnit runs use an isolated SQLite in-memory database configured by `phpu
 
 GitHub Actions remains configured to use the dedicated PostgreSQL database `ecommerce_testing`; explicit CI environment variables take precedence over the local SQLite defaults.
 
+The standard suite also keeps Redis and Meilisearch isolated:
+
+- queue jobs are faked by the base test case and use the `sync` connection;
+- cache uses the in-memory `array` store;
+- Redis fallbacks are limited to loopback databases `14` and `15` with the
+  `ecommerce_testing_` prefix;
+- Meilisearch is limited to loopback and the `buyer_products_testing` index.
+
+The application refuses to bootstrap in `testing` when queue or cache uses an
+external driver, Redis does not use the testing boundary, or Meilisearch points
+to a remote host or non-testing index. Standard tests mock the Meilisearch
+client and do not require Redis or Meilisearch to be running.
+
+The explicit test in
+`tests/Integration/MeilisearchBuyerProductSearchTest.php` uses a unique index
+derived from `buyer_products_testing` and removes it during teardown. Run it
+only when local Meilisearch is available:
+
+```bash
+php artisan test tests/Integration/MeilisearchBuyerProductSearchTest.php
+```
+
+The full-reindex integration test uses the same unique-index boundary plus the
+SQLite in-memory database and fake queue from the standard test environment.
+It processes the captured jobs only against its disposable index, so it never
+clears the development `buyer_products` index or publishes to development
+Redis:
+
+```bash
+php artisan test tests/Integration/BuyerProductReindexTest.php
+```
+
+The PostgreSQL locking integration test is opt-in because the standard suite
+uses SQLite. Point it only at a disposable PostgreSQL database whose name
+contains `test` or `testing`, then run:
+
+```bash
+php artisan test tests/Integration/PostgresOutboxLockingTest.php
+```
+
+It verifies that concurrent publishers use `FOR UPDATE SKIP LOCKED` to claim
+different outbox rows. It skips automatically when the active testing driver is
+not PostgreSQL.
+
 Run the local suite normally:
 
 ```bash
 php artisan test
 ```
 
-Do not disable the PHPUnit database settings or the bootstrap database guard to make a test run against the development database.
+Do not disable the PHPUnit resource settings or bootstrap guards to make a test
+run against development PostgreSQL, Redis, or Meilisearch data.
 
 ## macOS Setup
 

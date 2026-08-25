@@ -3,21 +3,28 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
+use App\Services\BuyerProductSearchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Throwable;
 
 class BelanjaController extends Controller
 {
     /**
+     * Menyiapkan controller dengan service pencarian katalog buyer.
+     *
+     * @param  BuyerProductSearchService  $buyerProductSearchService  Service yang menjalankan query Meilisearch.
+     */
+    public function __construct(protected BuyerProductSearchService $buyerProductSearchService) {}
+
+    /**
      * Mengambil katalog buyer yang hanya berisi produk dengan stok yang dapat dibeli.
      *
-     * Cursor, pencarian, rentang harga, terakhir ditambahkan, exclusion list, dan sorting divalidasi sebelum scope
-     * purchasable diterapkan.
-     * Query hanya mengembalikan produk aktif dengan stok serta lokasi seller valid dan menggunakan
-     * urutan stabil untuk pagination berikutnya.
+     * Keyword, filter, sorting, dan pagination bernomor divalidasi sebelum dikirim ke Meilisearch.
+     * Meilisearch hanya menyimpan proyeksi produk yang sudah dapat dibeli, sedangkan database tetap
+     * menjadi sumber kebenaran untuk operasi cart dan checkout.
      *
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      *
@@ -25,10 +32,11 @@ class BelanjaController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi cursor, pencarian, filter katalog, dan sorting
+        // --- step 1 - start - validasi pagination, pencarian, filter katalog, dan sorting
         $validator = Validator::make(
             [
-                'products_current_id' => $request->products_current_id,
+                'page' => $request->page,
+                'per_page' => $request->per_page,
                 'search_product' => $request->search_product,
                 'min_price' => $request->min_price,
                 'max_price' => $request->max_price,
@@ -36,20 +44,13 @@ class BelanjaController extends Controller
                 'sort_product' => $request->sort_product,
             ],
             [
-                'products_current_id' => [
-                    'required',
-                    'json',
-                    function ($attribute, $value, $fail) {
-                        if (! is_string($value) || ! is_array(json_decode($value, true))) {
-                            $fail("The {$attribute} field must be a JSON array.");
-                        }
-                    },
-                ],
-                'search_product' => ['nullable', 'string'],
+                'page' => ['nullable', 'integer', 'min:1'],
+                'per_page' => ['nullable', 'integer', 'min:1', 'max:'.config('buyer_product_search.max_per_page')],
+                'search_product' => ['nullable', 'string', 'max:255'],
                 'min_price' => ['nullable', 'integer', 'min:0'],
                 'max_price' => ['nullable', 'integer', 'min:0'],
                 'added_within' => ['nullable', Rule::in(Product::RECENTLY_ADDED_FILTER_OPTIONS)],
-                'sort_product' => ['nullable', Rule::in(Product::SORT_OPTIONS)],
+                'sort_product' => ['nullable', Rule::in([...Product::SORT_OPTIONS, 'relevance'])],
             ]
         );
 
@@ -67,52 +68,46 @@ class BelanjaController extends Controller
         }
 
         $validate = $validator->validate();
-        // --- step 1 - end - validasi cursor, pencarian, filter katalog, dan sorting
+        // --- step 1 - end - validasi pagination, pencarian, filter katalog, dan sorting
 
         // Identitas token menjadi satu-satunya sumber seller yang dikecualikan dari katalog buyer.
         $authenticatedUserId = $request->user()->id;
 
         // --- step 2 - start - siapkan parameter query katalog buyer
-        $products_current_id = json_decode($validate['products_current_id'], true);
+        $page = (int) ($validate['page'] ?? 1);
+        $perPage = (int) ($validate['per_page'] ?? config('buyer_product_search.per_page'));
         $search_product = trim($validate['search_product'] ?? '');
         $min_price = $validate['min_price'] ?? null;
         $max_price = $validate['max_price'] ?? null;
         $added_within = $validate['added_within'] ?? null;
-        $sort_product = $validate['sort_product'] ?? 'latest';
+        $sort_product = $validate['sort_product'] ?? ($search_product === '' ? 'latest' : 'relevance');
         // --- step 2 - end - siapkan parameter query katalog buyer
 
-        // --- step 3 - start - ambil produk seller lain yang masih dapat dibeli
-        $products = Product::select(
-            'products.id as p_id',
-            'products.img as p_img',
-            'products.name as p_name',
-            'products.price as p_price',
-            'products.stock as p_stock',
-            'users.id as u_id',
-            DB::raw("COALESCE(NULLIF(companies.name, ''), users.name) as u_name")
-        )
-            ->join('users', 'products.user_id_seller', '=', 'users.id')
-            ->leftJoin('companies', 'companies.user_id', '=', 'users.id')
-            ->where('products.user_id_seller', '<>', $authenticatedUserId)
-            ->whereNotIn('products.id', $products_current_id)
-            ->purchasable()
-            ->where(function ($query) use ($search_product) {
-                $searchPattern = '%'.mb_strtolower($search_product).'%';
+        // --- step 3 - start - jalankan query katalog melalui Meilisearch tanpa fallback PostgreSQL
+        try {
+            $result = $this->buyerProductSearchService->search(
+                (string) $authenticatedUserId,
+                [
+                    'search_product' => $search_product,
+                    'min_price' => $min_price,
+                    'max_price' => $max_price,
+                    'added_within' => $added_within,
+                    'sort_product' => $sort_product,
+                ],
+                $page,
+                $perPage,
+            );
+        } catch (Throwable $exception) {
+            report($exception);
 
-                $query->whereRaw('LOWER(products.name) LIKE ?', [$searchPattern])
-                    ->orWhereRaw("LOWER(COALESCE(NULLIF(companies.name, ''), users.name)) LIKE ?", [$searchPattern]);
-            })
-            ->when($min_price !== null, fn ($query) => $query->where('products.price', '>=', $min_price))
-            ->when($max_price !== null, fn ($query) => $query->where('products.price', '<=', $max_price))
-            ->when(
-                $added_within !== null,
-                fn ($query) => $query->where('products.created_at', '>=', now()->subDays((int) $added_within))
-            )
-            ->withProductSort($sort_product);
+            return response()->json([
+                'status' => 503,
+                'code' => 'BUYER_PRODUCT_SEARCH_UNAVAILABLE',
+                'message' => 'Pencarian produk sedang tidak tersedia. Silakan coba lagi beberapa saat lagi.',
+            ], 503);
+        }
+        // --- step 3 - end - jalankan query katalog melalui Meilisearch tanpa fallback PostgreSQL
 
-        $products = $products->limit(200)->get();
-        // --- step 3 - end - ambil produk seller lain yang masih dapat dibeli
-
-        return response()->json(['status' => 200, 'products' => $products], 200);
+        return response()->json(['status' => 200, ...$result], 200);
     }
 }

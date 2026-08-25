@@ -12,17 +12,25 @@ class Kernel extends ConsoleKernel
      *
      * @param  Schedule  $schedule  Scheduler Laravel yang menerima pendaftaran command.
      *
-     * @return void  Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
+     * @return void Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
      */
     protected function schedule(Schedule $schedule): void
     {
-        // $schedule->command('inspire')->hourly();
+        $schedule
+            ->command('outbox:publish')
+            ->everyMinute()
+            ->withoutOverlapping(10);
+
+        $schedule
+            ->command('outbox:prune --days=7')
+            ->dailyAt('02:00')
+            ->withoutOverlapping(60);
     }
 
     /**
      * Memuat command dari direktori console dan mendaftarkan route command tambahan.
      *
-     * @return void  Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
+     * @return void Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
      */
     protected function commands(): void
     {

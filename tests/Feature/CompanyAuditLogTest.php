@@ -3,13 +3,19 @@
 namespace Tests\Feature;
 
 use App\Enums\AuditEvent;
+use App\Enums\OutboxAggregateType;
+use App\Enums\OutboxEventType;
+use App\Enums\OutboxStatus;
 use App\Models\AuditLog;
 use App\Models\Company;
+use App\Models\OutboxMessage;
 use App\Models\User;
 use App\Services\AuditLogService;
+use App\Services\OutboxRecorderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Mockery\MockInterface;
 use RuntimeException;
@@ -60,6 +66,17 @@ class CompanyAuditLogTest extends TestCase
         ]))->assertOk();
 
         $audit = AuditLog::query()->sole();
+
+        $outbox = OutboxMessage::query()->sole();
+        $this->assertSame(OutboxEventType::BUYER_CATALOG_SELLER_SYNC->value, $outbox->event_type);
+        $this->assertSame(OutboxAggregateType::SELLER->value, $outbox->aggregate_type);
+        $this->assertSame($this->user->id, $outbox->aggregate_id);
+        $this->assertSame(OutboxStatus::PENDING, $outbox->status);
+        $this->assertSame([
+            'schema_version' => 1,
+            'source' => OutboxRecorderService::SOURCE_COMPANY_UPDATED,
+        ], $outbox->payload);
+        Queue::assertNothingPushed();
 
         $this->assertSame(AuditEvent::COMPANY_UPDATED, $audit->event);
         $this->assertSame('company', $audit->category);
@@ -146,6 +163,8 @@ class CompanyAuditLogTest extends TestCase
         ])->assertUnprocessable();
 
         $this->assertDatabaseCount('audit_logs', 0);
+        $this->assertDatabaseCount('outbox_messages', 0);
+        Queue::assertNothingPushed();
     }
 
     /**
@@ -189,6 +208,8 @@ class CompanyAuditLogTest extends TestCase
         $this->assertSame('Toko Awal', $company->name);
         $this->assertSame('08120000133', $company->phone);
         $this->assertDatabaseCount('audit_logs', 0);
+        $this->assertDatabaseCount('outbox_messages', 0);
+        Queue::assertNothingPushed();
     }
 
     /**
@@ -226,7 +247,7 @@ class CompanyAuditLogTest extends TestCase
     /**
      * Membentuk payload Profil Toko yang valid untuk endpoint update.
      *
-     * @param  array<string, mixed>  $overrides Nilai yang menimpa payload dasar.
+     * @param  array<string, mixed>  $overrides  Nilai yang menimpa payload dasar.
      *
      * @return array<string, mixed> Payload untuk endpoint update profil toko.
      */

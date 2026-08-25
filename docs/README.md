@@ -29,6 +29,21 @@ alias path as inline code for a file owned by another repository.
 - [Local Native Development](setup/local-native-development.md)
   Explains how to run the frontend and backend locally without Docker by using local HTTPS domains and native app runtimes.
 
+- [Redis](architecture/redis.md)
+  Documents the Redis runtime role, local configuration, and deployment boundary.
+
+- [Laravel Queue](architecture/queue.md)
+  Documents buyer-search worker operation, retries, failed jobs, and recovery.
+
+- [Transactional Outbox](architecture/outbox.md)
+  Documents durable PostgreSQL-to-Redis delivery, message lifecycle, locking, retry, retention, and recovery.
+
+- [Laravel Scheduler](architecture/scheduler.md)
+  Documents recurring commands, local operation, and the dedicated Docker scheduler process.
+
+- [Meilisearch](architecture/meilisearch.md)
+  Documents Laravel-owned buyer search settings, index rebuilding, and availability behavior.
+
 - [Clerk Authentication](application/auth/clerk-auth.md)
   Documents the backend Clerk migration direction, local user bridge, request verification flow, dashboard setup decisions, and post-migration cleanup rules.
 
@@ -80,6 +95,24 @@ alias path as inline code for a file owned by another repository.
 - [TOK-21 Address Audit Log QA](qa/tok-21-address-audit-log.md)
   Tracks automated backend verification for buyer address audit persistence, personal-data masking, rollback, and ownership.
 
+- [TOK-22 Profile Audit Log QA](qa/tok-22-profile-audit-log.md)
+  Tracks profile change, image, masking, ownership, and rollback audit verification.
+
+- [TOK-23 Company Audit Log QA](qa/tok-23-company-audit-log.md)
+  Tracks company profile, location, image, masking, ownership, and rollback audit verification.
+
+- [TOK-24 Checkout Transaction Identity QA](qa/tok-24-checkout-transaction-redirect.md)
+  Tracks the checkout invoice identifier returned for frontend transaction highlighting.
+
+- [TOK-25 Pending Invoice Grouping QA](qa/tok-25-pending-invoice-grouping.md)
+  Tracks pending buyer invoice grouping across one or more seller transactions.
+
+- [TOK-29 Buyer Catalog Search QA](qa/tok-29-buyer-catalog-search.md)
+  Tracks Meilisearch contracts, Redis synchronization, testing isolation, recovery, and pending end-to-end buyer-catalog verification.
+
+- [TOK-30 Buyer Catalog Filters QA](qa/tok-30-buyer-catalog-filters.md)
+  Preserves historical backend evidence for the original price and recently-added buyer filters.
+
 - [Commit Guidelines](development/commit-guidelines.md)
   Explains how to keep commits focused on one purpose and separate unrelated changes.
 
@@ -106,6 +139,11 @@ docs/
 
   architecture/
     database.md
+    redis.md
+    queue.md
+    outbox.md
+    scheduler.md
+    meilisearch.md
 
   application/
     auth/
@@ -138,6 +176,13 @@ docs/
     tok-8-pinpoint-address.md
     tok-16-product-audit-log.md
     tok-17-product-list-filtering.md
+    tok-21-address-audit-log.md
+    tok-22-profile-audit-log.md
+    tok-23-company-audit-log.md
+    tok-24-checkout-transaction-redirect.md
+    tok-25-pending-invoice-grouping.md
+    tok-29-buyer-catalog-search.md
+    tok-30-buyer-catalog-filters.md
 
   development/
     commit-guidelines.md

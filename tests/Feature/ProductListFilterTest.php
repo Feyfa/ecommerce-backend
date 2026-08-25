@@ -6,8 +6,10 @@ use App\Models\Alamat;
 use App\Models\Company;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\BuyerProductSearchService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 class ProductListFilterTest extends TestCase
@@ -28,6 +30,16 @@ class ProductListFilterTest extends TestCase
         $this->withoutMiddleware();
         $this->user = User::factory()->create();
         $this->actingAs($this->user);
+
+        $this->mock(BuyerProductSearchService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('search')
+                ->andReturnUsing(fn (string $buyerId, array $filters, int $page, int $perPage): array => $this->fakeBuyerSearch(
+                    $buyerId,
+                    $filters,
+                    $page,
+                    $perPage,
+                ));
+        });
     }
 
     /**
@@ -53,7 +65,8 @@ class ProductListFilterTest extends TestCase
 
         $response->assertOk()
             ->assertJsonCount(1, 'products')
-            ->assertJsonPath('products.0.p_id', $available->id);
+            ->assertJsonPath('products.0.p_id', $available->id)
+            ->assertJsonPath('limit_reached', false);
     }
 
     /**
@@ -118,11 +131,10 @@ class ProductListFilterTest extends TestCase
         $this->getJson($this->buyerUrl([
             'search_product' => 'target',
             'sort_product' => 'price_highest',
-            'products_current_id' => json_encode([$excluded->id]),
         ]))
             ->assertOk()
-            ->assertJsonCount(1, 'products')
-            ->assertJsonPath('products.0.p_id', $remaining->id);
+            ->assertJsonCount(2, 'products')
+            ->assertJsonPath('products.0.p_id', $excluded->id);
 
         $this->getJson($this->buyerUrl(['search_product' => 'TOKO PILIHAN']))
             ->assertOk()
@@ -229,10 +241,9 @@ class ProductListFilterTest extends TestCase
             'max_price' => 20000,
             'added_within' => '7',
             'sort_product' => 'price_highest',
-            'products_current_id' => json_encode([$excluded->id]),
         ]))
             ->assertOk()
-            ->assertJsonCount(1, 'products')
+            ->assertJsonCount(2, 'products')
             ->assertJsonPath('products.0.p_id', $remaining->id);
     }
 
@@ -397,25 +408,21 @@ class ProductListFilterTest extends TestCase
     }
 
     /**
-     * Memverifikasi aturan filter dan pengurutan katalog produk pada skenario buyer rejects a
-     * malformed product cursor.
-     *
-     * Test menyiapkan kombinasi produk dan seller, memanggil endpoint list dengan filter tertentu,
-     * lalu memastikan urutan, scope ownership, dan hasil pagination sesuai kontrak.
+     * Memastikan endpoint buyer menolak nomor halaman dan ukuran halaman di luar batas kontrak.
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; validation error diverifikasi melalui assertion.
      */
-    public function buyer_rejects_a_malformed_product_cursor(): void
+    public function buyer_rejects_an_invalid_page_contract(): void
     {
-        $this->getJson($this->buyerUrl(['products_current_id' => 'invalid']))
+        $this->getJson($this->buyerUrl(['page' => 0]))
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['products_current_id'], 'message');
+            ->assertJsonValidationErrors(['page'], 'message');
 
-        $this->getJson($this->buyerUrl(['products_current_id' => json_encode('not-an-array')]))
+        $this->getJson($this->buyerUrl(['per_page' => 51]))
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['products_current_id'], 'message');
+            ->assertJsonValidationErrors(['per_page'], 'message');
     }
 
     /**
@@ -517,9 +524,78 @@ class ProductListFilterTest extends TestCase
     private function buyerUrl(array $parameters = []): string
     {
         return '/api/belanja?'.http_build_query([
-            'products_current_id' => json_encode([]),
+            'page' => 1,
+            'per_page' => 24,
             ...$parameters,
         ]);
+    }
+
+    /**
+     * Menirukan hasil index buyer untuk feature test tanpa menambahkan fallback database ke aplikasi.
+     *
+     * Test double ini hanya menggantikan boundary Meilisearch yang tidak tersedia pada test SQLite.
+     * Aturan select dijaga sama dengan dokumen publik agar test endpoint tetap menguji ownership,
+     * ketersediaan, filter, sort, dan metadata pagination secara deterministik.
+     *
+     * @param  string  $buyerId  ID buyer yang produk miliknya dikecualikan.
+     * @param  array<string, int|string|null>  $filters  Parameter katalog tervalidasi dari controller.
+     * @param  int  $page  Nomor halaman yang diminta.
+     * @param  int  $perPage  Jumlah hasil maksimum per halaman.
+     *
+     * @return array{products: array<int, array<string, mixed>>, page: int, per_page: int, has_more: bool, limit_reached: bool} Halaman fake beserta metadata pagination yang mengikuti kontrak endpoint.
+     */
+    private function fakeBuyerSearch(string $buyerId, array $filters, int $page, int $perPage): array
+    {
+        $keyword = mb_strtolower(trim((string) ($filters['search_product'] ?? '')));
+        $sortProduct = (string) ($filters['sort_product'] ?? 'latest');
+        $query = Product::select(
+            'products.id as p_id',
+            'products.img as p_img',
+            'products.name as p_name',
+            'products.price as p_price',
+            'products.stock as p_stock',
+            'users.id as u_id',
+            DB::raw("COALESCE(NULLIF(companies.name, ''), users.name) as u_name")
+        )
+            ->join('users', 'products.user_id_seller', '=', 'users.id')
+            ->leftJoin('companies', 'companies.user_id', '=', 'users.id')
+            ->where('products.user_id_seller', '<>', $buyerId)
+            ->purchasable()
+            ->when($keyword !== '', function ($query) use ($keyword): void {
+                $searchPattern = '%'.$keyword.'%';
+                $query->where(function ($searchQuery) use ($searchPattern): void {
+                    $searchQuery->whereRaw('LOWER(products.name) LIKE ?', [$searchPattern])
+                        ->orWhereRaw("LOWER(COALESCE(NULLIF(companies.name, ''), users.name)) LIKE ?", [$searchPattern]);
+                });
+            })
+            ->when($filters['min_price'] !== null, fn ($query) => $query->where('products.price', '>=', $filters['min_price']))
+            ->when($filters['max_price'] !== null, fn ($query) => $query->where('products.price', '<=', $filters['max_price']))
+            ->when(
+                $filters['added_within'] !== null,
+                fn ($query) => $query->where('products.created_at', '>=', now()->subDays((int) $filters['added_within']))
+            );
+
+        if ($sortProduct !== 'relevance') {
+            $query->withProductSort($sortProduct);
+        } else {
+            $query->withProductSort('latest');
+        }
+
+        $total = (clone $query)->count();
+        $products = $query
+            ->offset(($page - 1) * $perPage)
+            ->limit($perPage)
+            ->get()
+            ->map(static fn (Product $product): array => $product->getAttributes())
+            ->all();
+
+        return [
+            'products' => $products,
+            'page' => $page,
+            'per_page' => $perPage,
+            'has_more' => ($page * $perPage) < $total,
+            'limit_reached' => false,
+        ];
     }
 
     /**

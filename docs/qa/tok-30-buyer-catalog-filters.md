@@ -2,9 +2,22 @@
 
 ## Purpose
 
-This document is the canonical backend QA record for TOK-30 buyer catalog
-filters. It verifies that price boundaries and recently-added periods are
-validated and applied to the same query before sort and the 200-product limit.
+This document preserves the backend QA evidence recorded for TOK-30 buyer
+catalog filters on August 11, 2026, at commit
+`eab494bc8a8fd349a876f8ee24065334fca9cc32`. It verifies the price and
+recently-added filter contract that existed at that point in the implementation.
+
+## Historical Scope
+
+This is a historical QA record, not the source of truth for the current buyer
+catalog contract. The recorded implementation used the former 200-product and
+already-loaded-product exclusion behavior. Buyer catalog pagination has since
+moved to Meilisearch with `page`, `per_page`, and `has_more`.
+
+Keep the evidence below unchanged when the current implementation evolves.
+Refer to [Buyer Belanja](../application/buyer/belanja.md) for the active API
+contract and [Meilisearch](../architecture/meilisearch.md) for current search
+architecture and verification instructions.
 
 ## Automated Verification
 

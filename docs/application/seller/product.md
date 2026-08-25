@@ -169,7 +169,31 @@ Behavior:
 - Validates `user_id_seller` and `id` as UUID.
 - Soft-deletes the product row by filling `products.deleted_at`.
 - Preserves cart rows, image records, and stored image files for buyer status display and transaction history.
-- The product immediately disappears from the buyer catalog and cannot be added to cart or checked out.
+- The product becomes unavailable to cart and checkout immediately because those
+  operations revalidate PostgreSQL. Its derived buyer-catalog document is
+  removed after the queued search synchronization completes.
+
+### Buyer Catalog Synchronization
+
+Successful create, update, and soft-delete operations record
+`buyer_catalog.product.sync` in the same transaction as the product change.
+Laravel Scheduler publishes the message to Redis after commit. The resulting
+job reloads the latest product state and either upserts or removes its
+Meilisearch document, so retries converge on PostgreSQL rather than an old
+request payload.
+
+The HTTP response does not wait for Meilisearch. Keep the dedicated
+`buyer-catalog-search`
+queue worker running, and use the full reindex command for initial setup or
+recovery. See [Buyer Belanja](../buyer/belanja.md) for the active search
+contract and [Laravel Queue](../../architecture/queue.md) for worker and failed
+job operations.
+
+If Redis is unavailable, the committed outbox row remains pending and the
+publisher retries it automatically. The product response remains successful,
+and the Meilisearch projection can be temporarily stale without losing the
+synchronization intent. See
+[Transactional Outbox](../../architecture/outbox.md) for status and recovery.
 
 ## Response Shape
 

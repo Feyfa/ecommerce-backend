@@ -3,14 +3,20 @@
 namespace Tests\Feature;
 
 use App\Enums\AuditEvent;
+use App\Enums\OutboxAggregateType;
+use App\Enums\OutboxEventType;
+use App\Enums\OutboxStatus;
 use App\Models\Alamat;
 use App\Models\AuditLog;
+use App\Models\OutboxMessage;
 use App\Models\Product;
 use App\Models\User;
 use App\Services\AuditLogService;
+use App\Services\OutboxRecorderService;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
@@ -30,7 +36,7 @@ class ProductAuditLogTest extends TestCase
     /**
      * Menyiapkan fixture dan dependency sebelum setiap pengujian.
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     protected function setUp(): void
     {
@@ -52,7 +58,7 @@ class ProductAuditLogTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function successful_create_records_an_owner_scoped_product_snapshot(): void
     {
@@ -61,6 +67,9 @@ class ProductAuditLogTest extends TestCase
         $response->assertOk();
         $product = Product::with('images')->sole();
         $audit = AuditLog::query()->sole();
+
+        $this->assertProductOutbox($product->id, OutboxRecorderService::SOURCE_PRODUCT_CREATED);
+        Queue::assertNothingPushed();
 
         $this->assertSame(AuditEvent::PRODUCT_CREATED, $audit->event);
         $this->assertSame($this->seller->id, $audit->actor_user_id);
@@ -89,7 +98,7 @@ class ProductAuditLogTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function update_records_only_real_value_changes_and_image_metadata(): void
     {
@@ -106,6 +115,9 @@ class ProductAuditLogTest extends TestCase
         ])->assertOk();
 
         $audit = AuditLog::query()->sole();
+
+        $this->assertProductOutbox($product->id, OutboxRecorderService::SOURCE_PRODUCT_UPDATED);
+        Queue::assertNothingPushed();
 
         $this->assertSame(AuditEvent::PRODUCT_UPDATED, $audit->event);
 
@@ -162,7 +174,7 @@ class ProductAuditLogTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function identical_update_is_recorded_without_false_changes(): void
     {
@@ -194,13 +206,16 @@ class ProductAuditLogTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function delete_keeps_the_last_snapshot_after_the_product_is_gone(): void
     {
         $product = $this->productWithImages(2);
 
         $this->delete("/api/product/{$this->seller->id}/{$product->id}")->assertOk();
+
+        $this->assertProductOutbox($product->id, OutboxRecorderService::SOURCE_PRODUCT_DELETED);
+        Queue::assertNothingPushed();
 
         $this->assertSoftDeleted('products', ['id' => $product->id]);
         $audit = AuditLog::query()->sole();
@@ -226,7 +241,7 @@ class ProductAuditLogTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function changing_the_product_event_filter_after_pagination_starts_a_fresh_collection(): void
     {
@@ -296,7 +311,7 @@ class ProductAuditLogTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function failed_validation_and_foreign_product_writes_do_not_create_audit_rows(): void
     {
@@ -355,6 +370,8 @@ class ProductAuditLogTest extends TestCase
         ]);
         Storage::disk('public')->assertExists('product-imgs/other-seller.jpg');
         $this->assertDatabaseCount('audit_logs', 0);
+        $this->assertDatabaseCount('outbox_messages', 0);
+        Queue::assertNothingPushed();
         // --- step 4 - end - verify ownership data and audit history remain unchanged
     }
 
@@ -367,7 +384,7 @@ class ProductAuditLogTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function failed_update_and_missing_product_do_not_mutate_data_or_create_audit_rows(): void
     {
@@ -401,6 +418,8 @@ class ProductAuditLogTest extends TestCase
 
         // Failed requests do not represent successful domain operations and must not be audited.
         $this->assertDatabaseCount('audit_logs', 0);
+        $this->assertDatabaseCount('outbox_messages', 0);
+        Queue::assertNothingPushed();
     }
 
     /**
@@ -412,7 +431,7 @@ class ProductAuditLogTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function audit_failure_rolls_back_product_database_and_uploaded_files(): void
     {
@@ -426,7 +445,9 @@ class ProductAuditLogTest extends TestCase
 
         $this->assertDatabaseCount('products', 0);
         $this->assertDatabaseCount('product_images', 0);
+        $this->assertDatabaseCount('outbox_messages', 0);
         $this->assertSame([], Storage::disk('public')->allFiles('product-imgs'));
+        Queue::assertNothingPushed();
     }
 
     /**
@@ -438,7 +459,7 @@ class ProductAuditLogTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function audit_failure_rolls_back_update_and_preserves_the_previous_images(): void
     {
@@ -464,7 +485,9 @@ class ProductAuditLogTest extends TestCase
         $this->assertSame('Produk Audit', $product->name);
         $this->assertSame(12500, (int) $product->price);
         $this->assertSame($beforeImageIds, $product->images->pluck('id')->all());
+        $this->assertDatabaseCount('outbox_messages', 0);
         $this->assertCount(2, Storage::disk('public')->allFiles('product-imgs'));
+        Queue::assertNothingPushed();
     }
 
     /**
@@ -476,7 +499,7 @@ class ProductAuditLogTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function audit_failure_rolls_back_delete_and_keeps_product_files(): void
     {
@@ -497,15 +520,39 @@ class ProductAuditLogTest extends TestCase
 
         $this->assertDatabaseHas('products', ['id' => $product->id]);
         $this->assertDatabaseCount('product_images', 2);
+        $this->assertDatabaseCount('outbox_messages', 0);
         Storage::disk('public')->assertExists('product-imgs/product-0.jpg');
         Storage::disk('public')->assertExists('product-imgs/product-1.jpg');
+        Queue::assertNothingPushed();
+    }
+
+    /**
+     * Memastikan satu mutasi produk mencatat intent sinkronisasi yang tepat tanpa direct queue dispatch.
+     *
+     * @param  string  $productId  ID produk yang menjadi aggregate outbox.
+     * @param  string  $source  Sumber mutasi yang harus tersimpan di payload versi pertama.
+     *
+     * @return void Kontrak outbox diverifikasi melalui assertion model.
+     */
+    private function assertProductOutbox(string $productId, string $source): void
+    {
+        $message = OutboxMessage::query()->sole();
+
+        $this->assertSame(OutboxEventType::BUYER_CATALOG_PRODUCT_SYNC->value, $message->event_type);
+        $this->assertSame(OutboxAggregateType::PRODUCT->value, $message->aggregate_type);
+        $this->assertSame($productId, $message->aggregate_id);
+        $this->assertSame(OutboxStatus::PENDING, $message->status);
+        $this->assertSame([
+            'schema_version' => 1,
+            'source' => $source,
+        ], $message->payload);
     }
 
     /**
      * Menyusun payload create produk yang valid beserta satu gambar dan manifest urutannya. Nilai
      * default dibuat deterministik agar snapshot audit dapat dibandingkan secara ketat.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function createPayload(): array
     {
@@ -525,7 +572,7 @@ class ProductAuditLogTest extends TestCase
      *
      * @param  int  $imageCount  Jumlah gambar yang harus dibuat pada fixture produk.
      *
-     * @return Product  Model produk yang dibuat atau digunakan sebagai fixture.
+     * @return Product Model produk yang dibuat atau digunakan sebagai fixture.
      */
     private function productWithImages(int $imageCount = 2): Product
     {
@@ -552,7 +599,7 @@ class ProductAuditLogTest extends TestCase
      *
      * @param  User  $seller  Model user seller yang menjadi actor atau fixture.
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     private function createVerifiedSellerAddress(User $seller): void
     {
@@ -578,7 +625,7 @@ class ProductAuditLogTest extends TestCase
      * @param  CarbonImmutable  $occurredAt  Waktu event yang digunakan untuk menyusun fixture timeline.
      * @param  string  $sequence  Nomor urut untuk menghasilkan fixture deterministik.
      *
-     * @return AuditLog  Model audit log yang berhasil ditemukan atau dicatat.
+     * @return AuditLog Model audit log yang berhasil ditemukan atau dicatat.
      */
     private function createProductAudit(
         AuditEvent $event,

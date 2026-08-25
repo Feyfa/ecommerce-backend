@@ -2,18 +2,24 @@
 
 namespace Tests\Feature;
 
+use App\Enums\OutboxAggregateType;
+use App\Enums\OutboxEventType;
+use App\Enums\OutboxStatus;
 use App\Exceptions\CheckoutChangedException;
 use App\Models\Alamat;
 use App\Models\Company;
 use App\Models\Keranjang;
+use App\Models\OutboxMessage;
 use App\Models\PaymentList;
 use App\Models\Product;
 use App\Models\TransactionInvoice;
 use App\Models\User;
 use App\Services\CheckoutService;
+use App\Services\OutboxRecorderService;
 use App\Services\PaymentService;
 use App\Services\XenditService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Mockery\MockInterface;
 use Tests\TestCase;
 
@@ -423,7 +429,8 @@ class CheckoutTest extends TestCase
      * Test menyiapkan buyer, alamat seller terverifikasi, cart, serta metode pembayaran, memalsukan
      * pembuatan virtual account, lalu memastikan response sukses membawa id invoice yang benar benar
      * tersimpan. Id tersebut adalah kontrak yang dipakai frontend untuk menandai transaksi hasil
-     * checkout, sehingga menebak data terbaru buyer tidak lagi diperlukan.
+     * checkout, sedangkan produk yang stoknya berubah harus dijadwalkan untuk disinkronkan ke
+     * Meilisearch setelah transaksi berhasil.
      *
      * @test
      *
@@ -496,6 +503,19 @@ class CheckoutTest extends TestCase
 
         $response->assertJsonPath('transaction_invoice_id', $invoice->id);
         // --- step 4 - end - pastikan id invoice pada response cocok dengan baris yang tersimpan
+
+        // --- step 5 - start - pastikan stok terbaru dicatat durable bersama checkout
+        $outbox = OutboxMessage::query()->sole();
+        $this->assertSame(OutboxEventType::BUYER_CATALOG_PRODUCT_SYNC->value, $outbox->event_type);
+        $this->assertSame(OutboxAggregateType::PRODUCT->value, $outbox->aggregate_type);
+        $this->assertSame($fixture['product']->id, $outbox->aggregate_id);
+        $this->assertSame(OutboxStatus::PENDING, $outbox->status);
+        $this->assertSame([
+            'schema_version' => 1,
+            'source' => OutboxRecorderService::SOURCE_CHECKOUT_STOCK_CHANGED,
+        ], $outbox->payload);
+        Queue::assertNothingPushed();
+        // --- step 5 - end - pastikan stok terbaru dicatat durable bersama checkout
     }
 
     /**

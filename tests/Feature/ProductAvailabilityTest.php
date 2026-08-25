@@ -7,11 +7,13 @@ use App\Models\Company;
 use App\Models\Keranjang;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\BuyerProductSearchService;
 use App\Services\KeranjangService;
 use App\Services\ProductAvailabilityService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 class ProductAvailabilityTest extends TestCase
@@ -81,9 +83,29 @@ class ProductAvailabilityTest extends TestCase
         $this->createProduct($unverifiedSeller, 'Tanpa Lokasi', 3);
         $deleted->delete();
 
+        $this->mock(BuyerProductSearchService::class, function (MockInterface $mock) use ($available, $verifiedSeller): void {
+            $mock->shouldReceive('search')
+                ->once()
+                ->andReturn([
+                    'products' => [[
+                        'p_id' => $available->id,
+                        'p_img' => $available->img,
+                        'p_name' => $available->name,
+                        'p_price' => $available->price,
+                        'p_stock' => $available->stock,
+                        'u_id' => $verifiedSeller->id,
+                        'u_name' => $verifiedSeller->name,
+                    ]],
+                    'page' => 1,
+                    'per_page' => 24,
+                    'has_more' => false,
+                ]);
+        });
+
         $this->actingAs($buyer)
             ->getJson('/api/belanja?'.http_build_query([
-                'products_current_id' => json_encode([]),
+                'page' => 1,
+                'per_page' => 24,
             ]))
             ->assertOk()
             ->assertJsonCount(1, 'products')

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Product;
 use App\Models\ProductImage;
 use App\Services\AuditLogService;
+use App\Services\OutboxRecorderService;
 use App\Services\ProductAvailabilityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -24,12 +25,12 @@ class ProductController extends Controller
      *
      * @param  AuditLogService  $auditLogService  Service audit log yang digunakan oleh class ini.
      * @param  ProductAvailabilityService  $productAvailabilityService  Service product availability yang digunakan oleh class ini.
-     *
-     * @return void  Tidak mengembalikan nilai; dependency disimpan pada instance.
+     * @param  OutboxRecorderService  $outboxRecorder  Recorder durable untuk sinkronisasi katalog buyer.
      */
     public function __construct(
         protected AuditLogService $auditLogService,
         protected ProductAvailabilityService $productAvailabilityService,
+        protected OutboxRecorderService $outboxRecorder,
     ) {}
 
     /**
@@ -42,7 +43,7 @@ class ProductController extends Controller
      * @param  string  $user_id_seller  ID seller pemilik produk atau transaksi.
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function index(string $user_id_seller, Request $request): JsonResponse
     {
@@ -118,7 +119,7 @@ class ProductController extends Controller
      * @param  string  $id  Identifier record yang menjadi target operasi.
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function show(string $user_id_seller, string $id, Request $request): JsonResponse
     {
@@ -164,7 +165,7 @@ class ProductController extends Controller
      *
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function store(Request $request): JsonResponse
     {
@@ -222,6 +223,10 @@ class ProductController extends Controller
 
                 $product->load('images');
                 $this->auditLogService->recordProductCreated($request->user(), $product, $request);
+                $this->outboxRecorder->recordProductSync(
+                    (string) $product->id,
+                    OutboxRecorderService::SOURCE_PRODUCT_CREATED,
+                );
 
                 return $product;
             });
@@ -244,7 +249,7 @@ class ProductController extends Controller
      * @param  string  $id  Identifier record yang menjadi target operasi.
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function update(string $id, Request $request): JsonResponse
     {
@@ -336,6 +341,10 @@ class ProductController extends Controller
                     $this->productChanges($beforeValues, $product),
                     $imageChanges,
                 );
+                $this->outboxRecorder->recordProductSync(
+                    (string) $product->id,
+                    OutboxRecorderService::SOURCE_PRODUCT_UPDATED,
+                );
 
                 return $product;
             });
@@ -364,7 +373,7 @@ class ProductController extends Controller
      * @param  string  $id  Identifier record yang menjadi target operasi.
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function delete(string $user_id_seller, string $id, Request $request): JsonResponse
     {
@@ -407,6 +416,10 @@ class ProductController extends Controller
         DB::transaction(function () use ($request, $product, $snapshot) {
             $product->delete();
             $this->auditLogService->recordProductDeleted($request->user(), $product, $request, $snapshot);
+            $this->outboxRecorder->recordProductSync(
+                (string) $product->id,
+                OutboxRecorderService::SOURCE_PRODUCT_DELETED,
+            );
         });
         // --- step 4 - end - soft-delete produk tanpa menghapus keranjang dan gambar
 
@@ -424,7 +437,7 @@ class ProductController extends Controller
      * @param  bool  $creating  Nilai creating yang diperlukan untuk menjalankan proses ini.
      * @param  Product|null  $product  Model produk yang menjadi target atau sumber data.
      *
-     * @return ValidationValidator  Validator berisi aturan dasar dan pemeriksaan lanjutan untuk payload.
+     * @return ValidationValidator Validator berisi aturan dasar dan pemeriksaan lanjutan untuk payload.
      */
     private function productValidator(Request $request, bool $creating, ?Product $product = null): ValidationValidator
     {
@@ -468,7 +481,7 @@ class ProductController extends Controller
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      * @param  Product|null  $product  Model produk yang menjadi target atau sumber data.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function resolveImageOrder(Request $request, ?Product $product = null): array
     {
@@ -532,7 +545,7 @@ class ProductController extends Controller
      *
      * @param  Product  $product  Model produk yang menjadi target atau sumber data.
      *
-     * @return array{name: string, price: int, stock: int}  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{name: string, price: int, stock: int} Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function productValues(Product $product): array
     {
@@ -554,7 +567,7 @@ class ProductController extends Controller
      * @param  array{name: string, price: int, stock: int}  $beforeValues  Nilai before values yang diperlukan untuk menjalankan proses ini.
      * @param  Product  $product  Model produk yang menjadi target atau sumber data.
      *
-     * @return array<int, array{field: string, label: string, before: mixed, after: mixed}>  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array<int, array{field: string, label: string, before: mixed, after: mixed}> Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function productChanges(array $beforeValues, Product $product): array
     {
@@ -593,7 +606,7 @@ class ProductController extends Controller
      * @param  Product  $product  Model produk yang menjadi target atau sumber data.
      * @param  array<int, array{id?: string, path?: string, file?: mixed}>  $orderedImages  Nilai ordered images yang diperlukan untuk menjalankan proses ini.
      *
-     * @return array{before_count: int, after_count: int, added_count: int, removed_count: int, cover_changed: bool, order_changed: bool}  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{before_count: int, after_count: int, added_count: int, removed_count: int, cover_changed: bool, order_changed: bool} Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function imageChanges(Product $product, array $orderedImages): array
     {
