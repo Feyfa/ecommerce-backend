@@ -7,7 +7,6 @@ use App\Http\Middleware\AuthenticateApiRequest;
 use App\Models\AuditLog;
 use App\Models\User;
 use App\Services\AuditLogService;
-use App\Services\Clerk\ClerkBackendClientService;
 use App\Services\Clerk\ClerkUserSyncService;
 use App\Services\UserAgentParserService;
 use Carbon\CarbonImmutable;
@@ -86,7 +85,7 @@ class AuditLogTest extends TestCase
      */
     public function test_clerk_sync_status_drives_registration_event_once(): void
     {
-        $syncService = new ClerkUserSyncService(new ClerkBackendClientService);
+        $syncService = $this->app->make(ClerkUserSyncService::class);
         $clerkUser = $this->clerkUser('user_sync_audit', 'audit-sync@example.com');
         $request = $this->auditRequest('sess_sync_register');
         $recordAuthEvent = function (User $user, bool $wasCreated) use ($request): void {

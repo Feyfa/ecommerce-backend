@@ -3,6 +3,7 @@
 namespace App\Services\Clerk;
 
 use App\Models\User;
+use App\Services\OutboxRecorderService;
 use Clerk\Backend\Models\Components\EmailAddress;
 use Clerk\Backend\Models\Components\User as ClerkUser;
 use Illuminate\Support\Facades\DB;
@@ -15,11 +16,11 @@ class ClerkUserSyncService
      * Menyiapkan dependency yang diperlukan oleh class.
      *
      * @param  ClerkBackendClientService  $clerkBackendClientService  Service clerk backend client yang digunakan oleh class ini.
-     *
-     * @return void  Tidak mengembalikan nilai; dependency disimpan pada instance.
+     * @param  OutboxRecorderService  $outboxRecorder  Recorder durable untuk perubahan fallback nama seller.
      */
     public function __construct(
-        protected ClerkBackendClientService $clerkBackendClientService
+        protected ClerkBackendClientService $clerkBackendClientService,
+        protected OutboxRecorderService $outboxRecorder,
     ) {}
 
     /**
@@ -28,7 +29,7 @@ class ClerkUserSyncService
      *
      * @param  string  $clerkUserId  ID user pada Clerk yang telah berasal dari token terverifikasi.
      *
-     * @return User  Model user lokal yang berhasil ditemukan, dibuat, atau disinkronkan.
+     * @return User Model user lokal yang berhasil ditemukan, dibuat, atau disinkronkan.
      */
     public function syncByClerkUserId(string $clerkUserId): User
     {
@@ -45,7 +46,7 @@ class ClerkUserSyncService
      * @param  string  $clerkUserId  Identity user dari token Clerk valid.
      * @param  callable|null  $afterSync  Callback yang dijalankan dalam transaction.
      *
-     * @return array{user: User, was_created: bool}  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{user: User, was_created: bool} Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function syncByClerkUserIdWithStatus(string $clerkUserId, ?callable $afterSync = null): array
     {
@@ -67,7 +68,7 @@ class ClerkUserSyncService
      *
      * @param  ClerkUser  $clerkUser  Model identity user yang diperoleh dari Clerk.
      *
-     * @return User  Model user lokal yang berhasil ditemukan, dibuat, atau disinkronkan.
+     * @return User Model user lokal yang berhasil ditemukan, dibuat, atau disinkronkan.
      */
     public function syncClerkUser(ClerkUser $clerkUser): User
     {
@@ -80,12 +81,13 @@ class ClerkUserSyncService
      *
      * Email utama menjadi kunci pencocokan identity, sedangkan Clerk ID, nama, dan gambar diperbarui
      * dari provider. Callback audit dijalankan dalam transaksi yang sama agar pembuatan user dan event
-     * pertama berhasil atau rollback bersama.
+     * pertama berhasil atau rollback bersama. Perubahan nama juga mengantrekan proyeksi ulang katalog
+     * seller karena nama user dapat menjadi fallback identitas toko buyer.
      *
      * @param  ClerkUser  $clerkUser  User yang sudah diambil dari Clerk Backend API.
      * @param  callable|null  $afterSync  Callback yang menerima user dan status create.
      *
-     * @return array{user: User, was_created: bool}  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{user: User, was_created: bool} Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function syncClerkUserWithStatus(ClerkUser $clerkUser, ?callable $afterSync = null): array
     {
@@ -97,7 +99,12 @@ class ClerkUserSyncService
 
         $displayName = $this->resolveDisplayName($clerkUser, $primaryEmail);
 
-        return DB::transaction(function () use ($clerkUser, $primaryEmail, $displayName, $afterSync): array {
+        return DB::transaction(function () use (
+            $clerkUser,
+            $primaryEmail,
+            $displayName,
+            $afterSync,
+        ): array {
             // --- step 1 - start - cari user lokal berdasarkan clerk_user_id
             $user = User::query()
                 ->where('clerk_user_id', $clerkUser->id)
@@ -137,8 +144,17 @@ class ClerkUserSyncService
             // Gambar Clerk belum langsung disalin ke field img lokal karena frontend
             // existing masih menganggap img sebagai path storage lokal Laravel.
             $user->save();
+            $displayNameChanged = $user->wasChanged('name');
 
             $syncedUser = $user->fresh();
+
+            if ($displayNameChanged) {
+                // Nama user menjadi fallback label toko ketika profil company belum memiliki nama yang dapat dipakai.
+                $this->outboxRecorder->recordSellerSync(
+                    (string) $syncedUser->id,
+                    OutboxRecorderService::SOURCE_CLERK_NAME_CHANGED,
+                );
+            }
 
             if ($afterSync) {
                 $afterSync($syncedUser, $wasCreated);
@@ -164,7 +180,7 @@ class ClerkUserSyncService
      *
      * @param  ClerkUser  $clerkUser  Model identity user yang diperoleh dari Clerk.
      *
-     * @return string|null  Nilai teks yang telah dinormalisasi, atau null ketika sumber datanya tidak tersedia.
+     * @return string|null Nilai teks yang telah dinormalisasi, atau null ketika sumber datanya tidak tersedia.
      */
     private function resolvePrimaryEmail(ClerkUser $clerkUser): ?string
     {
@@ -193,7 +209,7 @@ class ClerkUserSyncService
      * @param  ClerkUser  $clerkUser  Model identity user yang diperoleh dari Clerk.
      * @param  string|null  $primaryEmail  Email utama yang digunakan sebagai fallback nama tampilan.
      *
-     * @return string  Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
+     * @return string Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
      */
     private function resolveDisplayName(ClerkUser $clerkUser, ?string $primaryEmail): string
     {

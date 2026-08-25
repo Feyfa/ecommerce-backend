@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\AlamatService;
 use App\Services\AuditLogService;
 use App\Services\CompanyService;
+use App\Services\OutboxRecorderService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -24,13 +25,13 @@ class CompanyController extends Controller
      * @param  CompanyService  $companyService  Service company yang digunakan oleh class ini.
      * @param  AlamatService  $alamatService  Service alamat yang digunakan oleh class ini.
      * @param  AuditLogService  $auditLogService  Service yang membatasi context dan metadata audit.
-     *
-     * @return void  Tidak mengembalikan nilai; dependency disimpan pada instance.
+     * @param  OutboxRecorderService  $outboxRecorder  Recorder durable untuk proyeksi ulang katalog seller.
      */
     public function __construct(
         protected CompanyService $companyService,
         protected AlamatService $alamatService,
         protected AuditLogService $auditLogService,
+        protected OutboxRecorderService $outboxRecorder,
     ) {}
 
     /**
@@ -39,7 +40,7 @@ class CompanyController extends Controller
      * Identitas user terautentikasi digunakan sebagai satu-satunya scope pembacaan profil toko.
      * Response menggabungkan data perusahaan dan alamat seller yang relevan untuk halaman pengaturan.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function show(): JsonResponse
     {
@@ -69,7 +70,7 @@ class CompanyController extends Controller
      *
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function updateCompany(Request $request): JsonResponse
     {
@@ -173,6 +174,10 @@ class CompanyController extends Controller
                 $this->companyChanges($beforeValues, $company, $sellerAddress),
                 $sellerAddress,
             );
+            $this->outboxRecorder->recordSellerSync(
+                (string) $user_id,
+                OutboxRecorderService::SOURCE_COMPANY_UPDATED,
+            );
         });
         // --- step 3 - end - perbarui profil dan alamat toko bersama audit secara atomik
 
@@ -193,7 +198,7 @@ class CompanyController extends Controller
      *
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function uploadImage(Request $request): JsonResponse
     {
@@ -282,7 +287,7 @@ class CompanyController extends Controller
      *
      * @param  Request  $request  Request terautentikasi beserta metadata operasi.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function deleteImage(Request $request): JsonResponse
     {

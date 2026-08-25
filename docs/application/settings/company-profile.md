@@ -79,6 +79,20 @@ Side effects:
 - Seller address is updated or created in `alamats` with `type = seller` and `enable = 1`.
 - The backend builds the final display address for pinpoint mode.
 - A successful save records one owner-scoped `company.updated` audit event in the same database transaction. The audit snapshot stores name, email, phone, description, formatted address, address detail, and `has_company_image`. Latitude, longitude, and Geoapify place id are never stored. An identical save still records the event with an empty `changes` list.
+- The same transaction records a seller outbox message. After commit, Laravel
+  Scheduler publishes `SyncSellerBuyerCatalogSearchJob`, which queues the seller's
+  products for re-projection. This keeps the displayed store name and
+  verified-location availability current without making the profile request
+  wait for the complete catalog update.
+
+The dedicated `buyer-catalog-search` queue worker must be running for the buyer catalog to
+receive those changes. PostgreSQL-backed cart and checkout validation remains
+authoritative while the projection catches up. See
+[Buyer Belanja](../buyer/belanja.md) and
+[Laravel Queue](../../architecture/queue.md) for the worker contract. If Redis
+is unavailable, the profile response remains successful and the committed
+outbox message is retried automatically. See
+[Transactional Outbox](../../architecture/outbox.md) for publisher recovery.
 
 Success response:
 

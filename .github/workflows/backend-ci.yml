@@ -38,6 +38,12 @@ jobs:
       CACHE_DRIVER: array
       SESSION_DRIVER: array
       QUEUE_CONNECTION: sync
+      REDIS_HOST: 127.0.0.1
+      REDIS_DB: 14
+      REDIS_CACHE_DB: 15
+      REDIS_PREFIX: ecommerce_testing_
+      MEILISEARCH_HOST: http://127.0.0.1:7700
+      BUYER_PRODUCT_SEARCH_INDEX: buyer_products_testing
       MAIL_MAILER: array
 
     steps:
