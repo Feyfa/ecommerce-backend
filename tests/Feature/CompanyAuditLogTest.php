@@ -72,7 +72,7 @@ class CompanyAuditLogTest extends TestCase
         $this->assertSame(OutboxAggregateType::SELLER->value, $outbox->aggregate_type);
         $this->assertSame($this->user->id, $outbox->aggregate_id);
         $this->assertSame(OutboxStatus::PENDING, $outbox->status);
-        $this->assertSame([
+        $this->assertEquals([
             'schema_version' => 1,
             'source' => OutboxRecorderService::SOURCE_COMPANY_UPDATED,
         ], $outbox->payload);

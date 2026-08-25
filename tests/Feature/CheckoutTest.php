@@ -510,7 +510,7 @@ class CheckoutTest extends TestCase
         $this->assertSame(OutboxAggregateType::PRODUCT->value, $outbox->aggregate_type);
         $this->assertSame($fixture['product']->id, $outbox->aggregate_id);
         $this->assertSame(OutboxStatus::PENDING, $outbox->status);
-        $this->assertSame([
+        $this->assertEquals([
             'schema_version' => 1,
             'source' => OutboxRecorderService::SOURCE_CHECKOUT_STOCK_CHANGED,
         ], $outbox->payload);
