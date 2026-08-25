@@ -33,6 +33,30 @@ When adding, removing, renumbering, or otherwise changing checklist rows in
 finishing. Preserve meaningful section headings, but ensure the row sequence
 across the document does not leave lower-numbered IDs after higher-numbered IDs.
 
+## Incremental Change Batches
+
+Make file changes incrementally around one clear objective or behavior at a
+time so that a human reviewer can understand the purpose and scope of each
+batch.
+
+- Do not combine independent objectives into one batch of edits.
+- Before each batch, explain its objective, the files expected to change, and
+  why each file belongs to that objective.
+- Use the smallest practical file batch that keeps the implementation
+  consistent and allows meaningful validation.
+- When an objective requires only one file, edit and validate that file before
+  proceeding to another independent objective.
+- Multiple files may be changed together only when they implement or verify
+  one shared contract or inseparable behavior. Explain that relationship before
+  editing them.
+- After each batch, inspect the actual diff and report the files changed, the
+  resulting behavior, and the validation performed before starting another
+  independent objective.
+- Do not implement an entire multi-objective task first and explain all changes
+  only after the full task is complete.
+- If the required scope expands beyond the announced batch, explain the new
+  file and reason before editing it.
+
 ## Related Repositories
 
 The project may include separate frontend and deployment repositories. If a task affects another repository and that repository is available in the workspace, inspect its code and documentation as well. Do not assume that related repositories are always available or located at a specific path.
@@ -64,9 +88,26 @@ and a branch that follows the shared release flow in
 - Before creating or refreshing a `*-staging` task branch, switch to the local
   `staging` branch and run `git pull --ff-only origin staging` as separate
   commands. Use the updated local `staging` branch as the merge source.
+- A new `*-staging` task branch must be created from the completed main Jira
+  task branch. Immediately before `git switch -c <task>-staging`, run
+  `git branch --show-current` and require the output to exactly match `<task>`.
+  Never create the branch while `main`, `staging`, or another branch is checked
+  out.
 - Do not create or reset a local task staging branch from `origin/staging`. Do
   not use `git switch -c/-C <task>-staging origin/staging` or
   `git checkout -b/-B <task>-staging origin/staging` for this workflow.
+- Before integration merges, update the local `main` and `staging` branches
+  with `git pull --ff-only` and use the refreshed local branch names as merge
+  sources. Do not run `git merge origin/main`, `git merge origin/staging`, or
+  `git merge origin/<task>`.
+- After the completed main Jira task branch passes local validation, push it
+  before creating or refreshing the matching task staging branch. If CI runs
+  for task-branch pushes, wait for it to pass before staging preparation. If no
+  such CI exists, continue immediately after the push; the push is a checkpoint,
+  not a stopping point.
+- When the task staging branch already exists, merge the completed local main
+  task branch into it, then merge the refreshed local `staging` branch. Do not
+  recreate or reset the existing task staging branch.
 - When a local merge must produce an integration commit, use
   `git merge --no-ff --no-edit <local-branch>` and let Git generate the merge
   message. Do not pass a custom `-m` message to `git merge`.
