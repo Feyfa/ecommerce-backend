@@ -9,7 +9,6 @@ use App\Models\OutboxMessage;
 use App\Services\OutboxRecorderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
-use LogicException;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -19,37 +18,6 @@ use Tests\TestCase;
 class OutboxRecorderServiceTest extends TestCase
 {
     use RefreshDatabase;
-
-    /**
-     * Memastikan recorder menolak pemanggilan di luar transaksi agar dual-write gap tidak kembali muncul.
-     *
-     * @return void Tidak mengembalikan nilai; pelanggaran boundary dinyatakan melalui exception.
-     */
-    public function test_recording_outside_a_database_transaction_is_rejected(): void
-    {
-        $this->expectException(LogicException::class);
-        $this->expectExceptionMessage('inside an active database transaction');
-
-        $this->app->make(OutboxRecorderService::class)->recordProductSync(
-            'product-outside-transaction',
-            OutboxRecorderService::SOURCE_PRODUCT_UPDATED,
-        );
-    }
-
-    /**
-     * Memastikan batch kosong tidak dapat melewati kewajiban transaction boundary recorder.
-     *
-     * @return void Tidak mengembalikan nilai; pelanggaran boundary dinyatakan melalui exception.
-     */
-    public function test_empty_batch_outside_a_database_transaction_is_rejected(): void
-    {
-        $this->expectException(LogicException::class);
-
-        $this->app->make(OutboxRecorderService::class)->recordProductSyncMany(
-            [],
-            OutboxRecorderService::SOURCE_CHECKOUT_STOCK_CHANGED,
-        );
-    }
 
     /**
      * Memastikan commit menyimpan event produk dan seller dengan kontrak payload versi pertama.

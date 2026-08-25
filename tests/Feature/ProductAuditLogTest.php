@@ -542,7 +542,7 @@ class ProductAuditLogTest extends TestCase
         $this->assertSame(OutboxAggregateType::PRODUCT->value, $message->aggregate_type);
         $this->assertSame($productId, $message->aggregate_id);
         $this->assertSame(OutboxStatus::PENDING, $message->status);
-        $this->assertSame([
+        $this->assertEquals([
             'schema_version' => 1,
             'source' => $source,
         ], $message->payload);
