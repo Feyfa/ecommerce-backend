@@ -72,6 +72,9 @@ Required query/body data:
 
 Optional data:
 
+- `per_page`: integer from 1 through `SELLER_PRODUCT_MAX_PER_PAGE` (default 50).
+  Missing or null values use `SELLER_PRODUCT_PER_PAGE` (default 50).
+  Invalid values return HTTP 422 rather than being silently reduced.
 - `search_product`: product name search keyword.
 - `stock_filter`: stock filter. Public values are `all`, `healthy`, `low`, and `empty`; deprecated `available` remains a compatibility alias for `healthy` during rollout.
 - `sort_product`: sorting option. Allowed values are `latest`, `oldest`, `price_highest`, `price_lowest`, `name_asc`, and `name_desc`.
@@ -95,7 +98,7 @@ Behavior:
   - `price_lowest`: `price ASC`.
   - `name_asc`: `name ASC`.
   - `name_desc`: `name DESC`.
-- Requests one lookahead record, returns up to 50 products, and sets `has_more`
+- Requests one lookahead record, returns up to the resolved batch size, and sets `has_more`
   to indicate whether another batch genuinely exists.
 
 This endpoint is used by the frontend for initial list loading, search, stock filtering, sorting, and infinite scroll.
@@ -261,8 +264,11 @@ Validation failures return `422` with `message` containing validator messages.
 - Image position 1 is the primary product cover.
 - Update can set stock to `0`; create cannot.
 - Creating a product requires an active verified Pinpoint seller location; existing seller products remain manageable when that location later becomes invalid.
-- Product list returns a maximum of 50 products per request.
-- A terminal seller batch containing 50 or fewer remaining products returns `has_more = false`.
+- Product list defaults to 50 products per request, with a configurable maximum of 50.
+- `config/seller_product.php` keeps the configured maximum at least 1 and clamps
+  the default to the range 1 through that maximum. These settings do not limit
+  the total catalog or require a search reindex.
+- A terminal seller batch containing no more than the resolved batch size returns `has_more = false`.
 - Product stock conditions are mutually exclusive: healthy is above 5, low is 1–5, and empty is 0 or below.
 - Buyer and seller list queries share the product sorting scope so their accepted sort values cannot drift apart.
 - The backend docs file name matches the frontend docs file name so the same feature can be compared across both repositories.

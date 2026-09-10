@@ -500,6 +500,61 @@ class ProductListFilterTest extends TestCase
     }
 
     /**
+     * Memastikan ukuran request seller mengalahkan default dan lookahead tetap akurat antarbatch.
+     *
+     * @return void Dua batch mencakup seluruh fixture tanpa duplikasi dan berhenti pada batch terakhir.
+     */
+    public function test_seller_request_page_size_overrides_default_with_correct_completion(): void
+    {
+        // --- step 1 - start - siapkan katalog yang melebihi ukuran request
+        config()->set('seller_product.per_page', 1);
+        config()->set('seller_product.max_per_page', 3);
+        for ($index = 1; $index <= 3; $index++) {
+            $this->createProduct($this->user, "Ukuran Seller {$index}", 10000 + $index, 10);
+        }
+        // --- step 1 - end - siapkan katalog yang melebihi ukuran request
+
+        // --- step 2 - start - verifikasi request eksplisit dan batch terakhir
+        $first = $this->getJson($this->sellerUrl($this->user, ['per_page' => 2]))
+            ->assertOk()->assertJsonCount(2, 'products')->assertJsonPath('has_more', true);
+        $firstIds = array_column($first->json('products'), 'id');
+        $second = $this->getJson($this->sellerUrl($this->user, [
+            'per_page' => 2,
+            'products_current_id' => json_encode($firstIds),
+        ]))->assertOk()->assertJsonCount(1, 'products')->assertJsonPath('has_more', false);
+        $this->assertSame([], array_intersect($firstIds, array_column($second->json('products'), 'id')));
+        $this->getJson($this->sellerUrl($this->user, ['per_page' => 3]))
+            ->assertOk()->assertJsonCount(3, 'products')->assertJsonPath('has_more', false);
+        // --- step 2 - end - verifikasi request eksplisit dan batch terakhir
+    }
+
+    /**
+     * Memastikan client lama tanpa per_page memakai default seller dan input tidak valid ditolak.
+     *
+     * @return void Default membatasi hasil dan validasi menolak ukuran di luar kontrak konfigurasi.
+     */
+    public function test_seller_uses_configured_default_and_rejects_invalid_page_sizes(): void
+    {
+        // --- step 1 - start - verifikasi fallback client tanpa ukuran batch
+        config()->set('seller_product.per_page', 1);
+        config()->set('seller_product.max_per_page', 2);
+        $this->createProduct($this->user, 'Default Seller A', 10000, 10);
+        $this->createProduct($this->user, 'Default Seller B', 20000, 10);
+        $this->getJson($this->sellerUrl($this->user))
+            ->assertOk()->assertJsonCount(1, 'products')->assertJsonPath('has_more', true);
+        $this->getJson($this->sellerUrl($this->user, ['per_page' => '']))
+            ->assertOk()->assertJsonCount(1, 'products')->assertJsonPath('has_more', true);
+        // --- step 1 - end - verifikasi fallback client tanpa ukuran batch
+
+        // --- step 2 - start - tolak input di luar batas atau bukan bilangan bulat
+        foreach ([0, -1, 3, 1.5, 'invalid', [1]] as $invalidSize) {
+            $this->getJson($this->sellerUrl($this->user, ['per_page' => $invalidSize]))
+                ->assertStatus(422)->assertJsonValidationErrors(['per_page'], 'message');
+        }
+        // --- step 2 - end - tolak input di luar batas atau bukan bilangan bulat
+    }
+
+    /**
      * Memverifikasi aturan filter dan pengurutan katalog produk pada skenario seller cannot read
      * another sellers product list.
      *

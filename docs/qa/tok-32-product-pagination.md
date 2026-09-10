@@ -54,3 +54,16 @@ endpoint. It does not walk all 200 pages or simulate concurrent catalog changes.
   **7 tests passed, 64 assertions**, including BE-07 and BE-08.
 - Pint `--test` passed for the five changed PHP files: the product controller,
   buyer search configuration, two feature tests, and search integration test.
+
+## Configurable Seller Batch Size
+
+Seller now accepts optional `per_page`, with `SELLER_PRODUCT_PER_PAGE` as the
+fallback and `SELLER_PRODUCT_MAX_PER_PAGE` as the request validation ceiling.
+Both default to 50. Empty input follows the fallback; invalid sizes return 422.
+The existing ID-exclusion and lookahead response contracts remain in place.
+
+- Focused product-list tests: **19 passed, 152 assertions**, covering explicit
+  sizes, fallback, exact maximum, terminal batches, and invalid inputs.
+- Full backend suite: **186 passed, 1,036 assertions**.
+- Pint passed for the controller, seller configuration, and feature test.
+- Real-Meilisearch tests were not rerun for this seller-only behavior change.

@@ -20,8 +20,6 @@ use Throwable;
 
 class ProductController extends Controller
 {
-    private const SELLER_PRODUCT_BATCH_SIZE = 50;
-
     /**
      * Menyiapkan controller dengan layanan produk, ketersediaan, dan audit log.
      *
@@ -41,6 +39,7 @@ class ProductController extends Controller
      * Filter, pencarian, sorting, kumpulan ID yang sudah dimuat, dan identitas seller divalidasi sebelum
      * query produk dibentuk. Response menggunakan urutan stabil, metadata keberadaan batch berikutnya,
      * serta status verifikasi lokasi yang menentukan apakah produk baru dapat ditambahkan.
+     * Ukuran batch mengikuti per_page yang valid atau default konfigurasi bila tidak dikirim.
      *
      * @param  string  $user_id_seller  ID seller pemilik produk atau transaksi.
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
@@ -54,12 +53,14 @@ class ProductController extends Controller
             [
                 'user_id_seller' => $user_id_seller,
                 'products_current_id' => $request->products_current_id,
+                'per_page' => $request->per_page === '' ? null : $request->per_page,
                 'search_product' => $request->search_product,
                 'stock_filter' => $request->stock_filter,
                 'sort_product' => $request->sort_product,
             ],
             [
                 'user_id_seller' => ['required', 'uuid'],
+                'per_page' => ['nullable', 'integer', 'min:1', 'max:'.config('seller_product.max_per_page')],
                 'products_current_id' => [
                     'required',
                     'json',
@@ -90,6 +91,7 @@ class ProductController extends Controller
 
         // --- step 3 - start - ambil batch produk dan tentukan metadata pagination
         $products_current_id = json_decode($validate['products_current_id'], true);
+        $per_page = (int) ($validate['per_page'] ?? config('seller_product.per_page'));
         $search_product = trim($validate['search_product'] ?? '');
         $stock_filter = $validate['stock_filter'] ?? 'all';
         $sort_product = $validate['sort_product'] ?? 'latest';
@@ -100,12 +102,12 @@ class ProductController extends Controller
             ->whereRaw('LOWER(name) LIKE ?', ['%'.mb_strtolower($search_product).'%'])
             ->withStockCondition($stock_filter)
             ->withProductSort($sort_product)
-            ->limit(self::SELLER_PRODUCT_BATCH_SIZE + 1)
+            ->limit($per_page + 1)
             ->get();
 
         // Satu record lookahead membuktikan keberadaan batch berikutnya tanpa mengirimkannya ke frontend.
-        $has_more = $products->count() > self::SELLER_PRODUCT_BATCH_SIZE;
-        $products = $products->take(self::SELLER_PRODUCT_BATCH_SIZE)->values();
+        $has_more = $products->count() > $per_page;
+        $products = $products->take($per_page)->values();
         // --- step 3 - end - ambil batch produk dan tentukan metadata pagination
 
         return response()->json([
