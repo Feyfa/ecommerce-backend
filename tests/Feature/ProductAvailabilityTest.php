@@ -23,7 +23,7 @@ class ProductAvailabilityTest extends TestCase
     /**
      * Menyiapkan fixture dan dependency sebelum setiap pengujian.
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     protected function setUp(): void
     {
@@ -42,7 +42,7 @@ class ProductAvailabilityTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function seller_must_verify_the_store_location_before_creating_a_product(): void
     {
@@ -69,7 +69,7 @@ class ProductAvailabilityTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function buyer_catalog_excludes_unverified_and_soft_deleted_products(): void
     {
@@ -97,7 +97,7 @@ class ProductAvailabilityTest extends TestCase
                         'u_name' => $verifiedSeller->name,
                     ]],
                     'page' => 1,
-                    'per_page' => 24,
+                    'per_page' => 50,
                     'has_more' => false,
                 ]);
         });
@@ -105,7 +105,7 @@ class ProductAvailabilityTest extends TestCase
         $this->actingAs($buyer)
             ->getJson('/api/belanja?'.http_build_query([
                 'page' => 1,
-                'per_page' => 24,
+                'per_page' => 50,
             ]))
             ->assertOk()
             ->assertJsonCount(1, 'products')
@@ -121,7 +121,7 @@ class ProductAvailabilityTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function cart_keeps_quantity_and_explains_a_soft_deleted_product(): void
     {
@@ -156,7 +156,7 @@ class ProductAvailabilityTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function quantity_endpoints_reject_unavailable_products_without_changing_quantity(): void
     {
@@ -199,7 +199,7 @@ class ProductAvailabilityTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function quantity_endpoints_reject_out_of_stock_products_without_changing_quantity(): void
     {
@@ -245,7 +245,7 @@ class ProductAvailabilityTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function cart_read_repairs_injected_out_of_stock_selection_without_resetting_quantity(): void
     {
@@ -285,7 +285,7 @@ class ProductAvailabilityTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function cart_read_exposes_and_repairs_a_quantity_that_exceeds_positive_stock(): void
     {
@@ -329,7 +329,7 @@ class ProductAvailabilityTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function cart_endpoints_reject_an_authenticated_user_targeting_another_buyers_cart(): void
     {
@@ -416,7 +416,7 @@ class ProductAvailabilityTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function cart_uses_out_of_stock_before_unverified_seller_location(): void
     {
@@ -442,7 +442,7 @@ class ProductAvailabilityTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function cart_marks_stocked_products_from_an_unverified_seller(): void
     {
@@ -471,7 +471,7 @@ class ProductAvailabilityTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function cart_checkout_validation_reports_a_concurrently_unverified_seller(): void
     {
@@ -518,7 +518,7 @@ class ProductAvailabilityTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function refreshing_checkout_reports_a_concurrently_unverified_seller(): void
     {
@@ -557,7 +557,7 @@ class ProductAvailabilityTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function processing_checkout_reports_a_concurrently_unverified_seller_before_payment(): void
     {
@@ -619,7 +619,7 @@ class ProductAvailabilityTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function cart_checkout_validation_unchecks_an_item_without_resetting_quantity(): void
     {
@@ -662,7 +662,7 @@ class ProductAvailabilityTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function stock_change_blocks_the_first_checkout_but_preserves_valid_multi_seller_items(): void
     {
@@ -752,7 +752,7 @@ class ProductAvailabilityTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function refreshing_checkout_rejects_a_soft_deleted_product_and_preserves_the_cart(): void
     {
@@ -783,7 +783,7 @@ class ProductAvailabilityTest extends TestCase
      *
      * @param  User  $seller  Model user seller yang menjadi actor atau fixture.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function productPayload(User $seller): array
     {
@@ -805,7 +805,7 @@ class ProductAvailabilityTest extends TestCase
      * @param  string  $name  Nama user, rekening, atau resource sesuai konteks operasi.
      * @param  int  $stock  Jumlah stok produk untuk skenario atau perubahan terkait.
      *
-     * @return Product  Model produk yang dibuat atau digunakan sebagai fixture.
+     * @return Product Model produk yang dibuat atau digunakan sebagai fixture.
      */
     private function createProduct(User $seller, string $name, int $stock): Product
     {
@@ -827,7 +827,7 @@ class ProductAvailabilityTest extends TestCase
      * @param  Product  $product  Model produk yang menjadi target atau sumber data.
      * @param  int  $quantity  Quantity produk yang digunakan pada cart atau checkout.
      *
-     * @return Keranjang  Model item keranjang yang dibuat untuk skenario terkait.
+     * @return Keranjang Model item keranjang yang dibuat untuk skenario terkait.
      */
     private function createCart(User $buyer, User $seller, Product $product, int $quantity): Keranjang
     {
@@ -847,7 +847,7 @@ class ProductAvailabilityTest extends TestCase
      *
      * @param  User  $seller  Model user seller yang menjadi actor atau fixture.
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     private function createVerifiedSellerAddress(User $seller): void
     {
@@ -871,7 +871,7 @@ class ProductAvailabilityTest extends TestCase
      *
      * @param  User  $seller  Model user seller yang menjadi actor atau fixture.
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     private function invalidateSellerAddress(User $seller): void
     {
@@ -894,7 +894,7 @@ class ProductAvailabilityTest extends TestCase
      *
      * @param  User  $buyer  Model user buyer yang menjadi actor atau fixture.
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     private function createBuyerAddress(User $buyer): void
     {

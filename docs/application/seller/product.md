@@ -72,6 +72,9 @@ Required query/body data:
 
 Optional data:
 
+- `per_page`: integer from 1 through `SELLER_PRODUCT_MAX_PER_PAGE` (default 50).
+  Missing or null values use `SELLER_PRODUCT_PER_PAGE` (default 50).
+  Invalid values return HTTP 422 rather than being silently reduced.
 - `search_product`: product name search keyword.
 - `stock_filter`: stock filter. Public values are `all`, `healthy`, `low`, and `empty`; deprecated `available` remains a compatibility alias for `healthy` during rollout.
 - `sort_product`: sorting option. Allowed values are `latest`, `oldest`, `price_highest`, `price_lowest`, `name_asc`, and `name_desc`.
@@ -95,7 +98,8 @@ Behavior:
   - `price_lowest`: `price ASC`.
   - `name_asc`: `name ASC`.
   - `name_desc`: `name DESC`.
-- Returns up to 50 products.
+- Requests one lookahead record, returns up to the resolved batch size, and sets `has_more`
+  to indicate whether another batch genuinely exists.
 
 This endpoint is used by the frontend for initial list loading, search, stock filtering, sorting, and infinite scroll.
 
@@ -210,11 +214,12 @@ List responses include:
 ```json
 {
   "status": 200,
-  "products": []
+  "products": [],
+  "has_more": false
 }
 ```
 
-Seller list responses also include `seller_location_verified`. The frontend uses it to disable product creation and show the store-location warning without hiding existing products.
+Seller list responses also include `seller_location_verified`. The frontend uses it to disable product creation and show the store-location warning without hiding existing products. `has_more` lets the frontend stop observing the pagination sentinel without sending another request solely to receive an empty batch.
 
 Create and update responses include:
 
@@ -245,6 +250,7 @@ Validation failures return `422` with `message` containing validator messages.
 - Product image paths are stored in `product_images`; `products.img` mirrors position 1 for existing buyer, cart, checkout, and transaction consumers.
 - The product-images migration backfills every non-empty legacy `products.img` as position 1 without moving the physical file.
 - Product list pagination uses `products_current_id` instead of page numbers.
+- Product list completion uses an explicit boolean `has_more` calculated from one lookahead record.
 - Search normalizes the product name and keyword to lowercase so it remains case-insensitive and testable across supported database environments.
 - Stock filtering and sorting use existing `products` columns, so they do not require extra database fields.
 - Product deletion uses soft delete; existing cart rows and product images are intentionally retained.
@@ -258,7 +264,11 @@ Validation failures return `422` with `message` containing validator messages.
 - Image position 1 is the primary product cover.
 - Update can set stock to `0`; create cannot.
 - Creating a product requires an active verified Pinpoint seller location; existing seller products remain manageable when that location later becomes invalid.
-- Product list returns a maximum of 50 products per request.
+- Product list defaults to 50 products per request, with a configurable maximum of 50.
+- `config/seller_product.php` keeps the configured maximum at least 1 and clamps
+  the default to the range 1 through that maximum. These settings do not limit
+  the total catalog or require a search reindex.
+- A terminal seller batch containing no more than the resolved batch size returns `has_more = false`.
 - Product stock conditions are mutually exclusive: healthy is above 5, low is 1–5, and empty is 0 or below.
 - Buyer and seller list queries share the product sorting scope so their accepted sort values cannot drift apart.
 - The backend docs file name matches the frontend docs file name so the same feature can be compared across both repositories.

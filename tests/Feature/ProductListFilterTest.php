@@ -21,7 +21,7 @@ class ProductListFilterTest extends TestCase
     /**
      * Menyiapkan fixture dan dependency sebelum setiap pengujian.
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     protected function setUp(): void
     {
@@ -51,7 +51,7 @@ class ProductListFilterTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function buyer_only_receives_purchasable_products(): void
     {
@@ -78,7 +78,7 @@ class ProductListFilterTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function buyer_and_seller_use_the_same_product_sort_options(): void
     {
@@ -119,7 +119,7 @@ class ProductListFilterTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function buyer_can_combine_case_insensitive_search_sort_and_excluded_ids(): void
     {
@@ -149,7 +149,7 @@ class ProductListFilterTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function buyer_can_filter_products_by_inclusive_price_range(): void
     {
@@ -186,7 +186,7 @@ class ProductListFilterTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function buyer_can_filter_products_by_recently_added_period(): void
     {
@@ -225,7 +225,7 @@ class ProductListFilterTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function buyer_can_combine_price_filter_with_search_sort_and_excluded_ids(): void
     {
@@ -255,7 +255,7 @@ class ProductListFilterTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function buyer_rejects_invalid_price_filter_values(): void
     {
@@ -285,7 +285,7 @@ class ProductListFilterTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function buyer_catalog_prioritizes_and_searches_the_store_name(): void
     {
@@ -316,7 +316,7 @@ class ProductListFilterTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function buyer_ignores_legacy_stock_filter_and_keeps_purchasable_invariant(): void
     {
@@ -339,7 +339,7 @@ class ProductListFilterTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function seller_stock_conditions_are_exclusive_and_all_is_the_default(): void
     {
@@ -367,7 +367,7 @@ class ProductListFilterTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function seller_can_combine_search_stock_sort_and_excluded_ids(): void
     {
@@ -388,6 +388,62 @@ class ProductListFilterTest extends TestCase
     }
 
     /**
+     * Memastikan metadata akhir pagination seller akurat untuk katalog pendek, tepat satu batch,
+     * dan katalog multi-batch.
+     *
+     * Lookahead tidak boleh ikut dikirim pada batch pertama. Request lanjutan dengan seluruh ID
+     * batch pertama harus mengembalikan sisa produk tanpa duplikasi dan menandai pagination selesai.
+     *
+     * @return void Tidak mengembalikan nilai; metadata dan isi setiap batch diverifikasi melalui assertion.
+     *
+     * @test
+     */
+    public function seller_returns_explicit_completion_metadata_for_terminal_and_multi_batch_catalogs(): void
+    {
+        // --- step 1 - start - verifikasi katalog pendek dan tepat satu batch
+        for ($index = 1; $index <= 4; $index++) {
+            $this->createProduct($this->user, "Produk Pendek {$index}", 10000 + $index, 10);
+        }
+
+        $this->getJson($this->sellerUrl($this->user))
+            ->assertOk()
+            ->assertJsonCount(4, 'products')
+            ->assertJsonPath('has_more', false);
+
+        for ($index = 5; $index <= 50; $index++) {
+            $this->createProduct($this->user, "Produk Batch {$index}", 10000 + $index, 10);
+        }
+
+        $this->getJson($this->sellerUrl($this->user))
+            ->assertOk()
+            ->assertJsonCount(50, 'products')
+            ->assertJsonPath('has_more', false);
+        // --- step 1 - end - verifikasi katalog pendek dan tepat satu batch
+
+        // --- step 2 - start - verifikasi lookahead dan kelengkapan dua batch
+        $this->createProduct($this->user, 'Produk Lookahead', 20000, 10);
+        $firstBatch = $this->getJson($this->sellerUrl($this->user))
+            ->assertOk()
+            ->assertJsonCount(50, 'products')
+            ->assertJsonPath('has_more', true);
+        $firstBatchIds = collect($firstBatch->json('products'))->pluck('id')->all();
+
+        $secondBatch = $this->getJson($this->sellerUrl($this->user, [
+            'products_current_id' => json_encode($firstBatchIds),
+        ]))
+            ->assertOk()
+            ->assertJsonCount(1, 'products')
+            ->assertJsonPath('has_more', false);
+
+        $secondBatchIds = collect($secondBatch->json('products'))->pluck('id')->all();
+        $allProductIds = Product::where('user_id_seller', $this->user->id)->pluck('id')->all();
+
+        $this->assertSame([], array_intersect($firstBatchIds, $secondBatchIds));
+        $this->assertEqualsCanonicalizing($allProductIds, [...$firstBatchIds, ...$secondBatchIds]);
+        // --- step 2 - end - verifikasi lookahead dan kelengkapan dua batch
+    }
+
+    /**
      * Memverifikasi aturan filter dan pengurutan katalog produk pada skenario legacy stock sort values
      * are rejected.
      *
@@ -396,7 +452,7 @@ class ProductListFilterTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function legacy_stock_sort_values_are_rejected(): void
     {
@@ -426,6 +482,79 @@ class ProductListFilterTest extends TestCase
     }
 
     /**
+     * Memastikan endpoint buyer menggunakan ukuran halaman 50 dari konfigurasi ketika client tidak
+     * mengirimkan override.
+     *
+     * @return void Tidak mengembalikan nilai; default response pagination diverifikasi melalui assertion.
+     *
+     * @test
+     */
+    public function buyer_uses_the_configured_fifty_product_default_page_size(): void
+    {
+        config()->set('buyer_product_search.per_page', 50);
+
+        $this->getJson('/api/belanja')
+            ->assertOk()
+            ->assertJsonPath('page', 1)
+            ->assertJsonPath('per_page', 50);
+    }
+
+    /**
+     * Memastikan ukuran request seller mengalahkan default dan lookahead tetap akurat antarbatch.
+     *
+     * @return void Dua batch mencakup seluruh fixture tanpa duplikasi dan berhenti pada batch terakhir.
+     */
+    public function test_seller_request_page_size_overrides_default_with_correct_completion(): void
+    {
+        // --- step 1 - start - siapkan katalog yang melebihi ukuran request
+        config()->set('seller_product.per_page', 1);
+        config()->set('seller_product.max_per_page', 3);
+        for ($index = 1; $index <= 3; $index++) {
+            $this->createProduct($this->user, "Ukuran Seller {$index}", 10000 + $index, 10);
+        }
+        // --- step 1 - end - siapkan katalog yang melebihi ukuran request
+
+        // --- step 2 - start - verifikasi request eksplisit dan batch terakhir
+        $first = $this->getJson($this->sellerUrl($this->user, ['per_page' => 2]))
+            ->assertOk()->assertJsonCount(2, 'products')->assertJsonPath('has_more', true);
+        $firstIds = array_column($first->json('products'), 'id');
+        $second = $this->getJson($this->sellerUrl($this->user, [
+            'per_page' => 2,
+            'products_current_id' => json_encode($firstIds),
+        ]))->assertOk()->assertJsonCount(1, 'products')->assertJsonPath('has_more', false);
+        $this->assertSame([], array_intersect($firstIds, array_column($second->json('products'), 'id')));
+        $this->getJson($this->sellerUrl($this->user, ['per_page' => 3]))
+            ->assertOk()->assertJsonCount(3, 'products')->assertJsonPath('has_more', false);
+        // --- step 2 - end - verifikasi request eksplisit dan batch terakhir
+    }
+
+    /**
+     * Memastikan client lama tanpa per_page memakai default seller dan input tidak valid ditolak.
+     *
+     * @return void Default membatasi hasil dan validasi menolak ukuran di luar kontrak konfigurasi.
+     */
+    public function test_seller_uses_configured_default_and_rejects_invalid_page_sizes(): void
+    {
+        // --- step 1 - start - verifikasi fallback client tanpa ukuran batch
+        config()->set('seller_product.per_page', 1);
+        config()->set('seller_product.max_per_page', 2);
+        $this->createProduct($this->user, 'Default Seller A', 10000, 10);
+        $this->createProduct($this->user, 'Default Seller B', 20000, 10);
+        $this->getJson($this->sellerUrl($this->user))
+            ->assertOk()->assertJsonCount(1, 'products')->assertJsonPath('has_more', true);
+        $this->getJson($this->sellerUrl($this->user, ['per_page' => '']))
+            ->assertOk()->assertJsonCount(1, 'products')->assertJsonPath('has_more', true);
+        // --- step 1 - end - verifikasi fallback client tanpa ukuran batch
+
+        // --- step 2 - start - tolak input di luar batas atau bukan bilangan bulat
+        foreach ([0, -1, 3, 1.5, 'invalid', [1]] as $invalidSize) {
+            $this->getJson($this->sellerUrl($this->user, ['per_page' => $invalidSize]))
+                ->assertStatus(422)->assertJsonValidationErrors(['per_page'], 'message');
+        }
+        // --- step 2 - end - tolak input di luar batas atau bukan bilangan bulat
+    }
+
+    /**
      * Memverifikasi aturan filter dan pengurutan katalog produk pada skenario seller cannot read
      * another sellers product list.
      *
@@ -434,7 +563,7 @@ class ProductListFilterTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function seller_cannot_read_another_sellers_product_list(): void
     {
@@ -452,7 +581,7 @@ class ProductListFilterTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function legacy_buyer_route_is_not_available(): void
     {
@@ -472,7 +601,7 @@ class ProductListFilterTest extends TestCase
      * @param  int  $stock  Jumlah stok produk untuk skenario atau perubahan terkait.
      * @param  string|null  $updatedAt  Waktu update produk untuk menguji urutan yang stabil.
      *
-     * @return Product  Model produk yang dibuat atau digunakan sebagai fixture.
+     * @return Product Model produk yang dibuat atau digunakan sebagai fixture.
      */
     private function createProduct(
         User $seller,
@@ -519,13 +648,13 @@ class ProductListFilterTest extends TestCase
      *
      * @param  array  $parameters  Parameter query yang akan ditambahkan ke URL pengujian.
      *
-     * @return string  Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
+     * @return string Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
      */
     private function buyerUrl(array $parameters = []): string
     {
         return '/api/belanja?'.http_build_query([
             'page' => 1,
-            'per_page' => 24,
+            'per_page' => 50,
             ...$parameters,
         ]);
     }
@@ -605,7 +734,7 @@ class ProductListFilterTest extends TestCase
      * @param  User  $seller  Model user seller yang menjadi actor atau fixture.
      * @param  array  $parameters  Parameter query yang akan ditambahkan ke URL pengujian.
      *
-     * @return string  Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
+     * @return string Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
      */
     private function sellerUrl(User $seller, array $parameters = []): string
     {
@@ -622,7 +751,7 @@ class ProductListFilterTest extends TestCase
      * @param  string  $filter  Nilai filter yang digunakan oleh skenario pengujian.
      * @param  array  $expectedIds  Urutan ID produk yang diharapkan pada response.
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     private function assertSellerFilterReturns(string $filter, array $expectedIds): void
     {

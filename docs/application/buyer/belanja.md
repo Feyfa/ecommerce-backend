@@ -13,7 +13,7 @@ POST /api/keranjang
 `GET /api/belanja` accepts:
 
 - `page`: page number, minimum `1`, default `1`.
-- `per_page`: cards per page, from `1` through `50`, default `24`.
+- `per_page`: cards per page, from `1` through `50`, default `50`.
 - `search_product`: product or displayed-store keyword.
 - `min_price` and `max_price`: inclusive Rupiah price limits.
 - `added_within`: `7`, `14`, `30`, or `90` days.
@@ -29,7 +29,7 @@ typo tolerance and ranking remain effective.
   "status": 200,
   "products": [],
   "page": 1,
-  "per_page": 24,
+  "per_page": 50,
   "has_more": false,
   "limit_reached": false
 }
