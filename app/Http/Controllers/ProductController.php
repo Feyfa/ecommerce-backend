@@ -20,6 +20,8 @@ use Throwable;
 
 class ProductController extends Controller
 {
+    private const SELLER_PRODUCT_BATCH_SIZE = 50;
+
     /**
      * Menyiapkan controller dengan layanan produk, ketersediaan, dan audit log.
      *
@@ -36,9 +38,9 @@ class ProductController extends Controller
     /**
      * Mengambil daftar produk milik seller dengan filter dan urutan yang dipilih.
      *
-     * Filter, pencarian, sorting, cursor, dan identitas seller divalidasi sebelum query produk
-     * dibentuk. Response menggunakan urutan stabil serta menyertakan status verifikasi lokasi seller
-     * yang menentukan apakah produk baru dapat ditambahkan.
+     * Filter, pencarian, sorting, kumpulan ID yang sudah dimuat, dan identitas seller divalidasi sebelum
+     * query produk dibentuk. Response menggunakan urutan stabil, metadata keberadaan batch berikutnya,
+     * serta status verifikasi lokasi yang menentukan apakah produk baru dapat ditambahkan.
      *
      * @param  string  $user_id_seller  ID seller pemilik produk atau transaksi.
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
@@ -86,7 +88,7 @@ class ProductController extends Controller
         }
         // --- step 2 - end - pastikan seller hanya membaca daftar produknya sendiri
 
-        // --- step 3 - start - siapkan query dasar dan parameter pencarian produk
+        // --- step 3 - start - ambil batch produk dan tentukan metadata pagination
         $products_current_id = json_decode($validate['products_current_id'], true);
         $search_product = trim($validate['search_product'] ?? '');
         $stock_filter = $validate['stock_filter'] ?? 'all';
@@ -97,12 +99,19 @@ class ProductController extends Controller
             ->whereNotIn('id', $products_current_id)
             ->whereRaw('LOWER(name) LIKE ?', ['%'.mb_strtolower($search_product).'%'])
             ->withStockCondition($stock_filter)
-            ->withProductSort($sort_product);
-        // --- step 3 - end - siapkan query dasar dan parameter pencarian produk
+            ->withProductSort($sort_product)
+            ->limit(self::SELLER_PRODUCT_BATCH_SIZE + 1)
+            ->get();
+
+        // Satu record lookahead membuktikan keberadaan batch berikutnya tanpa mengirimkannya ke frontend.
+        $has_more = $products->count() > self::SELLER_PRODUCT_BATCH_SIZE;
+        $products = $products->take(self::SELLER_PRODUCT_BATCH_SIZE)->values();
+        // --- step 3 - end - ambil batch produk dan tentukan metadata pagination
 
         return response()->json([
             'status' => 200,
-            'products' => $products->limit(50)->get(),
+            'products' => $products,
+            'has_more' => $has_more,
             'seller_location_verified' => $this->productAvailabilityService
                 ->sellerHasVerifiedAddress($validate['user_id_seller']),
         ], 200);
