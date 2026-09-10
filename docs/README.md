@@ -113,6 +113,9 @@ alias path as inline code for a file owned by another repository.
 - [TOK-30 Buyer Catalog Filters QA](qa/tok-30-buyer-catalog-filters.md)
   Preserves historical backend evidence for the original price and recently-added buyer filters.
 
+- [TOK-32 Product Pagination QA](qa/tok-32-product-pagination.md)
+  Tracks seller lookahead metadata and the 50-product Buyer Belanja default.
+
 - [Commit Guidelines](development/commit-guidelines.md)
   Explains how to keep commits focused on one purpose and separate unrelated changes.
 
@@ -183,6 +186,7 @@ docs/
     tok-25-pending-invoice-grouping.md
     tok-29-buyer-catalog-search.md
     tok-30-buyer-catalog-filters.md
+    tok-32-product-pagination.md
 
   development/
     commit-guidelines.md

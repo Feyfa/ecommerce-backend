@@ -3,7 +3,9 @@
 namespace Tests\Integration;
 
 use App\Services\BuyerProductSearchService;
+use App\Services\ProductAvailabilityService;
 use Meilisearch\Client;
+use Mockery;
 use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
@@ -207,6 +209,131 @@ class MeilisearchBuyerProductSearchTest extends TestCase
         $this->assertSame(['deep-1001'], array_column($result['products'], 'id'));
         $this->assertFalse($result['has_more']);
         $this->assertFalse($result['limit_reached']);
+    }
+
+    /**
+     * Memastikan katalog 51 produk dipaginasi menjadi 50 dan satu produk pada engine nyata.
+     *
+     * Urutan ID kedua halaman harus mencakup seluruh fixture tepat sekali. Metadata membedakan
+     * halaman pertama yang masih memiliki lookahead dari halaman terakhir yang habis secara normal.
+     *
+     * @return void Isi halaman, ukuran halaman, dan metadata completion diverifikasi melalui assertion.
+     */
+    public function test_fifty_product_pages_return_all_fifty_one_products_without_duplicates(): void
+    {
+        // --- step 1 - start - masukkan 51 fixture dengan keyword khusus dan urutan harga stabil
+        $documents = [];
+
+        for ($index = 1; $index <= 51; $index++) {
+            $documents[] = $this->document(
+                sprintf('page-fifty-%03d', $index),
+                'seller-pagination',
+                'Fifty Pagination Fixture',
+                $index,
+                1,
+            );
+        }
+
+        $task = $this->client->index($this->indexName)->addDocuments($documents, 'id');
+        $this->client->waitForTask($task['taskUid'], 20_000);
+        $filters = [
+            'search_product' => 'Fifty Pagination Fixture',
+            'sort_product' => 'price_lowest',
+        ];
+        // --- step 1 - end - masukkan 51 fixture dengan keyword khusus dan urutan harga stabil
+
+        // --- step 2 - start - verifikasi dua halaman beserta metadata dan kelengkapan ID
+        $firstPage = $this->searchService->search('buyer-1', $filters, 1, 50);
+        $secondPage = $this->searchService->search('buyer-1', $filters, 2, 50);
+        $expectedIds = array_column($documents, 'id');
+        $firstIds = array_column($firstPage['products'], 'id');
+        $secondIds = array_column($secondPage['products'], 'id');
+
+        $this->assertSame(array_slice($expectedIds, 0, 50), $firstIds);
+        $this->assertSame(1, $firstPage['page']);
+        $this->assertSame(50, $firstPage['per_page']);
+        $this->assertTrue($firstPage['has_more']);
+        $this->assertFalse($firstPage['limit_reached']);
+
+        $this->assertSame(array_slice($expectedIds, 50), $secondIds);
+        $this->assertSame(2, $secondPage['page']);
+        $this->assertSame(50, $secondPage['per_page']);
+        $this->assertFalse($secondPage['has_more']);
+        $this->assertFalse($secondPage['limit_reached']);
+        $this->assertSame($expectedIds, [...$firstIds, ...$secondIds]);
+        // --- step 2 - end - verifikasi dua halaman beserta metadata dan kelengkapan ID
+    }
+
+    /**
+     * Memastikan halaman berukuran 50 berhenti tepat pada batas 10.000 hasil meskipun index berisi lebih banyak.
+     *
+     * Halaman 199 dan 200 dibaca dari 10.001 fixture pada engine nyata. Halaman 201 kemudian diuji
+     * dengan client yang melarang akses index agar response kosong tidak menyembunyikan query tambahan.
+     *
+     * @return void Batas halaman nyata dan penghentian akses engine setelah batas diverifikasi.
+     */
+    public function test_fifty_product_pages_stop_at_ten_thousand_results_without_querying_the_next_page(): void
+    {
+        // --- step 1 - start - siapkan hasil yang melampaui batas index aplikasi
+        $this->assertSame(10000, config('buyer_product_search.max_total_hits'));
+        $documents = [];
+
+        for ($index = 1; $index <= 10001; $index++) {
+            $documents[] = $this->document(
+                sprintf('boundary-%05d', $index),
+                'seller-boundary',
+                'Boundary Pagination Fixture',
+                $index,
+                1,
+            );
+        }
+
+        $task = $this->client->index($this->indexName)->addDocuments($documents, 'id');
+        $this->client->waitForTask($task['taskUid'], 60_000);
+        $filters = [
+            'search_product' => 'Boundary Pagination Fixture',
+            'sort_product' => 'price_lowest',
+        ];
+
+        // Dokumen di luar batas benar-benar tersimpan; hasil terminal bukan akibat fixture habis.
+        $extraDocument = $this->client->index($this->indexName)->getDocument('boundary-10001');
+        $this->assertSame('boundary-10001', $extraDocument['id']);
+        // --- step 1 - end - siapkan hasil yang melampaui batas index aplikasi
+
+        // --- step 2 - start - verifikasi transisi halaman sebelum batas menuju halaman terminal
+        $penultimatePage = $this->searchService->search('buyer-1', $filters, 199, 50);
+        $lastPage = $this->searchService->search('buyer-1', $filters, 200, 50);
+        $expectedIds = array_column($documents, 'id');
+
+        $this->assertSame(array_slice($expectedIds, 9900, 50), array_column($penultimatePage['products'], 'id'));
+        $this->assertSame(199, $penultimatePage['page']);
+        $this->assertSame(50, $penultimatePage['per_page']);
+        $this->assertTrue($penultimatePage['has_more']);
+        $this->assertFalse($penultimatePage['limit_reached']);
+
+        $this->assertSame(array_slice($expectedIds, 9950, 50), array_column($lastPage['products'], 'id'));
+        $this->assertSame(200, $lastPage['page']);
+        $this->assertSame(50, $lastPage['per_page']);
+        $this->assertFalse($lastPage['has_more']);
+        $this->assertTrue($lastPage['limit_reached']);
+        // --- step 2 - end - verifikasi transisi halaman sebelum batas menuju halaman terminal
+
+        // --- step 3 - start - pastikan halaman setelah batas tidak mengakses Meilisearch
+        $client = Mockery::mock(Client::class);
+        $client->shouldNotReceive('index');
+        $service = new BuyerProductSearchService(
+            $client,
+            $this->app->make(ProductAvailabilityService::class),
+        );
+
+        $this->assertSame([
+            'products' => [],
+            'page' => 201,
+            'per_page' => 50,
+            'has_more' => false,
+            'limit_reached' => true,
+        ], $service->search('buyer-1', $filters, 201, 50));
+        // --- step 3 - end - pastikan halaman setelah batas tidak mengakses Meilisearch
     }
 
     /**

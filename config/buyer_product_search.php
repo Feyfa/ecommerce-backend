@@ -5,7 +5,7 @@ $maxTotalHits = max(1, (int) env('BUYER_PRODUCT_SEARCH_MAX_TOTAL_HITS', 10000));
 return [
     'index' => env('BUYER_PRODUCT_SEARCH_INDEX', 'buyer_products'),
 
-    'per_page' => (int) env('BUYER_PRODUCT_SEARCH_PER_PAGE', 24),
+    'per_page' => (int) env('BUYER_PRODUCT_SEARCH_PER_PAGE', 50),
 
     'max_per_page' => (int) env('BUYER_PRODUCT_SEARCH_MAX_PER_PAGE', 50),
 
