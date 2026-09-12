@@ -1,6 +1,13 @@
 name: Backend CI
 
 on:
+  push:
+    branches:
+      - 'feature/**'
+      - 'story/**'
+      - 'bug/**'
+      - 'task/**'
+      - 'hotfix/**'
   pull_request:
     branches:
       - main
