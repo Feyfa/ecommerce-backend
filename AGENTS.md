@@ -100,14 +100,17 @@ and a branch that follows the shared release flow in
   with `git pull --ff-only` and use the refreshed local branch names as merge
   sources. Do not run `git merge origin/main`, `git merge origin/staging`, or
   `git merge origin/<task>`.
-- After the completed main Jira task branch passes local validation, push it
-  before creating or refreshing the matching task staging branch. If CI runs
-  for task-branch pushes, wait for it to pass before staging preparation. If no
-  such CI exists, continue immediately after the push; the push is a checkpoint,
-  not a stopping point.
+- After the completed main Jira task branch passes local validation, push it and
+  wait for task-branch CI to pass before staging preparation.
+- Refresh local `main` and `staging`, then merge local `main` into the main task
+  branch. Compare the task branch HEAD before and after the merge. If HEAD
+  changed, validate, push, and wait for CI again. If HEAD did not change, do not
+  push again and retain the successful CI result for the unchanged commit.
 - When the task staging branch already exists, merge the completed local main
   task branch into it, then merge the refreshed local `staging` branch. Do not
   recreate or reset the existing task staging branch.
+- After validating the task staging branch, push it and wait for task-branch CI
+  to pass before its pull request may be merged into `staging`.
 - When a local merge must produce an integration commit, use
   `git merge --no-ff --no-edit <local-branch>` and let Git generate the merge
   message. Do not pass a custom `-m` message to `git merge`.
