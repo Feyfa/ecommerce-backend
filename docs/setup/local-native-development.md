@@ -94,27 +94,102 @@ outbox messages; the scheduler publishes due messages to Redis; the worker
 updates the rebuildable Meilisearch projection. PostgreSQL remains the source
 of truth.
 
-The backend uses the PhpRedis extension. Verify the CLI and the PHP runtime used
-by PHP-FPM both load it:
-
-```bash
-php -m | grep -i redis
-```
-
-If the CLI and PHP-FPM use different `php.ini` files, enable the extension in
-both environments before starting the worker.
+The backend uses the PhpRedis extension. Redis Server and PhpRedis are separate
+requirements: Redis Server stores queue data, while PhpRedis lets Laravel's PHP
+runtime communicate with that server. A running Redis service does not confirm
+that the PHP extension is installed or loaded.
 
 ### macOS
 
-Install and run both services through Homebrew:
+Confirm that `php`, `pecl`, and `php-config` resolve to the same Homebrew PHP
+installation before installing the extension:
 
 ```bash
+command -v php
+command -v pecl
+command -v php-config
+php --version
+pecl version
+php-config --version
+```
+
+If the commands resolve to different PHP installations or versions, correct
+the shell `PATH` first. Installing with a `pecl` binary from another PHP version
+can place `redis.so` in an extension directory that the active runtime does not
+load.
+
+Install PhpRedis through PECL, then install and run the Redis and Meilisearch
+servers through Homebrew:
+
+```bash
+pecl install redis
 brew install redis meilisearch
 brew services start redis
 brew services start meilisearch
 ```
 
-Verify the local endpoints:
+`pecl install redis` installs the PhpRedis extension for the active PHP
+installation. `brew install redis` installs Redis Server; it does not install
+or enable the PHP extension.
+
+Verify the PECL package and CLI runtime separately:
+
+```bash
+pecl list | grep -i redis
+php --ri redis
+php --ini
+php-config --extension-dir
+```
+
+`php --ri redis` must report `Redis Support => enabled`. The loaded
+configuration shown by `php --ini` must enable the same `redis.so` stored under
+the directory reported by `php-config --extension-dir`.
+
+PHP-FPM can load different configuration files from the CLI. Inspect its
+configuration and module information independently:
+
+```bash
+php-fpm -i | grep -E 'Loaded Configuration File|Scan this dir for additional .ini files|extension_dir|Redis Support'
+```
+
+The PHP-FPM output must report `Redis Support => enabled`. If it does not,
+enable `redis.so` in an INI file loaded by PHP-FPM rather than assuming the CLI
+configuration also applies to it.
+
+If PECL reports that its extension target directory does not exist, resolve the
+directory from the active PHP installation instead of copying a hard-coded PHP
+API directory from another machine:
+
+```bash
+php-config --extension-dir
+ls -ld "$(php-config --extension-dir)"
+```
+
+Create or repair permissions for exactly the directory returned by
+`php-config --extension-dir`, then rerun `pecl install redis`. Do not hard-code
+a directory such as `20230831`; PHP API directory names can change between PHP
+versions and builds.
+
+After installing or enabling PhpRedis, restart the Homebrew PHP service that
+provides PHP-FPM. Replace `php@8.3` only when this project is intentionally
+running another PHP formula:
+
+```bash
+brew services restart php@8.3
+```
+
+Stop and start any foreground `php artisan schedule:work` process again. Ask
+long-running queue workers to exit after their current job, then start the
+dedicated worker again so both processes load the updated PHP runtime:
+
+```bash
+php artisan queue:restart
+php artisan schedule:work
+php artisan queue:work redis --queue=buyer-catalog-search --sleep=1 --tries=3 --backoff=5 --timeout=60
+```
+
+Run the scheduler and queue worker in separate terminals. Verify the local
+services after the restart:
 
 ```bash
 redis-cli ping
