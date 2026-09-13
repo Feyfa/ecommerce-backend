@@ -359,8 +359,7 @@ class ProductListFilterTest extends TestCase
     }
 
     /**
-     * Memverifikasi aturan filter dan pengurutan katalog produk pada skenario seller can combine
-     * search stock sort and excluded ids.
+     * Memverifikasi seller dapat menggabungkan pencarian, filter stok, dan sorting.
      *
      * Test menyiapkan kombinasi produk dan seller, memanggil endpoint list dengan filter tertentu,
      * lalu memastikan urutan, scope ownership, dan hasil pagination sesuai kontrak.
@@ -369,7 +368,7 @@ class ProductListFilterTest extends TestCase
      *
      * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
-    public function seller_can_combine_search_stock_sort_and_excluded_ids(): void
+    public function seller_can_combine_search_stock_and_sort(): void
     {
         $lowerPrice = $this->createProduct($this->user, 'Target Murah', 10000, 2);
         $higherPrice = $this->createProduct($this->user, 'Target Mahal', 20000, 3);
@@ -379,20 +378,20 @@ class ProductListFilterTest extends TestCase
             'search_product' => 'Target',
             'stock_filter' => 'low',
             'sort_product' => 'price_highest',
-            'products_current_id' => json_encode([$higherPrice->id]),
         ]));
 
         $response->assertOk()
-            ->assertJsonCount(1, 'products')
-            ->assertJsonPath('products.0.id', $lowerPrice->id);
+            ->assertJsonCount(2, 'products')
+            ->assertJsonPath('products.0.id', $higherPrice->id)
+            ->assertJsonPath('products.1.id', $lowerPrice->id);
     }
 
     /**
      * Memastikan metadata akhir pagination seller akurat untuk katalog pendek, tepat satu batch,
      * dan katalog multi-batch.
      *
-     * Lookahead tidak boleh ikut dikirim pada batch pertama. Request lanjutan dengan seluruh ID
-     * batch pertama harus mengembalikan sisa produk tanpa duplikasi dan menandai pagination selesai.
+     * Lookahead tidak boleh ikut dikirim pada batch pertama. Request lanjutan menggunakan cursor
+     * harus mengembalikan sisa produk tanpa duplikasi dan menandai pagination selesai.
      *
      * @return void Tidak mengembalikan nilai; metadata dan isi setiap batch diverifikasi melalui assertion.
      *
@@ -429,7 +428,7 @@ class ProductListFilterTest extends TestCase
         $firstBatchIds = collect($firstBatch->json('products'))->pluck('id')->all();
 
         $secondBatch = $this->getJson($this->sellerUrl($this->user, [
-            'products_current_id' => json_encode($firstBatchIds),
+            'cursor' => $firstBatch->json('next_cursor'),
         ]))
             ->assertOk()
             ->assertJsonCount(1, 'products')
@@ -520,7 +519,7 @@ class ProductListFilterTest extends TestCase
         $firstIds = array_column($first->json('products'), 'id');
         $second = $this->getJson($this->sellerUrl($this->user, [
             'per_page' => 2,
-            'products_current_id' => json_encode($firstIds),
+            'cursor' => $first->json('next_cursor'),
         ]))->assertOk()->assertJsonCount(1, 'products')->assertJsonPath('has_more', false);
         $this->assertSame([], array_intersect($firstIds, array_column($second->json('products'), 'id')));
         $this->getJson($this->sellerUrl($this->user, ['per_page' => 3]))
@@ -738,10 +737,7 @@ class ProductListFilterTest extends TestCase
      */
     private function sellerUrl(User $seller, array $parameters = []): string
     {
-        return '/api/product/'.$seller->id.'?'.http_build_query([
-            'products_current_id' => json_encode([]),
-            ...$parameters,
-        ]);
+        return '/api/product/'.$seller->id.'?'.http_build_query($parameters);
     }
 
     /**

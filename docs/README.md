@@ -116,6 +116,9 @@ alias path as inline code for a file owned by another repository.
 - [TOK-32 Product Pagination QA](qa/tok-32-product-pagination.md)
   Tracks seller lookahead metadata and the 50-product Buyer Belanja default.
 
+- [TOK-34 Seller Cursor Pagination QA](qa/tok-34-seller-cursor-pagination.md)
+  Tracks the bounded Seller Product cursor contract, coordinated rollout, and PostgreSQL query-plan evidence.
+
 - [Commit Guidelines](development/commit-guidelines.md)
   Explains how to keep commits focused on one purpose and separate unrelated changes.
 
@@ -187,6 +190,7 @@ docs/
     tok-29-buyer-catalog-search.md
     tok-30-buyer-catalog-filters.md
     tok-32-product-pagination.md
+    tok-34-seller-cursor-pagination.md
 
   development/
     commit-guidelines.md

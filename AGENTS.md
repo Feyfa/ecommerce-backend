@@ -210,6 +210,11 @@ globs. After staging, inspect `git diff --cached --name-status`,
 `git diff --cached --stat`, and `git diff --cached` so the approval clearly
 shows which files will be committed.
 
+When one Git command contains multiple explicit file paths, format it across
+multiple lines with one path per line and shell line continuations. Keep it as
+one Git operation while making every staged path easy to review in the
+approval dialog.
+
 ### Commit Scope and Atomicity
 
 A branch does not define a single commit scope. If a branch or working tree contains changes for multiple tasks, tickets, or independently reviewable purposes, inspect and stage each scope separately and generate one commit message from that scope's staged diff. Changes for one task must not absorb an unrelated feature, fix, refactor, configuration update, migration, test, or documentation change merely because they exist on the same branch.
