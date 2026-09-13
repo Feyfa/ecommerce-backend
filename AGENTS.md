@@ -308,13 +308,21 @@ because it is available.
 ### GitHub Pull Requests
 
 When the user asks to inspect, create, open, update, review, merge, or otherwise
-operate a pull request, use the GitHub API through the connected GitHub
-integration only. Do not use `gh`, Chrome, browser automation, or the GitHub web
-UI for backend pull request operations.
+operate a pull request, use the connected GitHub integration first so the action
+is displayed through the structured Codex action UI. Do not use `gh`, Chrome,
+browser automation, or the GitHub web UI while the connected integration can
+perform the requested backend pull request operation.
 
-If the connected GitHub integration is unavailable, stop and report the
-limitation. Use another tool only when the user explicitly authorizes that
-fallback.
+If the connected GitHub integration is unavailable or fails, explain that
+limitation before using the GitHub CLI as a fallback. Prefer the dedicated
+`gh pr` commands and use `gh api` only when the required operation is not
+available through a standard `gh` subcommand. Use browser-based interaction only
+when the user explicitly requests it.
+
+Before any pull request operation that changes remote state, confirm the
+repository, pull request number when applicable, source branch, and target
+branch. After the operation, verify the resulting pull request state through the
+connected integration or the explained fallback tool.
 
 ### GitHub Actions
 
