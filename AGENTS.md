@@ -119,6 +119,31 @@ and a branch that follows the shared release flow in
   each result before running the next command, and run status or log checks as
   separate commands.
 
+### Working Branch End State And Release Completion
+
+- When a Jira task branch participates in staging preparation, return to the
+  main Jira task branch after validating and pushing its `*-staging` branch. Do
+  not leave the repository on the staging integration branch.
+- When an operation involves only `main` and `staging` without a Jira task
+  branch, finish on `main`, not `staging`.
+- After an actual staging or production deployment and its required health
+  checks succeed, first confirm the working tree is safe to switch, then update
+  local `staging` with `git pull --ff-only origin staging`, update local `main`
+  with `git pull --ff-only origin main`, and finish on `main`. This
+  post-deployment rule takes precedence over the task-preparation end state.
+- Before reporting completion, run `git branch --show-current` and verify the
+  expected final branch. Report any failed pull or branch check instead of
+  claiming synchronization succeeded.
+- If a matching Jira issue exists, record relevant release evidence and move it
+  to `Done` only after every deployment required by its scope has succeeded and
+  been validated. Keep it in its current status while any required CI, merge,
+  deployment, health check, or local synchronization remains incomplete or
+  failed.
+- After the `Done` transition, move the card to the top of the Done column when
+  a supported ranking operation is available. Treat ranking as best effort,
+  report an unavailable or failed ranking operation, and never guess or directly
+  overwrite an opaque Jira rank value.
+
 ## PHP Documentation and Comments
 
 Every named PHP function or method that is added or changed must have a PHPDoc block, even when its name, native parameter types, or native return type appear self-explanatory. New classes, interfaces, traits, and enums must also have PHPDoc that explains their primary responsibility.
@@ -284,7 +309,17 @@ Preserve other valid trailers and do not add a duplicate Codex trailer. Separate
 
 Before presenting or creating the commit message, verify that the repository and staged scope are correct, every major API or subsystem behavior in scope is represented, each claim is supported by the diff or executed validation, English grammar is sound, no empty section remains, relevant limitations are disclosed, and footers and trailers are correctly ordered.
 
-For multi-line commit messages, use real newline characters. Do not place literal `\n` sequences inside `git commit -m` arguments. Prefer `git commit -F -` with a heredoc or another method that preserves the intended line breaks.
+Every commit must read its message from standard input using `git commit -F -`
+with a quoted `'EOF'` heredoc delimiter. This applies to subject-only commits,
+multi-line messages, and amendments that replace a commit message. Do not use
+`git commit -m`, multiple `-m` arguments, or literal `\n` sequences in place of
+real line breaks.
+
+```bash
+git commit -F - <<'EOF'
+docs(workflow): describe the verified change
+EOF
+```
 
 Hard-wrap commit-message prose at 72 characters per line. Keep the subject at
 72 characters or fewer. Do not wrap commands, URLs, paths, hashes, code
