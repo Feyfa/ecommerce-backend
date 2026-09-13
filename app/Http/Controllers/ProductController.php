@@ -7,12 +7,14 @@ use App\Models\ProductImage;
 use App\Services\AuditLogService;
 use App\Services\OutboxRecorderService;
 use App\Services\ProductAvailabilityService;
+use App\Services\SellerProductCursorService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Validator as ValidationValidator;
 use InvalidArgumentException;
 use RuntimeException;
@@ -26,20 +28,21 @@ class ProductController extends Controller
      * @param  AuditLogService  $auditLogService  Service audit log yang digunakan oleh class ini.
      * @param  ProductAvailabilityService  $productAvailabilityService  Service product availability yang digunakan oleh class ini.
      * @param  OutboxRecorderService  $outboxRecorder  Recorder durable untuk sinkronisasi katalog buyer.
+     * @param  SellerProductCursorService  $sellerProductCursorService  Service cursor keyset daftar produk seller.
      */
     public function __construct(
         protected AuditLogService $auditLogService,
         protected ProductAvailabilityService $productAvailabilityService,
         protected OutboxRecorderService $outboxRecorder,
+        protected SellerProductCursorService $sellerProductCursorService,
     ) {}
 
     /**
      * Mengambil daftar produk milik seller dengan filter dan urutan yang dipilih.
      *
-     * Filter, pencarian, sorting, kumpulan ID yang sudah dimuat, dan identitas seller divalidasi sebelum
-     * query produk dibentuk. Response menggunakan urutan stabil, metadata keberadaan batch berikutnya,
-     * serta status verifikasi lokasi yang menentukan apakah produk baru dapat ditambahkan.
-     * Ukuran batch mengikuti per_page yang valid atau default konfigurasi bila tidak dikirim.
+     * Filter, pencarian, sorting, cursor, dan identitas seller divalidasi sebelum query produk dibentuk.
+     * Cursor mengikat posisi ke seller serta kriteria aktif. Response mengembalikan posisi batch
+     * berikutnya dan status verifikasi lokasi yang menentukan apakah produk baru dapat ditambahkan.
      *
      * @param  string  $user_id_seller  ID seller pemilik produk atau transaksi.
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
@@ -52,7 +55,7 @@ class ProductController extends Controller
         $validator = Validator::make(
             [
                 'user_id_seller' => $user_id_seller,
-                'products_current_id' => $request->products_current_id,
+                'cursor' => $request->cursor,
                 'per_page' => $request->per_page === '' ? null : $request->per_page,
                 'search_product' => $request->search_product,
                 'stock_filter' => $request->stock_filter,
@@ -60,16 +63,8 @@ class ProductController extends Controller
             ],
             [
                 'user_id_seller' => ['required', 'uuid'],
+                'cursor' => ['bail', 'nullable', 'string', 'max:2048'],
                 'per_page' => ['nullable', 'integer', 'min:1', 'max:'.config('seller_product.max_per_page')],
-                'products_current_id' => [
-                    'required',
-                    'json',
-                    function ($attribute, $value, $fail) {
-                        if (! is_string($value) || ! is_array(json_decode($value, true))) {
-                            $fail("The {$attribute} field must be a JSON array.");
-                        }
-                    },
-                ],
                 'search_product' => ['nullable', 'string'],
                 'stock_filter' => ['nullable', Rule::in(Product::STOCK_FILTER_OPTIONS)],
                 'sort_product' => ['nullable', Rule::in(Product::SORT_OPTIONS)],
@@ -90,29 +85,63 @@ class ProductController extends Controller
         // --- step 2 - end - pastikan seller hanya membaca daftar produknya sendiri
 
         // --- step 3 - start - ambil batch produk dan tentukan metadata pagination
-        $products_current_id = json_decode($validate['products_current_id'], true);
         $per_page = (int) ($validate['per_page'] ?? config('seller_product.per_page'));
         $search_product = trim($validate['search_product'] ?? '');
         $stock_filter = $validate['stock_filter'] ?? 'all';
         $sort_product = $validate['sort_product'] ?? 'latest';
+        try {
+            $cursor_position = $request->filled('cursor')
+                ? $this->sellerProductCursorService->decode(
+                    $validate['cursor'],
+                    $validate['user_id_seller'],
+                    $search_product,
+                    $stock_filter,
+                    $sort_product,
+                )
+                : null;
+        } catch (ValidationException $exception) {
+            return response()->json(['status' => 422, 'message' => $exception->errors()], 422);
+        }
 
         $products = Product::with('images')
             ->where('user_id_seller', $validate['user_id_seller'])
-            ->whereNotIn('id', $products_current_id)
-            ->whereRaw('LOWER(name) LIKE ?', ['%'.mb_strtolower($search_product).'%'])
+            ->whereRaw(
+                'LOWER(products.name) LIKE LOWER(CAST(? AS TEXT))',
+                ['%'.$search_product.'%'],
+            )
             ->withStockCondition($stock_filter)
-            ->withProductSort($sort_product)
+            ->tap(fn ($query) => $this->sellerProductCursorService->applyBoundary(
+                $query,
+                $cursor_position,
+                $sort_product,
+            ));
+
+        $products = $this->sellerProductCursorService
+            ->applyOrder($products, $sort_product)
             ->limit($per_page + 1)
             ->get();
 
         // Satu record lookahead membuktikan keberadaan batch berikutnya tanpa mengirimkannya ke frontend.
         $has_more = $products->count() > $per_page;
         $products = $products->take($per_page)->values();
+        $next_cursor = $has_more
+            ? $this->sellerProductCursorService->encode(
+                $products->last(),
+                $validate['user_id_seller'],
+                $search_product,
+                $stock_filter,
+                $sort_product,
+            )
+            : null;
+        $products->each(
+            fn (Product $product) => $this->sellerProductCursorService->hideInternalAttribute($product),
+        );
         // --- step 3 - end - ambil batch produk dan tentukan metadata pagination
 
         return response()->json([
             'status' => 200,
             'products' => $products,
+            'next_cursor' => $next_cursor,
             'has_more' => $has_more,
             'seller_location_verified' => $this->productAvailabilityService
                 ->sellerHasVerifiedAddress($validate['user_id_seller']),

@@ -66,12 +66,9 @@ DELETE /api/product/{user_id_seller}/{id}
 
 `GET /api/product/{user_id_seller}`
 
-Required query/body data:
-
-- `products_current_id`: JSON encoded array of product ids already loaded by the frontend. Malformed JSON and non-array JSON values are rejected.
-
 Optional data:
 
+- `cursor`: opaque position returned as `next_cursor` by the previous response.
 - `per_page`: integer from 1 through `SELLER_PRODUCT_MAX_PER_PAGE` (default 50).
   Missing or null values use `SELLER_PRODUCT_PER_PAGE` (default 50).
   Invalid values return HTTP 422 rather than being silently reduced.
@@ -83,8 +80,18 @@ Behavior:
 
 - Validates `user_id_seller` as UUID.
 - Validates `stock_filter` and `sort_product` against allowed values when present.
-- Excludes ids from `products_current_id`.
-- Applies case-insensitive product-name matching with a normalized `LOWER(name) LIKE` expression.
+- An initial request omits `cursor`.
+- A cursor request starts strictly after the previous primary sort value and
+  product UUID. Cursor format version 1 stores a fixed-size SHA-256 criteria
+  hash instead of the raw seller, search, stock filter, and sorting values.
+  The backend calculates this hash when encoding and recalculates it from the
+  normalized request when decoding; the frontend never hashes or decodes it.
+- Malformed, modified, unsupported-version, foreign-seller, or
+  criteria-incompatible cursors return HTTP 422 without exposing cursor data.
+- Applies case-insensitive product-name matching by evaluating both the product
+  name and bound keyword through a PostgreSQL-compatible
+  `LOWER(CAST(... AS TEXT))` query expression. PHP does not lowercase the
+  keyword.
 - Applies stock filters:
   - `all`: no stock restriction.
   - `healthy`: `stock > 5`.
@@ -96,10 +103,17 @@ Behavior:
   - `oldest`: `updated_at ASC`.
   - `price_highest`: `price DESC`.
   - `price_lowest`: `price ASC`.
-  - `name_asc`: `name ASC`.
-  - `name_desc`: `name DESC`.
+  - `name_asc`: normalized `LOWER(name) ASC`.
+  - `name_desc`: normalized `LOWER(name) DESC`.
+- Every sort places null primary values last and uses product UUID ascending as
+  its deterministic tie-breaker.
+- Name-sort cursors reuse the exact `LOWER(products.name)` value selected by
+  the database for ordering. The internal cursor value is not exposed in the
+  product response.
 - Requests one lookahead record, returns up to the resolved batch size, and sets `has_more`
   to indicate whether another batch genuinely exists.
+- Returns `next_cursor` only when another batch exists; terminal responses
+  return `next_cursor: null` and `has_more: false`.
 
 This endpoint is used by the frontend for initial list loading, search, stock filtering, sorting, and infinite scroll.
 
@@ -215,11 +229,12 @@ List responses include:
 {
   "status": 200,
   "products": [],
+  "next_cursor": null,
   "has_more": false
 }
 ```
 
-Seller list responses also include `seller_location_verified`. The frontend uses it to disable product creation and show the store-location warning without hiding existing products. `has_more` lets the frontend stop observing the pagination sentinel without sending another request solely to receive an empty batch.
+Seller list responses also include `seller_location_verified`. The frontend uses it to disable product creation and show the store-location warning without hiding existing products. `next_cursor` advances infinite scroll with a bounded request, while `has_more` lets the frontend stop observing the pagination sentinel without sending another request solely to receive an empty batch.
 
 Create and update responses include:
 
@@ -249,7 +264,8 @@ Validation failures return `422` with `message` containing validator messages.
 - Product ids are UUIDs.
 - Product image paths are stored in `product_images`; `products.img` mirrors position 1 for existing buyer, cart, checkout, and transaction consumers.
 - The product-images migration backfills every non-empty legacy `products.img` as position 1 without moving the physical file.
-- Product list pagination uses `products_current_id` instead of page numbers.
+- Product list pagination uses an opaque keyset cursor instead of page numbers or
+  a growing list of product UUIDs.
 - Product list completion uses an explicit boolean `has_more` calculated from one lookahead record.
 - Search normalizes the product name and keyword to lowercase so it remains case-insensitive and testable across supported database environments.
 - Stock filtering and sorting use existing `products` columns, so they do not require extra database fields.
