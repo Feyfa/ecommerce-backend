@@ -20,7 +20,7 @@ class ProductImagesTest extends TestCase
     /**
      * Menyiapkan fixture dan dependency sebelum setiap pengujian.
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     protected function setUp(): void
     {
@@ -42,7 +42,7 @@ class ProductImagesTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function seller_can_create_a_product_with_one_image(): void
     {
@@ -67,7 +67,7 @@ class ProductImagesTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function seller_can_create_a_product_with_five_images(): void
     {
@@ -89,7 +89,7 @@ class ProductImagesTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function create_rejects_an_empty_or_oversized_image_collection(): void
     {
@@ -115,7 +115,7 @@ class ProductImagesTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function create_rejects_non_image_and_files_larger_than_one_megabyte(): void
     {
@@ -145,7 +145,7 @@ class ProductImagesTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function create_rejects_malformed_image_manifests_without_server_errors(): void
     {
@@ -168,25 +168,20 @@ class ProductImagesTest extends TestCase
     }
 
     /**
-     * Memverifikasi aturan pengelolaan satu hingga lima gambar produk pada skenario product list
-     * rejects a malformed product cursor.
+     * Memverifikasi daftar produk menolak cursor keyset yang rusak.
      *
      * Test menyiapkan seller dan file upload, menjalankan endpoint produk, lalu memastikan validasi
      * manifest, urutan gambar, ownership, storage, dan database tetap konsisten.
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function product_list_rejects_a_malformed_product_cursor(): void
     {
-        $this->get("/api/product/{$this->seller->id}?products_current_id=invalid")
+        $this->get("/api/product/{$this->seller->id}?cursor=invalid")
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['products_current_id'], 'message');
-
-        $this->get("/api/product/{$this->seller->id}?products_current_id=".urlencode('"not-an-array"'))
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors(['products_current_id'], 'message');
+            ->assertJsonValidationErrors(['cursor'], 'message');
     }
 
     /**
@@ -198,7 +193,7 @@ class ProductImagesTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function migration_backfills_a_legacy_product_image_as_position_one(): void
     {
@@ -230,7 +225,7 @@ class ProductImagesTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function seller_can_reorder_keep_add_and_remove_product_images(): void
     {
@@ -276,7 +271,7 @@ class ProductImagesTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function update_rejects_zero_images_and_images_from_another_product(): void
     {
@@ -308,7 +303,7 @@ class ProductImagesTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function soft_deleting_a_product_keeps_images_for_existing_cart_context(): void
     {
@@ -334,7 +329,7 @@ class ProductImagesTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function seller_cannot_create_or_update_products_for_another_seller(): void
     {
@@ -375,7 +370,7 @@ class ProductImagesTest extends TestCase
      *
      * @param  int  $imageCount  Jumlah gambar yang harus dibuat pada fixture produk.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function createPayload(int $imageCount): array
     {
@@ -403,7 +398,7 @@ class ProductImagesTest extends TestCase
      *
      * @param  string  $path  Path file storage yang digunakan oleh fixture.
      *
-     * @return Product  Model produk yang dibuat atau digunakan sebagai fixture.
+     * @return Product Model produk yang dibuat atau digunakan sebagai fixture.
      */
     private function productWithImage(string $path): Product
     {
@@ -425,7 +420,7 @@ class ProductImagesTest extends TestCase
      *
      * @param  User  $seller  Model user seller yang menjadi actor atau fixture.
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     private function createVerifiedSellerAddress(User $seller): void
     {
