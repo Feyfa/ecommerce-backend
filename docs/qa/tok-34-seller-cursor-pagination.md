@@ -53,9 +53,13 @@ inside its main database query without an extra normalization round trip.
 
 | ID | Status | Verification | Expected Result | Evidence |
 | --- | --- | --- | --- | --- |
-| TOK-34-BE-07 | ⬜ | Deploy the cursor-capable backend and frontend as one coordinated release. | Seller infinite scroll advances with `next_cursor`; no request depends on a product UUID exclusion list. | Requires staging. |
-| TOK-34-BE-08 | ⬜ | Exercise malformed, modified, criteria-incompatible, and foreign-seller cursors through staging HTTP. | Invalid cursor use returns safe 422 or ownership 403 without internal details. | Requires staging. |
-| TOK-34-BE-09 | ⬜ | Inspect Seller Product requests and query logs during staging pagination. | Requests remain bounded and the endpoint executes keyset boundaries without UUID exclusion-list processing. | Requires staging. |
+| TOK-34-BE-07 | ✅ | Deploy the cursor-capable backend and frontend as one coordinated release. | Seller infinite scroll advances with `next_cursor`; no request depends on a product UUID exclusion list. | Deploy Staging run `34744957628` succeeded on September 13, 2026. A three-product staging catalog requested with `per_page=2` returned two products plus `has_more: true` and an opaque `next_cursor`, then one distinct product plus `has_more: false` and `next_cursor: null`; all three returned IDs were unique. |
+
+Malformed, modified, criteria-incompatible, foreign-seller, and 1,000-product
+cases remain automated verification because they are safer and more
+deterministic there than when modifying authenticated requests or staging data.
+Their coverage is recorded in `TOK-34-BE-01`; staging is limited to the
+deployed cross-application cursor contract and observable HTTP behavior.
 
 ## Rollback
 
