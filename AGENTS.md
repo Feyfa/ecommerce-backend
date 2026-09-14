@@ -217,6 +217,21 @@ Do not force step comments into a simple function that has no meaningful interna
 
 Add contextual comments when they explain intent, business rules, state relationships, side effects, compatibility constraints, edge cases, race conditions, or regressions that are not obvious from the code. Prefer comments that explain why the logic exists and avoid comments that merely translate syntax.
 
+## Command And Approval Readability
+
+- Keep simple commands on one line when they remain easy to read and review.
+- Format PHP, SQL, shell, or other complex commands across multiple lines with
+  clear indentation so the approval dialog remains easy to understand before
+  the command is approved.
+- Split complex operations into smaller commands with one clear purpose per
+  execution when that separation is safe and preserves the required atomicity.
+- Avoid placing complex scripts, especially `php -r` or long SQL statements,
+  on one dense line that is difficult to review.
+- When a temporary script is the safer approach, show or explain its contents
+  first, then use a short and specific command to execute it.
+- State explicitly in each approval question whether the command only reads
+  data or changes state.
+
 ## Git and Commit Workflow
 
 Before proposing or creating a commit:
