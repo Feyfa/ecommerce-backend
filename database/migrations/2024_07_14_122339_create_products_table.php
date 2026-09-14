@@ -10,7 +10,7 @@ return new class extends Migration
      * Membuat tabel products untuk kepemilikan seller, gambar cover legacy, nama, harga, dan stok.
      * Foreign key menghubungkan produk ke user seller dan timestamp mendukung pengurutan katalog.
      *
-     * @return void  Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
+     * @return void Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
      */
     public function up(): void
     {
@@ -31,7 +31,7 @@ return new class extends Migration
      * Menghapus tabel products beserta seluruh constraint dan data di dalamnya untuk membatalkan
      * struktur yang dibuat oleh migration ini.
      *
-     * @return void  Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
+     * @return void Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
      */
     public function down(): void
     {

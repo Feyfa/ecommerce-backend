@@ -57,7 +57,7 @@ class AppServiceProvider extends ServiceProvider
      * test dapat menjalankan migration. Guard ini menghentikan proses lebih awal ketika konfigurasi
      * berpotensi menunjuk database development atau database bersama.
      *
-     * @return void  Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
+     * @return void Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
      */
     private function ensureTestingDatabaseIsSafe(): void
     {

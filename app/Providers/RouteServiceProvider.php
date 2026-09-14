@@ -25,7 +25,7 @@ class RouteServiceProvider extends ServiceProvider
      * Provider mendaftarkan pembatasan rate untuk route API berdasarkan user atau alamat IP, lalu
      * menyerahkan binding dan konfigurasi route lainnya kepada implementasi framework.
      *
-     * @return void  Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
+     * @return void Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
      */
     public function boot(): void
     {

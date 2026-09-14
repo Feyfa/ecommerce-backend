@@ -18,7 +18,7 @@ class ProductAvailabilityService
      *
      * @param  AlamatService  $alamatService  Service alamat yang digunakan oleh class ini.
      *
-     * @return void  Tidak mengembalikan nilai; dependency disimpan pada instance.
+     * @return void Tidak mengembalikan nilai; dependency disimpan pada instance.
      */
     public function __construct(private AlamatService $alamatService) {}
 
@@ -27,7 +27,7 @@ class ProductAvailabilityService
      *
      * @param  string  $sellerId  ID seller yang menjadi scope pemeriksaan.
      *
-     * @return bool  True ketika kondisi seller has verified address terpenuhi; false jika tidak.
+     * @return bool True ketika kondisi seller has verified address terpenuhi; false jika tidak.
      */
     public function sellerHasVerifiedAddress(string $sellerId): bool
     {
@@ -43,7 +43,7 @@ class ProductAvailabilityService
      *
      * @param  array<int, string>  $sellerIds  Daftar ID seller yang akan diperiksa secara sekaligus.
      *
-     * @return array<int, string>  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array<int, string> Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function verifiedSellerIds(array $sellerIds): array
     {
@@ -76,7 +76,7 @@ class ProductAvailabilityService
      * @param  int  $stock  Jumlah stok produk untuk skenario atau perubahan terkait.
      * @param  bool  $sellerLocationVerified  Penanda bahwa lokasi seller memenuhi invariant pinpoint.
      *
-     * @return string|null  Nilai teks yang telah dinormalisasi, atau null ketika sumber datanya tidak tersedia.
+     * @return string|null Nilai teks yang telah dinormalisasi, atau null ketika sumber datanya tidak tersedia.
      */
     public function unavailableReason(
         bool $productExists,
@@ -98,7 +98,7 @@ class ProductAvailabilityService
      * @param  array<string, string>  $reasons  Pemetaan alasan ketersediaan berdasarkan ID produk.
      * @param  string  $expectedReason  Kode alasan ketersediaan yang diharapkan oleh test.
      *
-     * @return bool  True ketika kondisi has only unavailable reason terpenuhi; false jika tidak.
+     * @return bool True ketika kondisi has only unavailable reason terpenuhi; false jika tidak.
      */
     public function hasOnlyUnavailableReason(array $reasons, string $expectedReason): bool
     {
@@ -113,7 +113,7 @@ class ProductAvailabilityService
      *
      * @param  string  $productId  ID produk yang menjadi target operasi.
      *
-     * @return Product|null  Model produk yang dibuat atau digunakan sebagai fixture.
+     * @return Product|null Model produk yang dibuat atau digunakan sebagai fixture.
      */
     public function findProductForAvailability(string $productId): ?Product
     {

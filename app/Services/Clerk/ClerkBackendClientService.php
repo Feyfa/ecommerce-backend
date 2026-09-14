@@ -12,7 +12,7 @@ class ClerkBackendClientService
      * Tujuan service ini untuk menyiapkan instance SDK Clerk backend
      * dan opsi verifikasi request secara terpusat.
      *
-     * @return ClerkBackend  Hasil proses yang telah dinormalisasi sesuai kontrak function ini.
+     * @return ClerkBackend Hasil proses yang telah dinormalisasi sesuai kontrak function ini.
      */
     public function makeSdk(): ClerkBackend
     {
@@ -27,7 +27,7 @@ class ClerkBackendClientService
      * Tujuan method ini untuk menyiapkan opsi authenticateRequest
      * agar middleware tidak perlu merakit konfigurasi Clerk berulang kali.
      *
-     * @return AuthenticateRequestOptions  Hasil proses yang telah dinormalisasi sesuai kontrak function ini.
+     * @return AuthenticateRequestOptions Hasil proses yang telah dinormalisasi sesuai kontrak function ini.
      */
     public function makeAuthenticateRequestOptions(): AuthenticateRequestOptions
     {
@@ -44,7 +44,7 @@ class ClerkBackendClientService
      * Tujuan method ini untuk memastikan backend Clerk sudah memiliki
      * secret key sebelum dipakai autentikasi.
      *
-     * @return void  Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
+     * @return void Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
      */
     private function ensureSecretKeyConfiguration(): void
     {
@@ -61,7 +61,7 @@ class ClerkBackendClientService
      *
      * @param  string  $key  Nama configuration key yang akan dinormalisasi.
      *
-     * @return string|null  Nilai teks yang telah dinormalisasi, atau null ketika sumber datanya tidak tersedia.
+     * @return string|null Nilai teks yang telah dinormalisasi, atau null ketika sumber datanya tidak tersedia.
      */
     private function nullableConfig(string $key): ?string
     {

@@ -19,7 +19,7 @@ class AlamatController extends Controller
      * @param  AlamatService  $alamatService  Layanan pengelolaan dan verifikasi alamat.
      * @param  AuditLogService  $auditLogService  Service audit log yang digunakan oleh class ini.
      *
-     * @return void  Tidak mengembalikan nilai; dependency disimpan pada instance.
+     * @return void Tidak mengembalikan nilai; dependency disimpan pada instance.
      */
     public function __construct(
         protected AlamatService $alamatService,
@@ -34,7 +34,7 @@ class AlamatController extends Controller
      *
      * @param  Request  $request  Filter pencarian alamat buyer.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function getAlamatBuyer(Request $request): JsonResponse
     {
@@ -77,7 +77,7 @@ class AlamatController extends Controller
      *
      * @param  Request  $request  Data alamat dan pinpoint buyer.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function addAlamatBuyer(Request $request): JsonResponse
     {
@@ -178,7 +178,7 @@ class AlamatController extends Controller
      * @param  string  $id  ID alamat.
      * @param  Request  $request  Request buyer terautentikasi.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function deleteAlamatBuyer(string $id, Request $request): JsonResponse
     {
@@ -272,7 +272,7 @@ class AlamatController extends Controller
      * @param  string  $id  ID alamat yang diaktifkan.
      * @param  Request  $request  Request buyer terautentikasi.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function setEnableAlamatBuyer(string $id, Request $request): JsonResponse
     {
@@ -373,7 +373,7 @@ class AlamatController extends Controller
      * @param  string  $id  ID alamat.
      * @param  Request  $request  Data alamat dan pinpoint terbaru.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function updateAlamatBuyer(string $id, Request $request): JsonResponse
     {
@@ -459,7 +459,7 @@ class AlamatController extends Controller
      *
      * @param  Alamat  $alamat  Model alamat yang menjadi target atau sumber data.
      *
-     * @return array{id: string, place: string, recipient_name: string}  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{id: string, place: string, recipient_name: string} Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function addressReference(Alamat $alamat): array
     {
@@ -480,7 +480,7 @@ class AlamatController extends Controller
      * @param  array<string, mixed>  $beforeValues  Snapshot alamat sebelum update diterapkan.
      * @param  Alamat  $alamat  Model alamat yang menjadi target atau sumber data.
      *
-     * @return array<int, array{field: string, label: string, before: mixed, after: mixed}>  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array<int, array{field: string, label: string, before: mixed, after: mixed}> Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function addressChanges(array $beforeValues, Alamat $alamat): array
     {

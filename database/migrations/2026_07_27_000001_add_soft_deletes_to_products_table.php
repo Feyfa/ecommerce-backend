@@ -9,7 +9,7 @@ return new class extends Migration
     /**
      * Menyimpan produk yang dihapus agar keranjang dan riwayat transaksi tetap dapat menjelaskan statusnya.
      *
-     * @return void  Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
+     * @return void Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
      */
     public function up(): void
     {
@@ -21,7 +21,7 @@ return new class extends Migration
     /**
      * Membatalkan perubahan schema database.
      *
-     * @return void  Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
+     * @return void Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
      */
     public function down(): void
     {

@@ -22,7 +22,7 @@ class AuditLogService
      *
      * @param  UserAgentParserService  $userAgentParserService  Service user agent parser yang digunakan oleh class ini.
      *
-     * @return void  Tidak mengembalikan nilai; dependency disimpan pada instance.
+     * @return void Tidak mengembalikan nilai; dependency disimpan pada instance.
      */
     public function __construct(
         protected UserAgentParserService $userAgentParserService
@@ -39,7 +39,7 @@ class AuditLogService
      * @param  User  $user  Actor lokal yang baru berhasil dibuat.
      * @param  Request  $request  Request Clerk bootstrap yang sudah diverifikasi.
      *
-     * @return AuditLog  Model audit log yang berhasil ditemukan atau dicatat.
+     * @return AuditLog Model audit log yang berhasil ditemukan atau dicatat.
      */
     public function recordRegistration(User $user, Request $request): AuditLog
     {
@@ -75,7 +75,7 @@ class AuditLogService
      * @param  User  $user  Actor lokal yang sedang login.
      * @param  Request  $request  Request bootstrap yang memuat Clerk session id.
      *
-     * @return AuditLog|null  Model audit log yang berhasil ditemukan atau dicatat.
+     * @return AuditLog|null Model audit log yang berhasil ditemukan atau dicatat.
      */
     public function recordLogin(User $user, Request $request): ?AuditLog
     {
@@ -111,7 +111,7 @@ class AuditLogService
      * @param  User  $user  Actor lokal yang meminta logout.
      * @param  Request  $request  Request logout sebelum session Clerk ditutup.
      *
-     * @return AuditLog|null  Model audit log yang berhasil ditemukan atau dicatat.
+     * @return AuditLog|null Model audit log yang berhasil ditemukan atau dicatat.
      */
     public function recordLogout(User $user, Request $request): ?AuditLog
     {
@@ -148,7 +148,7 @@ class AuditLogService
      * @param  Product  $product  Model produk yang menjadi target atau sumber data.
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      *
-     * @return AuditLog  Model audit log yang berhasil ditemukan atau dicatat.
+     * @return AuditLog Model audit log yang berhasil ditemukan atau dicatat.
      */
     public function recordProductCreated(User $user, Product $product, Request $request): AuditLog
     {
@@ -179,7 +179,7 @@ class AuditLogService
      * @param  array<int, array{field: string, label: string, before: mixed, after: mixed}>  $changes  Daftar perubahan field produk yang akan dicatat.
      * @param  array<string, int|bool>  $imageChanges  Ringkasan perubahan gambar yang akan dicatat.
      *
-     * @return AuditLog  Model audit log yang berhasil ditemukan atau dicatat.
+     * @return AuditLog Model audit log yang berhasil ditemukan atau dicatat.
      */
     public function recordProductUpdated(
         User $user,
@@ -219,7 +219,7 @@ class AuditLogService
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      * @param  array{name: string, price: int, stock: int, image_count: int}  $snapshot  Snapshot produk terakhir sebelum produk dinonaktifkan.
      *
-     * @return AuditLog  Model audit log yang berhasil ditemukan atau dicatat.
+     * @return AuditLog Model audit log yang berhasil ditemukan atau dicatat.
      */
     public function recordProductDeleted(
         User $user,
@@ -255,7 +255,7 @@ class AuditLogService
      * @param  Alamat  $alamat  Model alamat yang menjadi target atau sumber data.
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      *
-     * @return AuditLog  Model audit log yang berhasil ditemukan atau dicatat.
+     * @return AuditLog Model audit log yang berhasil ditemukan atau dicatat.
      */
     public function recordAddressCreated(User $user, Alamat $alamat, Request $request): AuditLog
     {
@@ -285,7 +285,7 @@ class AuditLogService
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      * @param  array<int, array{field: string, label: string, before: mixed, after: mixed}>  $changes  Daftar perubahan field alamat yang akan dicatat.
      *
-     * @return AuditLog  Model audit log yang berhasil ditemukan atau dicatat.
+     * @return AuditLog Model audit log yang berhasil ditemukan atau dicatat.
      */
     public function recordAddressUpdated(
         User $user,
@@ -324,7 +324,7 @@ class AuditLogService
      * @param  array<string, mixed>  $snapshot  Snapshot alamat terakhir sebelum row dihapus.
      * @param  array{id: string, place: string, recipient_name: string}|null  $replacement  Alamat utama pengganti ketika sistem memilihnya otomatis.
      *
-     * @return AuditLog  Model audit log yang berhasil ditemukan atau dicatat.
+     * @return AuditLog Model audit log yang berhasil ditemukan atau dicatat.
      */
     public function recordAddressDeleted(
         User $user,
@@ -360,7 +360,7 @@ class AuditLogService
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      * @param  array{id: string, place: string, recipient_name: string}|null  $previous  Alamat utama sebelum perpindahan, atau null ketika belum ada.
      *
-     * @return AuditLog  Model audit log yang berhasil ditemukan atau dicatat.
+     * @return AuditLog Model audit log yang berhasil ditemukan atau dicatat.
      */
     public function recordAddressSelected(
         User $user,
@@ -397,7 +397,7 @@ class AuditLogService
      * @param  Request  $request  Request terautentikasi beserta metadata operasi.
      * @param  array<int, array{field: string, label: string, before: mixed, after: mixed}>  $changes  Daftar perubahan field profil.
      *
-     * @return AuditLog  Model audit log yang berhasil ditemukan atau dicatat.
+     * @return AuditLog Model audit log yang berhasil ditemukan atau dicatat.
      */
     public function recordProfileUpdated(User $user, Request $request, array $changes): AuditLog
     {
@@ -429,7 +429,7 @@ class AuditLogService
      * @param  Request  $request  Request terautentikasi beserta metadata operasi.
      * @param  AuditEvent  $event  Event foto profil yang telah berhasil diselesaikan.
      *
-     * @return AuditLog  Model audit log yang berhasil ditemukan atau dicatat.
+     * @return AuditLog Model audit log yang berhasil ditemukan atau dicatat.
      */
     public function recordProfileImageChanged(User $user, Request $request, AuditEvent $event): AuditLog
     {
@@ -483,7 +483,7 @@ class AuditLogService
      * @param  array<int, array{field: string, label: string, before: mixed, after: mixed}>  $changes  Daftar perubahan field profil toko.
      * @param  Alamat|null  $sellerAddress  Alamat seller yang menyertai profil toko, jika ada.
      *
-     * @return AuditLog  Model audit log yang berhasil ditemukan atau dicatat.
+     * @return AuditLog Model audit log yang berhasil ditemukan atau dicatat.
      */
     public function recordCompanyUpdated(
         User $user,
@@ -522,7 +522,7 @@ class AuditLogService
      * @param  AuditEvent  $event  Event foto toko yang telah berhasil diselesaikan.
      * @param  Alamat|null  $sellerAddress  Alamat seller yang menyertai profil toko, jika ada.
      *
-     * @return AuditLog  Model audit log yang berhasil ditemukan atau dicatat.
+     * @return AuditLog Model audit log yang berhasil ditemukan atau dicatat.
      */
     public function recordCompanyImageChanged(
         User $user,
@@ -580,7 +580,7 @@ class AuditLogService
      *
      * @param  Alamat  $alamat  Model alamat yang menjadi target atau sumber data.
      *
-     * @return array{place: string, recipient_name: string, phone: string, formatted_address: string, address_detail: string, enable: bool}  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{place: string, recipient_name: string, phone: string, formatted_address: string, address_detail: string, enable: bool} Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function addressSnapshot(Alamat $alamat): array
     {
@@ -599,7 +599,7 @@ class AuditLogService
      *
      * @param  Product  $product  Model produk yang menjadi target atau sumber data.
      *
-     * @return array{price: int, stock: int, image_count: int}  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{price: int, stock: int, image_count: int} Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function productSnapshot(Product $product): array
     {
@@ -629,7 +629,7 @@ class AuditLogService
      * @param  array  $extraContext  Metadata tambahan yang sudah di-allow-list.
      * @param  string|null  $requestId  Correlation ID request untuk idempotensi dan penelusuran.
      *
-     * @return AuditLog  Model audit log yang berhasil ditemukan atau dicatat.
+     * @return AuditLog Model audit log yang berhasil ditemukan atau dicatat.
      */
     private function record(
         User $user,
@@ -696,7 +696,7 @@ class AuditLogService
      * @param  User  $user  Model user lokal yang menjadi actor atau pemilik data.
      * @param  string  $clerkSessionId  ID session Clerk yang terkait dengan request.
      *
-     * @return string  Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
+     * @return string Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
      */
     private function authSessionKey(User $user, string $clerkSessionId): string
     {
@@ -708,7 +708,7 @@ class AuditLogService
      *
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      *
-     * @return string  Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
+     * @return string Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
      */
     private function resolveClerkSessionId(Request $request): string
     {
@@ -720,7 +720,7 @@ class AuditLogService
      *
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      *
-     * @return string  Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
+     * @return string Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
      */
     private function resolveRequestId(Request $request): string
     {
@@ -735,7 +735,7 @@ class AuditLogService
      *
      * @param  CarbonInterface  $timestamp  Waktu aktivitas pada timezone aplikasi.
      *
-     * @return string  Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
+     * @return string Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
      */
     private function formatDatabaseTimestamp(CarbonInterface $timestamp): string
     {

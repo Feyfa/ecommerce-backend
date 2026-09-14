@@ -32,7 +32,7 @@ class CheckoutTest extends TestCase
     /**
      * Menyiapkan fixture dan dependency sebelum setiap pengujian.
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function setUp(): void
     {
@@ -44,7 +44,7 @@ class CheckoutTest extends TestCase
     /**
      * Memverifikasi satu.
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function test_satu(): void
     {
@@ -61,7 +61,7 @@ class CheckoutTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function checkout_groups_use_the_store_name_instead_of_the_seller_account_name(): void
     {
@@ -101,7 +101,7 @@ class CheckoutTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function checkout_validation_rejects_buyer_without_enabled_address_without_updating_checkout_rows(): void
     {
@@ -170,7 +170,7 @@ class CheckoutTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function checkout_data_rejects_buyer_without_checkout_rows_before_loading_payment_methods(): void
     {
@@ -219,7 +219,7 @@ class CheckoutTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function checkout_validation_marks_only_matching_checked_rows_for_the_authenticated_buyer(): void
     {
@@ -355,7 +355,7 @@ class CheckoutTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function locked_checkout_rejects_a_quantity_change_from_the_initial_snapshot(): void
     {
@@ -375,7 +375,7 @@ class CheckoutTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function locked_checkout_rejects_a_price_change_from_the_initial_snapshot(): void
     {
@@ -395,7 +395,7 @@ class CheckoutTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function locked_checkout_rejects_an_active_buyer_address_change(): void
     {
@@ -434,7 +434,7 @@ class CheckoutTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function successful_checkout_returns_the_created_invoice_id(): void
     {

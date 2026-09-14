@@ -1,5 +1,5 @@
-<?php 
+<?php
 
 return [
-    'key' => env('XENDIT_KEY', '')
+    'key' => env('XENDIT_KEY', ''),
 ];

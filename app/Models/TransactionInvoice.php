@@ -41,7 +41,7 @@ class TransactionInvoice extends Model
     /**
      * Mengambil buyer pemilik invoice.
      *
-     * @return BelongsTo  Relasi Eloquent menuju model induk yang terkait.
+     * @return BelongsTo Relasi Eloquent menuju model induk yang terkait.
      */
     public function buyer(): BelongsTo
     {
@@ -51,7 +51,7 @@ class TransactionInvoice extends Model
     /**
      * Mengambil transaksi per seller yang tergabung dalam invoice.
      *
-     * @return HasMany  Relasi Eloquent menuju seluruh model turunan yang terkait.
+     * @return HasMany Relasi Eloquent menuju seluruh model turunan yang terkait.
      */
     public function transactionUsers(): HasMany
     {

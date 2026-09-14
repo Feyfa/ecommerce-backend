@@ -17,7 +17,7 @@ class CheckoutChangedException extends RuntimeException
      *
      * @param  string  $message  Pesan yang menjelaskan bahwa checkout harus dimuat dan dikonfirmasi ulang.
      *
-     * @return void  Tidak mengembalikan nilai; pesan perubahan diteruskan ke exception induk.
+     * @return void Tidak mengembalikan nilai; pesan perubahan diteruskan ke exception induk.
      */
     public function __construct(string $message = 'Checkout berubah, silakan cek ulang sebelum membayar')
     {

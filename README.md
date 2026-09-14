@@ -7,6 +7,29 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
+## Backend Code Formatting
+
+The backend uses Laravel Pint with the repository-owned `pint.json`
+configuration to keep PHP formatting consistent. Install the locked Composer
+dependencies, then use these commands from the backend repository:
+
+```bash
+composer format
+composer format:check
+```
+
+`composer format` updates every PHP file selected by Pint, so review the Git
+diff before handing off a change. `composer format:check` performs the same
+repository-wide inspection without modifying files and is also enforced by
+backend CI.
+
+The equivalent direct Pint commands are:
+
+```bash
+./vendor/bin/pint
+./vendor/bin/pint --test
+```
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:

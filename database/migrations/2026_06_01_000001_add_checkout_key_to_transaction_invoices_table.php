@@ -10,7 +10,7 @@ return new class extends Migration
      * Menambahkan checkout_key unik pada transaction_invoices untuk mengidentifikasi snapshot checkout
      * yang sama. Kolom ini mendukung idempotensi agar retry pembayaran tidak membuat invoice duplikat.
      *
-     * @return void  Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
+     * @return void Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
      */
     public function up(): void
     {
@@ -23,7 +23,7 @@ return new class extends Migration
      * Menghapus unique checkout_key dari transaction_invoices untuk mengembalikan kontrak invoice
      * sebelum idempotensi checkout ditambahkan.
      *
-     * @return void  Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
+     * @return void Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
      */
     public function down(): void
     {

@@ -18,7 +18,7 @@ class SaldoService
      *
      * @param  string  $user_id  ID user yang menjadi scope data atau mutasi.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function getSaldo(string $user_id): array
     {
@@ -50,7 +50,7 @@ class SaldoService
      * @param  string  $end_date  Tanggal akhir filter riwayat saldo.
      * @param  array  $saldo_history_current_ids  Nilai saldo history current ids yang diperlukan untuk menjalankan proses ini.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function getSaldoHistory(string $user_id, string $start_date, string $end_date, array $saldo_history_current_ids = []): array
     {
@@ -136,7 +136,7 @@ class SaldoService
      *
      * @param  string  $id  Identifier record yang menjadi target operasi.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function getSaldoById(string $id): array
     {
@@ -210,7 +210,7 @@ class SaldoService
      * @param  string|null  $payment_user_id  ID rekening user yang terkait dengan mutasi saldo.
      * @param  int  $price  Nominal uang yang digunakan oleh operasi.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function saveSaldoAfterDisbursement(?string $user_id = null, ?string $payment_user_id = null, int $price = 0): array
     {

@@ -13,7 +13,7 @@ class AlamatService
      *
      * @param  GeoapifyService  $geoapifyService  Service geoapify yang digunakan oleh class ini.
      *
-     * @return void  Tidak mengembalikan nilai; dependency disimpan pada instance.
+     * @return void Tidak mengembalikan nilai; dependency disimpan pada instance.
      */
     public function __construct(private GeoapifyService $geoapifyService) {}
 
@@ -24,7 +24,7 @@ class AlamatService
      * bentuk yang konsisten. Rule yang sama dipakai buyer dan seller agar kedua flow tidak memiliki
      * definisi pinpoint berbeda.
      *
-     * @return array<string, array<int, mixed>>  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array<string, array<int, mixed>> Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function locationRules(): array
     {
@@ -44,7 +44,7 @@ class AlamatService
      *
      * @param  Alamat|null  $alamat  Model alamat yang diperiksa atau digunakan sebagai snapshot.
      *
-     * @return bool  True ketika kondisi is verified pinpoint terpenuhi; false jika tidak.
+     * @return bool True ketika kondisi is verified pinpoint terpenuhi; false jika tidak.
      */
     public function isVerifiedPinpoint(?Alamat $alamat): bool
     {
@@ -65,7 +65,7 @@ class AlamatService
      *
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      *
-     * @return array<string, mixed>  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array<string, mixed> Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function locationAttributes(Request $request): array
     {

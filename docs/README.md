@@ -191,6 +191,7 @@ docs/
     tok-30-buyer-catalog-filters.md
     tok-32-product-pagination.md
     tok-34-seller-cursor-pagination.md
+    tok-40-laravel-pint.md
 
   development/
     commit-guidelines.md

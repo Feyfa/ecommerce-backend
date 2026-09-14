@@ -23,7 +23,7 @@ class ClerkSecurityService
      *
      * @param  ClerkBackendClientService  $clerkBackendClientService  Service clerk backend client yang digunakan oleh class ini.
      *
-     * @return void  Tidak mengembalikan nilai; dependency disimpan pada instance.
+     * @return void Tidak mengembalikan nilai; dependency disimpan pada instance.
      */
     public function __construct(
         protected ClerkBackendClientService $clerkBackendClientService
@@ -39,7 +39,7 @@ class ClerkSecurityService
      *
      * @param  string  $clerkUserId  ID user pada Clerk yang telah berasal dari token terverifikasi.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function getSummary(string $clerkUserId): array
     {
@@ -119,7 +119,7 @@ class ClerkSecurityService
      * @param  string  $clerkUserId  ID user pada Clerk yang telah berasal dari token terverifikasi.
      * @param  string  $currentSessionId  ID session Clerk yang sedang digunakan dan harus dipertahankan.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function getActiveSessions(string $clerkUserId, string $currentSessionId): array
     {
@@ -162,7 +162,7 @@ class ClerkSecurityService
      * @param  string  $currentSessionId  ID session Clerk yang sedang digunakan dan harus dipertahankan.
      * @param  string  $sessionId  ID session Clerk yang menjadi target operasi.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function revokeSession(string $clerkUserId, string $currentSessionId, string $sessionId): array
     {
@@ -193,7 +193,7 @@ class ClerkSecurityService
      * @param  string  $clerkUserId  ID user pada Clerk yang telah berasal dari token terverifikasi.
      * @param  string  $currentSessionId  ID session Clerk yang sedang digunakan dan harus dipertahankan.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function revokeOtherSessions(string $clerkUserId, string $currentSessionId): array
     {
@@ -232,7 +232,7 @@ class ClerkSecurityService
      * @param  string  $clerkUserId  ID user pada Clerk yang telah berasal dari token terverifikasi.
      * @param  LocalUser  $localUser  Model user lokal yang sedang dihubungkan dengan identity provider.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function validateGoogleAccountLink(string $clerkUserId, LocalUser $localUser): array
     {
@@ -301,7 +301,7 @@ class ClerkSecurityService
      *
      * @param  string  $clerkUserId  ID user pada Clerk yang telah berasal dari token terverifikasi.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function cleanupFailedGoogleAccountLinks(string $clerkUserId): array
     {
@@ -327,7 +327,7 @@ class ClerkSecurityService
      *
      * @param  string  $clerkUserId  ID user pada Clerk yang telah berasal dari token terverifikasi.
      *
-     * @return ClerkUser  Model identity user yang berhasil diperoleh dari Clerk.
+     * @return ClerkUser Model identity user yang berhasil diperoleh dari Clerk.
      */
     private function getClerkUser(string $clerkUserId): ClerkUser
     {
@@ -352,7 +352,7 @@ class ClerkSecurityService
      * @param  ClerkUser  $clerkUser  Model identity user yang diperoleh dari Clerk.
      * @param  ResponseInterface  $rawResponse  Response mentah SDK yang diperlukan untuk membaca metadata provider.
      *
-     * @return void  Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
+     * @return void Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
      */
     private function hydrateExternalAccountDeletionIds(ClerkUser $clerkUser, ResponseInterface $rawResponse): void
     {
@@ -389,7 +389,7 @@ class ClerkSecurityService
      *
      * @param  ResponseInterface  $rawResponse  Response mentah SDK yang diperlukan untuk membaca metadata provider.
      *
-     * @return array<string, string>  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array<string, string> Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function extractExternalAccountDeletionIds(ResponseInterface $rawResponse): array
     {
@@ -439,7 +439,7 @@ class ClerkSecurityService
      * @param  string  $provider  Nama provider OAuth yang sedang diperiksa.
      * @param  string  $identificationId  ID identification Clerk yang tidak boleh dipakai sebagai deletion ID.
      *
-     * @return string  Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
+     * @return string Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
      */
     private function getExternalAccountLookupKey(string $provider, string $identificationId): string
     {
@@ -456,7 +456,7 @@ class ClerkSecurityService
      * @param  string  $clerkUserId  ID user pada Clerk yang telah berasal dari token terverifikasi.
      * @param  string  $sessionId  ID session Clerk yang menjadi target operasi.
      *
-     * @return Session  Model session Clerk yang telah diverifikasi kepemilikannya.
+     * @return Session Model session Clerk yang telah diverifikasi kepemilikannya.
      */
     private function getOwnedSession(string $clerkUserId, string $sessionId): Session
     {
@@ -478,7 +478,7 @@ class ClerkSecurityService
      * @param  ClerkUser  $clerkUser  Model identity user yang diperoleh dari Clerk.
      * @param  string  $provider  Nama provider OAuth yang sedang diperiksa.
      *
-     * @return bool  True ketika kondisi has verified provider terpenuhi; false jika tidak.
+     * @return bool True ketika kondisi has verified provider terpenuhi; false jika tidak.
      */
     private function hasVerifiedProvider(ClerkUser $clerkUser, string $provider): bool
     {
@@ -492,7 +492,7 @@ class ClerkSecurityService
      *
      * @param  ExternalAccountWithVerification  $externalAccount  External account Clerk yang sedang diperiksa.
      *
-     * @return bool  True ketika kondisi is verified provider account terpenuhi; false jika tidak.
+     * @return bool True ketika kondisi is verified provider account terpenuhi; false jika tidak.
      */
     private function isVerifiedProviderAccount(ExternalAccountWithVerification $externalAccount): bool
     {
@@ -505,7 +505,7 @@ class ClerkSecurityService
      * @param  ClerkUser  $clerkUser  Model identity user yang diperoleh dari Clerk.
      * @param  string  $provider  Nama provider OAuth yang sedang diperiksa.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function getProviderAccounts(ClerkUser $clerkUser, string $provider): array
     {
@@ -524,7 +524,7 @@ class ClerkSecurityService
      * @param  string|null  $firstEmail  Email external account pertama untuk perbandingan.
      * @param  string|null  $secondEmail  Email external account kedua untuk perbandingan.
      *
-     * @return bool  True ketika kondisi is same email terpenuhi; false jika tidak.
+     * @return bool True ketika kondisi is same email terpenuhi; false jika tidak.
      */
     private function isSameEmail(?string $firstEmail, ?string $secondEmail): bool
     {
@@ -540,7 +540,7 @@ class ClerkSecurityService
      * @param  string  $clerkUserId  ID user pada Clerk yang telah berasal dari token terverifikasi.
      * @param  ExternalAccountWithVerification  $externalAccount  External account Clerk yang sedang diperiksa.
      *
-     * @return void  Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
+     * @return void Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
      */
     private function ensureProviderAccountIsNotUsedByAnotherUser(
         string $clerkUserId,
@@ -574,7 +574,7 @@ class ClerkSecurityService
      * @param  ClerkUser  $clerkUser  Model identity user yang diperoleh dari Clerk.
      * @param  array  $externalAccounts  Daftar external account Clerk yang akan difilter atau diproses.
      *
-     * @return void  Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
+     * @return void Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
      */
     private function deleteProviderAccounts(ClerkUser $clerkUser, array $externalAccounts): void
     {
@@ -601,7 +601,7 @@ class ClerkSecurityService
      * @param  array  $externalAccounts  Daftar external account Clerk yang akan difilter atau diproses.
      * @param  string  $validExternalAccountId  ID resource external account yang valid untuk penghapusan.
      *
-     * @return void  Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
+     * @return void Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
      */
     private function deleteInvalidProviderAccounts(ClerkUser $clerkUser, array $externalAccounts, string $validExternalAccountId): void
     {
@@ -620,7 +620,7 @@ class ClerkSecurityService
      *
      * @param  ExternalAccountWithVerification  $externalAccount  External account Clerk yang sedang diperiksa.
      *
-     * @return string  Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
+     * @return string Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
      */
     private function getExternalAccountDeletionId(ExternalAccountWithVerification $externalAccount): string
     {
@@ -651,7 +651,7 @@ class ClerkSecurityService
      * @param  string  $clerkUserId  ID user pada Clerk yang telah berasal dari token terverifikasi.
      * @param  string  $externalAccountId  ID resource external account yang menjadi target penghapusan.
      *
-     * @return void  Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
+     * @return void Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
      */
     private function deleteExternalAccount(string $clerkUserId, string $externalAccountId): void
     {
@@ -676,7 +676,7 @@ class ClerkSecurityService
      * @param  string  $clerkUserId  ID user pada Clerk yang telah berasal dari token terverifikasi.
      * @param  array  $deletedExternalAccounts  Daftar external account yang telah dihapus pada proses sebelumnya.
      *
-     * @return void  Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
+     * @return void Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
      */
     private function ensureProviderAccountsAreDeleted(string $clerkUserId, array $deletedExternalAccounts): void
     {
@@ -714,7 +714,7 @@ class ClerkSecurityService
      * @param  ExternalAccountWithVerification  $firstExternalAccount  External account pertama untuk skenario perbandingan.
      * @param  ExternalAccountWithVerification  $secondExternalAccount  External account kedua untuk skenario perbandingan.
      *
-     * @return bool  True ketika kondisi is same external account terpenuhi; false jika tidak.
+     * @return bool True ketika kondisi is same external account terpenuhi; false jika tidak.
      */
     private function isSameExternalAccount(
         ExternalAccountWithVerification $firstExternalAccount,
@@ -741,7 +741,7 @@ class ClerkSecurityService
      *
      * @param  Throwable  $throwable  Exception provider yang akan diklasifikasikan.
      *
-     * @return bool  True ketika kondisi is external account not found error terpenuhi; false jika tidak.
+     * @return bool True ketika kondisi is external account not found error terpenuhi; false jika tidak.
      */
     private function isExternalAccountNotFoundError(Throwable $throwable): bool
     {
@@ -760,7 +760,7 @@ class ClerkSecurityService
      *
      * @param  array  $passkeys  Daftar passkey Clerk yang akan diproyeksikan secara aman.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function formatPasskeys(array $passkeys): array
     {
@@ -790,7 +790,7 @@ class ClerkSecurityService
      * @param  Session  $session  Model session Clerk yang akan diproyeksikan.
      * @param  string  $currentSessionId  ID session Clerk yang sedang digunakan dan harus dipertahankan.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function formatSession(Session $session, string $currentSessionId): array
     {
@@ -818,7 +818,7 @@ class ClerkSecurityService
      *
      * @param  SessionActivityResponse|null  $activity  Metadata aktivitas session Clerk yang akan diformat.
      *
-     * @return string  Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
+     * @return string Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
      */
     private function resolveDeviceLabel(?SessionActivityResponse $activity): string
     {
@@ -855,7 +855,7 @@ class ClerkSecurityService
      *
      * @param  SessionActivityResponse  $activity  Metadata aktivitas session Clerk yang akan diformat.
      *
-     * @return string  Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
+     * @return string Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
      */
     private function resolveSessionDeviceType(SessionActivityResponse $activity): string
     {
@@ -881,7 +881,7 @@ class ClerkSecurityService
      *
      * @param  SessionActivityResponse|null  $activity  Metadata aktivitas session Clerk yang akan diformat.
      *
-     * @return string|null  Nilai teks yang telah dinormalisasi, atau null ketika sumber datanya tidak tersedia.
+     * @return string|null Nilai teks yang telah dinormalisasi, atau null ketika sumber datanya tidak tersedia.
      */
     private function resolveLocationLabel(?SessionActivityResponse $activity): ?string
     {
@@ -902,7 +902,7 @@ class ClerkSecurityService
      *
      * @param  string  $deviceType  Tipe perangkat yang akan dinormalisasi atau ditampilkan.
      *
-     * @return string  Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
+     * @return string Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
      */
     private function formatDeviceType(string $deviceType): string
     {
@@ -921,7 +921,7 @@ class ClerkSecurityService
      *
      * @param  int|null  $timestamp  Timestamp provider dalam detik atau milidetik.
      *
-     * @return Carbon|null  Waktu yang telah dinormalisasi, atau null ketika timestamp tidak tersedia.
+     * @return Carbon|null Waktu yang telah dinormalisasi, atau null ketika timestamp tidak tersedia.
      */
     private function normalizeTimestamp(?int $timestamp): ?Carbon
     {

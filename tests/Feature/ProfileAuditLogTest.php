@@ -192,7 +192,7 @@ class ProfileAuditLogTest extends TestCase
     /**
      * Membentuk payload Pengaturan Pengguna yang sesuai dengan state fixture.
      *
-     * @param  array<string, mixed>  $overrides Nilai yang menimpa payload dasar.
+     * @param  array<string, mixed>  $overrides  Nilai yang menimpa payload dasar.
      *
      * @return array<string, mixed> Payload untuk endpoint update profil.
      */

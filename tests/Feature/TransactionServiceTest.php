@@ -68,7 +68,7 @@ class TransactionServiceTest extends TestCase
     /**
      * Memastikan invoice pending satu toko tetap memakai bentuk transaksi lama.
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function test_buyer_single_store_pending_transaction_keeps_the_regular_transaction_shape(): void
     {
@@ -174,6 +174,7 @@ class TransactionServiceTest extends TestCase
      * @param  string  $productName  Nama produk snapshot yang dapat dicari buyer.
      * @param  int  $productPrice  Subtotal produk untuk paket seller.
      * @param  int  $shippingPrice  Ongkir untuk paket seller.
+     *
      * @return TransactionUser Transaksi seller yang baru dibuat.
      */
     private function createStorePackage(

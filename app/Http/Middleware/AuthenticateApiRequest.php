@@ -29,7 +29,7 @@ class AuthenticateApiRequest
      *
      * @param  ClerkBackendClientService  $clerkBackendClientService  Service clerk backend client yang digunakan oleh class ini.
      *
-     * @return void  Tidak mengembalikan nilai; dependency disimpan pada instance.
+     * @return void Tidak mengembalikan nilai; dependency disimpan pada instance.
      */
     public function __construct(
         protected ClerkBackendClientService $clerkBackendClientService
@@ -47,7 +47,7 @@ class AuthenticateApiRequest
      * @param  Closure  $next  Callback middleware berikutnya pada pipeline request.
      * @param  string  $mode  Mode akses tambahan yang diwajibkan endpoint.
      *
-     * @return Response  Hasil proses yang telah dinormalisasi sesuai kontrak function ini.
+     * @return Response Hasil proses yang telah dinormalisasi sesuai kontrak function ini.
      */
     public function handle(Request $request, Closure $next, string $mode = 'strict'): Response
     {
@@ -125,7 +125,7 @@ class AuthenticateApiRequest
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      * @param  User  $user  Model user lokal yang menjadi actor atau pemilik data.
      *
-     * @return void  Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
+     * @return void Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
      */
     private function setAuthenticatedUser(Request $request, User $user): void
     {

@@ -25,7 +25,7 @@ class TransactionProduct extends Model
     /**
      * Mengambil transaksi seller yang memiliki item ini.
      *
-     * @return BelongsTo  Relasi Eloquent menuju model induk yang terkait.
+     * @return BelongsTo Relasi Eloquent menuju model induk yang terkait.
      */
     public function transactionUser(): BelongsTo
     {
@@ -35,7 +35,7 @@ class TransactionProduct extends Model
     /**
      * Mengambil produk sumber dari item transaksi.
      *
-     * @return BelongsTo  Relasi Eloquent menuju model induk yang terkait.
+     * @return BelongsTo Relasi Eloquent menuju model induk yang terkait.
      */
     public function product(): BelongsTo
     {

@@ -24,7 +24,7 @@ class TransactionService
      * @param  string  $user_type  Perspektif buyer atau seller yang menentukan scope transaksi.
      * @param  array  $filters  Kumpulan filter transaksi yang telah divalidasi.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function getTransaction(string $user_id, string $user_type, array $filters = []): array
     {
@@ -113,7 +113,7 @@ class TransactionService
      * level tersebut. Daftar pending buyer dapat mengelompokkan hasilnya kembali per invoice tanpa
      * mengubah sumber data seller atau transaksi yang sudah dibayar.
      *
-     * @return Builder  Query builder dengan join invoice, buyer, seller, dan perusahaan seller.
+     * @return Builder Query builder dengan join invoice, buyer, seller, dan perusahaan seller.
      */
     private function createBaseTransactionQuery(): Builder
     {
@@ -136,7 +136,7 @@ class TransactionService
      * @param  bool  $includePaymentAccount  Menentukan apakah nomor virtual account buyer disertakan.
      * @param  bool  $useInvoiceTotal  Menentukan apakah total invoice dipakai alih-alih total paket toko.
      *
-     * @return Builder  Query transaksi dengan kolom response yang telah dipilih.
+     * @return Builder Query transaksi dengan kolom response yang telah dipilih.
      */
     private function selectTransactionFields(Builder $query, bool $includePaymentAccount = false, bool $useInvoiceTotal = false): Builder
     {
@@ -182,7 +182,7 @@ class TransactionService
      * @param  string  $userId  ID buyer pemilik invoice pending yang akan dimuat.
      * @param  string  $sortOrder  Arah urutan tanggal transaksi, asc atau desc.
      *
-     * @return Collection  Kumpulan invoice pending yang setiap itemnya memiliki paket transaksi per toko.
+     * @return Collection Kumpulan invoice pending yang setiap itemnya memiliki paket transaksi per toko.
      */
     private function getPendingBuyerInvoices(Builder $filteredTransactions, string $userId, string $sortOrder): Collection
     {
@@ -246,7 +246,7 @@ class TransactionService
      *
      * @param  Collection  $transactions  Kumpulan transaksi seller yang akan disiapkan untuk response.
      *
-     * @return Collection  Transaksi dengan tanggal lokal dan daftar produk terkait.
+     * @return Collection Transaksi dengan tanggal lokal dan daftar produk terkait.
      */
     private function prepareTransactionRows(Collection $transactions): Collection
     {
@@ -291,7 +291,7 @@ class TransactionService
      * @param  string  $user_id  ID user yang menjadi scope data atau mutasi.
      * @param  string  $user_type  Perspektif buyer atau seller yang menentukan scope transaksi.
      *
-     * @return Builder  Query builder yang telah ditambahkan scope atau kondisi terkait.
+     * @return Builder Query builder yang telah ditambahkan scope atau kondisi terkait.
      */
     private function applyUserTypeFilter($query, string $user_id, string $user_type): Builder
     {
@@ -312,7 +312,7 @@ class TransactionService
      * @param  Builder  $query  Query Eloquent yang akan ditambahkan kondisi tanpa dieksekusi langsung.
      * @param  string  $search  Kata kunci pencarian yang akan diterapkan.
      *
-     * @return Builder  Query builder yang telah ditambahkan scope atau kondisi terkait.
+     * @return Builder Query builder yang telah ditambahkan scope atau kondisi terkait.
      */
     private function applySearchFilter($query, string $search): Builder
     {
@@ -352,7 +352,7 @@ class TransactionService
      * @param  string  $date_from  Tanggal awal filter transaksi.
      * @param  string  $date_to  Tanggal akhir filter transaksi.
      *
-     * @return Builder  Query builder yang telah ditambahkan scope atau kondisi terkait.
+     * @return Builder Query builder yang telah ditambahkan scope atau kondisi terkait.
      */
     private function applyDateFilter($query, string $date_from, string $date_to): Builder
     {
@@ -372,7 +372,7 @@ class TransactionService
      *
      * @param  string  $date  Tanggal kalender yang akan dikonversi menjadi batas waktu.
      *
-     * @return bool  True ketika kondisi is valid date terpenuhi; false jika tidak.
+     * @return bool True ketika kondisi is valid date terpenuhi; false jika tidak.
      */
     private function isValidDate(string $date): bool
     {
@@ -388,7 +388,7 @@ class TransactionService
      * @param  Builder  $query  Query Eloquent yang akan ditambahkan kondisi tanpa dieksekusi langsung.
      * @param  string  $status  Status bisnis yang akan diterapkan atau difilter.
      *
-     * @return Builder  Query builder yang telah ditambahkan scope atau kondisi terkait.
+     * @return Builder Query builder yang telah ditambahkan scope atau kondisi terkait.
      */
     private function applyStatusFilter($query, string $status): Builder
     {
@@ -425,7 +425,7 @@ class TransactionService
      * @param  float  $price  Nominal uang yang digunakan oleh operasi.
      * @param  string  $type  Nilai type yang diperlukan untuk menjalankan proses ini.
      *
-     * @return void  Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
+     * @return void Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
      */
     public function transferSaldo(string $user_id = '', string $transaction_user_id = '', float $price = 0, string $type = ''): void
     {

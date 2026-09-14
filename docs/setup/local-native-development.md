@@ -303,6 +303,27 @@ empty index produces an empty catalog, while an unreachable Meilisearch process
 causes `/api/belanja` to return `503` with
 `BUYER_PRODUCT_SEARCH_UNAVAILABLE`.
 
+## Backend Code Formatting
+
+Install the dependencies recorded in `composer.lock` before running the
+repository's Laravel Pint commands:
+
+```bash
+composer install
+composer format
+composer format:check
+```
+
+`composer format` applies the `pint.json` rules to every PHP file selected by
+Pint. Review the resulting Git diff because the command modifies files.
+`composer format:check` checks the same scope without modifying files and must
+pass before a backend change is handed off. Backend CI runs this check before
+preparing the database and executing the Laravel test suite.
+
+The direct equivalents are `./vendor/bin/pint` and
+`./vendor/bin/pint --test`. Both commands must run with the project's supported
+PHP runtime.
+
 ## Automated Test Resource Safety
 
 Local PHPUnit runs use an isolated SQLite in-memory database configured by `phpunit.xml`. They must never reuse the PostgreSQL development database from `.env`, because database-resetting traits such as `RefreshDatabase` recreate the active test schema.

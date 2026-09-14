@@ -23,7 +23,7 @@ class CheckoutService
      * @param  KeranjangService  $keranjangService  Service keranjang yang digunakan oleh class ini.
      * @param  ProductAvailabilityService  $productAvailabilityService  Service product availability yang digunakan oleh class ini.
      *
-     * @return void  Tidak mengembalikan nilai; dependency disimpan pada instance.
+     * @return void Tidak mengembalikan nilai; dependency disimpan pada instance.
      */
     public function __construct(
         private AlamatService $alamatService,
@@ -40,7 +40,7 @@ class CheckoutService
      *
      * @param  string  $buyerId  ID buyer yang menjadi scope operasi.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function reconcileCheckoutCart(string $buyerId): array
     {
@@ -55,7 +55,7 @@ class CheckoutService
      *
      * @param  array<string, mixed>  $cartState  State cart terbaru beserta issue ketersediaannya.
      *
-     * @return array{code: string, message: string}|null  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{code: string, message: string}|null Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function checkoutAvailabilityError(array $cartState): ?array
     {
@@ -87,7 +87,7 @@ class CheckoutService
      * @param  string  $buyerId  ID buyer yang menjadi scope operasi.
      * @param  array<int, string>  $cartIds  Daftar ID cart yang akan direkonsiliasi atau diperbarui.
      *
-     * @return void  Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
+     * @return void Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
      */
     public function uncheckCheckoutItems(string $buyerId, array $cartIds): void
     {
@@ -95,14 +95,13 @@ class CheckoutService
     }
 
     /**
-     *
      * ID cart diekstrak dari issue ketersediaan, dinormalisasi menjadi string unik, dan dipakai untuk
      * read-repair selection. Nilai kosong dibuang agar update berikutnya tidak menyasar row yang tidak
      * valid.
      *
      * @param  array  $checkouts  Kumpulan item checkout yang telah dimuat dan divalidasi.
      *
-     * @return array<int, string>  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array<int, string> Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function checkoutCartIds(array $checkouts): array
     {
@@ -123,7 +122,7 @@ class CheckoutService
      *
      * @param  Alamat|null  $alamat  Model alamat yang diperiksa atau digunakan sebagai snapshot.
      *
-     * @return bool  True ketika kondisi is address verified terpenuhi; false jika tidak.
+     * @return bool True ketika kondisi is address verified terpenuhi; false jika tidak.
      */
     public function isAddressVerified(?Alamat $alamat): bool
     {
@@ -139,7 +138,7 @@ class CheckoutService
      *
      * @param  array  $checkouts  Kumpulan item checkout yang telah dimuat dan divalidasi.
      *
-     * @return bool  True ketika kondisi has unverified seller address terpenuhi; false jika tidak.
+     * @return bool True ketika kondisi has unverified seller address terpenuhi; false jika tidak.
      */
     public function hasUnverifiedSellerAddress(array $checkouts): bool
     {
@@ -167,7 +166,7 @@ class CheckoutService
      *
      * @param  string  $user_id_buyer  ID buyer pemilik cart, alamat, atau transaksi.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function getAlamatBuyer(string $user_id_buyer = ''): array
     {
@@ -191,7 +190,7 @@ class CheckoutService
      *
      * @param  string  $user_id_buyer  ID buyer pemilik cart, alamat, atau transaksi.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function getKeranjangCheckout(string $user_id_buyer = ''): array
     {
@@ -261,7 +260,7 @@ class CheckoutService
      *
      * @param  array  $keranjangs  Kumpulan item keranjang yang akan dikelompokkan atau diproses.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function generateFormatKeranjangs($keranjangs = []): array
     {
@@ -290,7 +289,7 @@ class CheckoutService
      * dapat dibandingkan. Seller tanpa pilihan valid membuat snapshot berbeda sehingga checkout harus
      * dikonfirmasi ulang.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function generateFormatKurirs(): array
     {
@@ -338,7 +337,7 @@ class CheckoutService
      * @param  array  $noteds  Catatan buyer yang dipetakan untuk setiap grup seller.
      * @param  string  $paymentSlug  Slug metode pembayaran yang dipilih.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function buildCheckoutSnapshot(string $user_id_buyer = '', array $shippingOptions = [], array $noteds = [], string $paymentSlug = ''): array
     {
@@ -555,7 +554,7 @@ class CheckoutService
      *
      * @param  array  $checkoutSnapshot  Snapshot checkout authoritative yang akan diproses.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function formatCheckoutSnapshotForFrontend(array $checkoutSnapshot = []): array
     {
@@ -583,7 +582,7 @@ class CheckoutService
      * @param  array  $backendSnapshot  Snapshot terbaru yang dihitung ulang oleh backend.
      * @param  array  $clientSnapshot  Snapshot terakhir yang telah dilihat atau dikonfirmasi frontend.
      *
-     * @return bool  True ketika kondisi checkout snapshot changed terpenuhi; false jika tidak.
+     * @return bool True ketika kondisi checkout snapshot changed terpenuhi; false jika tidak.
      */
     public function checkoutSnapshotChanged(array $backendSnapshot = [], array $clientSnapshot = []): bool
     {
@@ -608,7 +607,7 @@ class CheckoutService
      * @param  string  $user_id_buyer  ID buyer pemilik cart, alamat, atau transaksi.
      * @param  array  $checkoutSnapshot  Snapshot checkout authoritative yang akan diproses.
      *
-     * @return string  Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
+     * @return string Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
      */
     public function generateCheckoutKey(string $user_id_buyer = '', array $checkoutSnapshot = []): string
     {
@@ -626,7 +625,7 @@ class CheckoutService
      *
      * @param  string  $checkout_key  Kunci idempotensi yang mewakili satu snapshot checkout.
      *
-     * @return void  Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
+     * @return void Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
      */
     public function lockCheckoutKey(string $checkout_key = ''): void
     {
@@ -642,7 +641,7 @@ class CheckoutService
      *
      * @param  string  $checkout_key  Kunci idempotensi yang mewakili satu snapshot checkout.
      *
-     * @return void  Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
+     * @return void Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
      */
     public function unlockCheckoutKey(string $checkout_key = ''): void
     {
@@ -659,7 +658,7 @@ class CheckoutService
      * @param  string  $user_id_buyer  ID buyer pemilik cart, alamat, atau transaksi.
      * @param  string  $checkout_key  Kunci idempotensi yang mewakili satu snapshot checkout.
      *
-     * @return TransactionInvoice|null  Hasil proses yang telah dinormalisasi sesuai kontrak function ini.
+     * @return TransactionInvoice|null Hasil proses yang telah dinormalisasi sesuai kontrak function ini.
      */
     public function getExistingCheckoutInvoice(string $user_id_buyer = '', string $checkout_key = ''): ?TransactionInvoice
     {
@@ -693,9 +692,9 @@ class CheckoutService
      * @param  string  $checkout_key  Kunci idempotensi yang mewakili satu snapshot checkout.
      * @param  array  $dataXendit  Response pembayaran Xendit yang telah berhasil dibuat.
      *
-     * @return array  Data terstruktur yang memuat status, pesan, dan id invoice yang baru dibuat. Id
-     *                invoice dikembalikan agar pemanggil dapat menandai transaksi hasil checkout tanpa
-     *                menebak data terbaru buyer. Satu invoice mencakup seluruh seller pada checkout ini.
+     * @return array Data terstruktur yang memuat status, pesan, dan id invoice yang baru dibuat. Id
+     *               invoice dikembalikan agar pemanggil dapat menandai transaksi hasil checkout tanpa
+     *               menebak data terbaru buyer. Satu invoice mencakup seluruh seller pada checkout ini.
      */
     public function saveCheckoutToDatabase(string $user_id_buyer = '', array $checkouts = [], array $kurirs = [], array $noteds = [], ?Alamat $alamat_buyer = null, string $payment_method = '', string $payment_slug = '', string $payment_name = '', string $expired_at = '', int $price = 0, string $checkout_key = '', array $dataXendit = []): array
     {
@@ -822,7 +821,7 @@ class CheckoutService
      * @param  string  $user_id_buyer  ID buyer pemilik cart, alamat, atau transaksi.
      * @param  array  $checkouts  Kumpulan item checkout yang telah dimuat dan divalidasi.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function deleteKeranjangAfterCheckoutForBuyer(string $user_id_buyer = '', array $checkouts = []): array
     {
@@ -865,7 +864,7 @@ class CheckoutService
      *
      * @param  array  $checkouts  Kumpulan item checkout yang telah dimuat dan divalidasi.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function changeStockProductAfterCheckout(array $checkouts = []): array
     {
@@ -922,7 +921,7 @@ class CheckoutService
      * @param  string  $buyerId  ID buyer yang menjadi scope operasi.
      * @param  array  $checkoutSnapshot  Snapshot authoritative yang akan dibandingkan dengan row terkunci.
      *
-     * @return void  Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
+     * @return void Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
      *
      * @throws CheckoutAvailabilityException
      * @throws CheckoutChangedException

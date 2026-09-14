@@ -12,7 +12,7 @@ class PaymentListSeeder extends Seeder
      * metadata stabil. Upsert atau insert yang digunakan menjaga hasil seeding dapat diulang tanpa
      * membuat entri duplikat.
      *
-     * @return void  Tidak mengembalikan nilai; data referensi ditulis langsung ke database.
+     * @return void Tidak mengembalikan nilai; data referensi ditulis langsung ke database.
      */
     public function run(): void
     {
