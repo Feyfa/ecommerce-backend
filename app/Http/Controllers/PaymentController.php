@@ -21,7 +21,7 @@ class PaymentController extends Controller
      * @param  PaymentService  $paymentService  Service payment yang digunakan oleh class ini.
      * @param  XenditService  $xenditService  Service xendit yang digunakan oleh class ini.
      *
-     * @return void  Tidak mengembalikan nilai; dependency disimpan pada instance.
+     * @return void Tidak mengembalikan nilai; dependency disimpan pada instance.
      */
     public function __construct(
         protected PaymentService $paymentService,
@@ -36,7 +36,7 @@ class PaymentController extends Controller
      *
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function getPayment(Request $request): JsonResponse
     {
@@ -63,7 +63,7 @@ class PaymentController extends Controller
     /**
      * Menampilkan daftar metode pembayaran yang tersedia.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function getPaymentList(): JsonResponse
     {
@@ -84,7 +84,7 @@ class PaymentController extends Controller
      *
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function validatePaymentAccount(Request $request): JsonResponse
     {
@@ -143,7 +143,7 @@ class PaymentController extends Controller
      *
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function addPayment(Request $request): JsonResponse
     {
@@ -218,7 +218,7 @@ class PaymentController extends Controller
      * @param  string  $id  Identifier record yang menjadi target operasi.
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function deletePayment(string $id, Request $request): JsonResponse
     {
@@ -263,7 +263,7 @@ class PaymentController extends Controller
      *
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function simulateChargeVirtualAccount(Request $request): JsonResponse
     {

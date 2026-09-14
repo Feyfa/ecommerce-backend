@@ -15,7 +15,7 @@ class TransactionController extends Controller
      *
      * @param  TransactionService  $transactionService  Layanan pengelolaan transaksi.
      *
-     * @return void  Tidak mengembalikan nilai; dependency disimpan pada instance.
+     * @return void Tidak mengembalikan nilai; dependency disimpan pada instance.
      */
     public function __construct(protected TransactionService $transactionService) {}
 
@@ -28,7 +28,7 @@ class TransactionController extends Controller
      *
      * @param  Request  $request  Filter dan identitas pengguna.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function getTransaction(Request $request): JsonResponse
     {
@@ -80,7 +80,7 @@ class TransactionController extends Controller
      *
      * @param  Request  $request  Data transaksi yang disetujui.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function approvedTransaction(Request $request): JsonResponse
     {

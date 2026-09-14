@@ -20,7 +20,7 @@ class SellerDashboardService
      *
      * @param  string  $user_id  ID user yang menjadi scope data atau mutasi.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function getDashboard(string $user_id): array
     {
@@ -53,7 +53,7 @@ class SellerDashboardService
      * @param  Carbon  $startOfMonth  Batas awal bulan untuk perhitungan metrik.
      * @param  Carbon  $endOfMonth  Batas akhir bulan untuk perhitungan metrik.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function getSummary(string $user_id, Carbon $startOfMonth, Carbon $endOfMonth): array
     {
@@ -85,7 +85,7 @@ class SellerDashboardService
      *
      * @param  string  $user_id  ID user yang menjadi scope data atau mutasi.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function getPerformance(string $user_id): array
     {
@@ -147,7 +147,7 @@ class SellerDashboardService
      *
      * @param  string  $user_id  ID user yang menjadi scope data atau mutasi.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function getRecentTransactions(string $user_id): array
     {
@@ -205,7 +205,7 @@ class SellerDashboardService
      *
      * @param  string  $user_id  ID user yang menjadi scope data atau mutasi.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function getProductSnapshot(string $user_id): array
     {
@@ -230,7 +230,7 @@ class SellerDashboardService
      *
      * @param  string  $user_id  ID user yang menjadi scope data atau mutasi.
      *
-     * @return Builder  Query builder yang telah ditambahkan scope atau kondisi terkait.
+     * @return Builder Query builder yang telah ditambahkan scope atau kondisi terkait.
      */
     private function doneTransactionQuery(string $user_id): Builder
     {
@@ -246,7 +246,7 @@ class SellerDashboardService
      *
      * @param  string  $user_id  ID user yang menjadi scope data atau mutasi.
      *
-     * @return Builder  Query builder yang telah ditambahkan scope atau kondisi terkait.
+     * @return Builder Query builder yang telah ditambahkan scope atau kondisi terkait.
      */
     private function newOrderQuery(string $user_id): Builder
     {

@@ -10,7 +10,7 @@ trait CreatesApplication
     /**
      * Creates the application.
      *
-     * @return Application  Hasil proses yang telah dinormalisasi sesuai kontrak function ini.
+     * @return Application Hasil proses yang telah dinormalisasi sesuai kontrak function ini.
      */
     public function createApplication(): Application
     {

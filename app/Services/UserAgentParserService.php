@@ -17,7 +17,7 @@ class UserAgentParserService
      *
      * @param  string|null  $userAgent  Nilai user agent yang diperlukan untuk menjalankan proses ini.
      *
-     * @return array{browser: string|null, operating_system: string|null, device_type: string|null}  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{browser: string|null, operating_system: string|null, device_type: string|null} Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function parse(?string $userAgent): array
     {
@@ -49,7 +49,7 @@ class UserAgentParserService
      *
      * @param  string  $userAgent  User-agent yang sudah dinormalisasi.
      *
-     * @return string|null  Nilai teks yang telah dinormalisasi, atau null ketika sumber datanya tidak tersedia.
+     * @return string|null Nilai teks yang telah dinormalisasi, atau null ketika sumber datanya tidak tersedia.
      */
     private function resolveBrowser(string $userAgent): ?string
     {
@@ -68,7 +68,7 @@ class UserAgentParserService
      *
      * @param  string  $userAgent  User-agent yang sudah dinormalisasi.
      *
-     * @return string|null  Nilai teks yang telah dinormalisasi, atau null ketika sumber datanya tidak tersedia.
+     * @return string|null Nilai teks yang telah dinormalisasi, atau null ketika sumber datanya tidak tersedia.
      */
     private function resolveOperatingSystem(string $userAgent): ?string
     {
@@ -91,7 +91,7 @@ class UserAgentParserService
      *
      * @param  string  $userAgent  User-agent yang sudah dinormalisasi.
      *
-     * @return string|null  Nilai teks yang telah dinormalisasi, atau null ketika sumber datanya tidak tersedia.
+     * @return string|null Nilai teks yang telah dinormalisasi, atau null ketika sumber datanya tidak tersedia.
      */
     private function resolveDeviceType(string $userAgent): ?string
     {

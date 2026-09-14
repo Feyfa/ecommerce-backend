@@ -18,7 +18,7 @@ class KeranjangController extends Controller
      * @param  KeranjangService  $keranjangService  Layanan pengelolaan keranjang.
      * @param  ProductAvailabilityService  $productAvailabilityService  Layanan pemeriksaan ketersediaan produk.
      *
-     * @return void  Tidak mengembalikan nilai; dependency disimpan pada instance.
+     * @return void Tidak mengembalikan nilai; dependency disimpan pada instance.
      */
     public function __construct(
         protected KeranjangService $keranjangService,
@@ -35,7 +35,7 @@ class KeranjangController extends Controller
      * @param  Request  $request  Request terautentikasi.
      * @param  string  $user_id_buyer  ID buyer pemilik keranjang.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function index(Request $request, string $user_id_buyer): JsonResponse
     {
@@ -76,7 +76,7 @@ class KeranjangController extends Controller
      *
      * @param  Request  $request  Data item keranjang.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function store(Request $request): JsonResponse
     {
@@ -172,7 +172,7 @@ class KeranjangController extends Controller
      * @param  string  $user_id_buyer  ID buyer pemilik keranjang.
      * @param  string  $product_id  ID produk yang dihapus.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function delete(Request $request, string $user_id_buyer, string $product_id): JsonResponse
     {
@@ -221,7 +221,7 @@ class KeranjangController extends Controller
      *
      * @param  Request  $request  Data item dan status pilihan.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function checked(Request $request): JsonResponse
     {
@@ -280,7 +280,7 @@ class KeranjangController extends Controller
      *
      * @param  Request  $request  Data seller dan status pilihan.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function checkedGroup(Request $request): JsonResponse
     {
@@ -336,7 +336,7 @@ class KeranjangController extends Controller
      *
      * @param  Request  $request  Data buyer dan status pilihan.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function checkedAll(Request $request): JsonResponse
     {
@@ -390,7 +390,7 @@ class KeranjangController extends Controller
      *
      * @param  Request  $request  Data item keranjang.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function plusTotalKeranjang(Request $request): JsonResponse
     {
@@ -471,7 +471,7 @@ class KeranjangController extends Controller
      *
      * @param  Request  $request  Data item keranjang.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function minusTotalKeranjang(Request $request): JsonResponse
     {
@@ -538,7 +538,7 @@ class KeranjangController extends Controller
      *
      * @param  Request  $request  Data item dan kuantitas baru.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function changeTotalKeranjang(Request $request): JsonResponse
     {
@@ -628,7 +628,7 @@ class KeranjangController extends Controller
      *
      * @param  Request  $request  Request buyer terautentikasi.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function validateCheckout(Request $request): JsonResponse
     {
@@ -798,7 +798,7 @@ class KeranjangController extends Controller
      * @param  array<string, mixed>  $cartState  State cart terbaru beserta issue ketersediaannya.
      * @param  array<int, array<string, mixed>>  $issues  Daftar masalah ketersediaan yang akan diterjemahkan ke response.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     private function stockChangedResponse(array $cartState, array $issues): JsonResponse
     {
@@ -821,7 +821,7 @@ class KeranjangController extends Controller
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      * @param  string  $buyerId  ID buyer yang menjadi scope operasi.
      *
-     * @return JsonResponse|null  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse|null Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     private function buyerOwnershipResponse(Request $request, string $buyerId): ?JsonResponse
     {
@@ -846,7 +846,7 @@ class KeranjangController extends Controller
      * @param  string  $buyerId  ID buyer yang menjadi scope operasi.
      * @param  string  $productId  ID produk yang menjadi target operasi.
      *
-     * @return JsonResponse|null  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse|null Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     private function unavailableQuantityResponse(string $buyerId, string $productId): ?JsonResponse
     {

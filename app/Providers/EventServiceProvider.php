@@ -23,7 +23,7 @@ class EventServiceProvider extends ServiceProvider
     /**
      * Register any events for your application.
      *
-     * @return void  Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
+     * @return void Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
      */
     public function boot(): void
     {
@@ -33,7 +33,7 @@ class EventServiceProvider extends ServiceProvider
     /**
      * Determine if events and listeners should be automatically discovered.
      *
-     * @return bool  True ketika kondisi should discover events terpenuhi; false jika tidak.
+     * @return bool True ketika kondisi should discover events terpenuhi; false jika tidak.
      */
     public function shouldDiscoverEvents(): bool
     {

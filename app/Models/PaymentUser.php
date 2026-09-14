@@ -23,7 +23,7 @@ class PaymentUser extends Model
     /**
      * Mengambil user pemilik rekening pembayaran.
      *
-     * @return BelongsTo  Relasi Eloquent menuju model induk yang terkait.
+     * @return BelongsTo Relasi Eloquent menuju model induk yang terkait.
      */
     public function user(): BelongsTo
     {
@@ -33,7 +33,7 @@ class PaymentUser extends Model
     /**
      * Mengambil metode pembayaran yang digunakan rekening ini.
      *
-     * @return BelongsTo  Relasi Eloquent menuju model induk yang terkait.
+     * @return BelongsTo Relasi Eloquent menuju model induk yang terkait.
      */
     public function paymentList(): BelongsTo
     {

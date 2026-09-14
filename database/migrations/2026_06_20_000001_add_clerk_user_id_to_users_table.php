@@ -10,7 +10,7 @@ return new class extends Migration
      * Tujuan migration ini untuk menambahkan identity bridge utama
      * antara user lokal Laravel dan user di Clerk.
      *
-     * @return void  Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
+     * @return void Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
      */
     public function up(): void
     {
@@ -27,7 +27,7 @@ return new class extends Migration
      * Tujuan rollback ini untuk menghapus bridge Clerk dari tabel users
      * jika migration perlu dibatalkan.
      *
-     * @return void  Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
+     * @return void Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
      */
     public function down(): void
     {

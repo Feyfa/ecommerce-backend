@@ -10,7 +10,7 @@ return new class extends Migration
      * Membuat tabel companies sebagai profil toko satu-per-user, termasuk gambar, kontak, dan
      * deskripsi. Constraint user unik mencegah satu akun memiliki lebih dari satu profil perusahaan.
      *
-     * @return void  Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
+     * @return void Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
      */
     public function up(): void
     {
@@ -33,7 +33,7 @@ return new class extends Migration
      * Menghapus tabel companies beserta seluruh constraint dan data di dalamnya untuk membatalkan
      * struktur yang dibuat oleh migration ini.
      *
-     * @return void  Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
+     * @return void Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
      */
     public function down(): void
     {

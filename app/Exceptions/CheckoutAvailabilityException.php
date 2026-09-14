@@ -15,7 +15,7 @@ class CheckoutAvailabilityException extends RuntimeException
      * @param  string  $message  Pesan kegagalan yang menjelaskan alasan operasi dihentikan.
      * @param  array<int, string>  $cartIds  Daftar ID cart yang akan direkonsiliasi atau diperbarui.
      *
-     * @return void  Tidak mengembalikan nilai; message dan daftar cart disimpan pada exception.
+     * @return void Tidak mengembalikan nilai; message dan daftar cart disimpan pada exception.
      */
     public function __construct(
         string $message,

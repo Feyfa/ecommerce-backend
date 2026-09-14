@@ -23,7 +23,7 @@ class AssignRequestId
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      * @param  Closure  $next  Callback middleware berikutnya pada pipeline request.
      *
-     * @return Response  Hasil proses yang telah dinormalisasi sesuai kontrak function ini.
+     * @return Response Hasil proses yang telah dinormalisasi sesuai kontrak function ini.
      */
     public function handle(Request $request, Closure $next): Response
     {

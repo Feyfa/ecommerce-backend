@@ -20,7 +20,7 @@ class UserController extends Controller
      *
      * @param  AuditLogService  $auditLogService  Service yang membatasi context dan metadata audit.
      *
-     * @return void  Tidak mengembalikan nilai; dependency disimpan pada instance.
+     * @return void Tidak mengembalikan nilai; dependency disimpan pada instance.
      */
     public function __construct(
         private readonly AuditLogService $auditLogService
@@ -35,7 +35,7 @@ class UserController extends Controller
      *
      * @param  Request  $request  Request pengguna terautentikasi.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function deleteImage(Request $request): JsonResponse
     {
@@ -97,7 +97,7 @@ class UserController extends Controller
      *
      * @param  Request  $request  File gambar profil.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function uploadImage(Request $request): JsonResponse
     {
@@ -172,7 +172,7 @@ class UserController extends Controller
     /**
      * Menampilkan profil pengguna yang terautentikasi.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function show(): JsonResponse
     {
@@ -195,7 +195,7 @@ class UserController extends Controller
      * @param  Request  $request  Data profil terbaru.
      * @param  string  $id  ID pengguna.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function updateUser(Request $request, string $id): JsonResponse
     {

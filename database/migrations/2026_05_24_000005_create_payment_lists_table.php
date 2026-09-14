@@ -10,7 +10,7 @@ return new class extends Migration
      * Membuat katalog payment_lists untuk mendefinisikan jenis, metode, slug, dan nama pembayaran.
      * Katalog ini menjadi referensi rekening user dan pilihan pembayaran yang tersedia.
      *
-     * @return void  Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
+     * @return void Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
      */
     public function up(): void
     {
@@ -33,7 +33,7 @@ return new class extends Migration
      * Menghapus tabel terkait beserta seluruh constraint dan data di dalamnya untuk membatalkan
      * struktur yang dibuat oleh migration ini.
      *
-     * @return void  Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
+     * @return void Tidak mengembalikan nilai; perubahan diterapkan langsung pada schema database.
      */
     public function down(): void
     {

@@ -25,7 +25,7 @@ class AddressAuditLogTest extends TestCase
     /**
      * Menyiapkan fixture dan dependency sebelum setiap pengujian.
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     protected function setUp(): void
     {
@@ -43,7 +43,7 @@ class AddressAuditLogTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function successful_create_records_an_owner_scoped_address_snapshot(): void
     {
@@ -84,7 +84,7 @@ class AddressAuditLogTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function coordinates_are_never_stored_or_exposed(): void
     {
@@ -107,7 +107,7 @@ class AddressAuditLogTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function update_records_only_real_value_changes(): void
     {
@@ -146,7 +146,7 @@ class AddressAuditLogTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function identical_update_is_recorded_without_false_changes(): void
     {
@@ -164,7 +164,7 @@ class AddressAuditLogTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function delete_keeps_the_last_snapshot_after_the_address_is_gone(): void
     {
@@ -185,7 +185,7 @@ class AddressAuditLogTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function delete_records_the_replacement_address_chosen_by_the_system(): void
     {
@@ -205,7 +205,7 @@ class AddressAuditLogTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function selecting_a_main_address_records_the_previous_one(): void
     {
@@ -226,7 +226,7 @@ class AddressAuditLogTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function collection_masks_personal_data_while_detail_reveals_it(): void
     {
@@ -253,7 +253,7 @@ class AddressAuditLogTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function collection_masks_change_rows_that_contain_personal_data(): void
     {
@@ -274,7 +274,7 @@ class AddressAuditLogTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function foreign_address_and_failed_validation_do_not_create_audit_rows(): void
     {
@@ -294,7 +294,7 @@ class AddressAuditLogTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function audit_failure_rolls_back_the_address_mutation(): void
     {
@@ -319,7 +319,7 @@ class AddressAuditLogTest extends TestCase
      *
      * @param  array<string, mixed>  $overrides  Nilai yang menimpa payload dasar untuk skenario tertentu.
      *
-     * @return array<string, mixed>  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array<string, mixed> Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function addressPayload(array $overrides = []): array
     {
@@ -342,7 +342,7 @@ class AddressAuditLogTest extends TestCase
      *
      * @param  array<string, mixed>  $overrides  Nilai yang menimpa atribut alamat dasar.
      *
-     * @return Alamat  Model alamat yang berhasil dibuat.
+     * @return Alamat Model alamat yang berhasil dibuat.
      */
     private function existingAddress(array $overrides = []): Alamat
     {
@@ -366,7 +366,7 @@ class AddressAuditLogTest extends TestCase
     /**
      * Memalsukan response verifikasi Geoapify agar pengujian tidak bergantung pada provider.
      *
-     * @return void  Tidak mengembalikan nilai; fake dipasang pada HTTP client aplikasi.
+     * @return void Tidak mengembalikan nilai; fake dipasang pada HTTP client aplikasi.
      */
     private function fakeIndonesiaVerification(): void
     {

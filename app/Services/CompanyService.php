@@ -12,7 +12,7 @@ class CompanyService
      *
      * @param  AlamatService  $alamatService  Service alamat yang digunakan oleh class ini.
      *
-     * @return void  Tidak mengembalikan nilai; dependency disimpan pada instance.
+     * @return void Tidak mengembalikan nilai; dependency disimpan pada instance.
      */
     public function __construct(private AlamatService $alamatService) {}
 
@@ -24,7 +24,7 @@ class CompanyService
      *
      * @param  string  $user_id  ID user yang menjadi scope data atau mutasi.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function getCompany(string $user_id = ''): array
     {

@@ -15,7 +15,7 @@ class PaymentService
      * dalam bentuk daftar sederhana. Data rekening withdrawal milik user tidak ikut tercampur dalam
      * pilihan pembayaran buyer.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function getCheckoutPayment(): array
     {
@@ -40,7 +40,7 @@ class PaymentService
      * @param  string  $user_id  ID user yang menjadi scope data atau mutasi.
      * @param  string  $search  Kata kunci pencarian yang akan diterapkan.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function getWithdrawalPayments(string $user_id = '', $search = ''): array
     {
@@ -82,7 +82,7 @@ class PaymentService
      * @param  string  $user_id  ID user yang menjadi scope data atau mutasi.
      * @param  string  $account  ID rekening pembayaran yang dicari.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function getWithdrawalPayment(string $user_id, string $account): array
     {
@@ -131,7 +131,7 @@ class PaymentService
      * Nilai acak yang aman untuk sandbox dibentuk sesuai kontrak identitas yang diperlukan provider.
      * Helper ini hanya mendukung simulasi dan tidak mengambil data pribadi user produksi.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function generateFakeUser(): array
     {

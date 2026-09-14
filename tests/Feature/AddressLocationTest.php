@@ -25,7 +25,7 @@ class AddressLocationTest extends TestCase
     /**
      * Menyiapkan fixture dan dependency sebelum setiap pengujian.
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     protected function setUp(): void
     {
@@ -47,7 +47,7 @@ class AddressLocationTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function buyer_can_store_a_pinpoint_address(): void
     {
@@ -75,7 +75,7 @@ class AddressLocationTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function map_address_requires_coordinates_and_detail(): void
     {
@@ -96,7 +96,7 @@ class AddressLocationTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function existing_address_cannot_be_changed_back_to_manual(): void
     {
@@ -126,7 +126,7 @@ class AddressLocationTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function legacy_payload_without_location_source_is_rejected_for_new_addresses(): void
     {
@@ -148,7 +148,7 @@ class AddressLocationTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function server_rejects_a_pinpoint_verified_outside_indonesia(): void
     {
@@ -175,7 +175,7 @@ class AddressLocationTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function server_uses_the_verified_address_instead_of_client_metadata(): void
     {
@@ -202,7 +202,7 @@ class AddressLocationTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function provider_failure_rejects_the_write_without_changing_existing_data(): void
     {
@@ -239,7 +239,7 @@ class AddressLocationTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function checkout_rejects_an_active_legacy_manual_buyer_address(): void
     {
@@ -265,7 +265,7 @@ class AddressLocationTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function buyer_cannot_select_a_legacy_manual_address(): void
     {
@@ -296,7 +296,7 @@ class AddressLocationTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function checkout_rejects_a_legacy_manual_seller_address(): void
     {
@@ -330,7 +330,7 @@ class AddressLocationTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function buyer_cannot_delete_another_users_address(): void
     {
@@ -358,7 +358,7 @@ class AddressLocationTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function buyer_cannot_update_another_users_address(): void
     {
@@ -390,7 +390,7 @@ class AddressLocationTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function seller_can_store_a_pinpoint_with_required_detail(): void
     {
@@ -419,7 +419,7 @@ class AddressLocationTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function checkout_copies_buyer_and_seller_location_snapshots(): void
     {
@@ -488,7 +488,7 @@ class AddressLocationTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function checkout_snapshot_detects_an_address_change(): void
     {
@@ -520,7 +520,7 @@ class AddressLocationTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function deleting_the_active_address_does_not_enable_a_legacy_manual_fallback(): void
     {
@@ -558,7 +558,7 @@ class AddressLocationTest extends TestCase
      * Nilai dasar dipisahkan dari metadata pinpoint agar test dapat mengubah koordinat tanpa
      * mengulang data penerima pada setiap skenario.
      *
-     * @return array<string, string>  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array<string, string> Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function buyerFields(): array
     {
@@ -575,7 +575,7 @@ class AddressLocationTest extends TestCase
      *
      * @param  array<string, mixed>  $overrides  Nilai pengganti yang digabungkan dengan fixture default.
      *
-     * @return array<string, mixed>  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array<string, mixed> Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function mapFields(array $overrides = []): array
     {
@@ -595,7 +595,7 @@ class AddressLocationTest extends TestCase
      * Helper memungkinkan test membuktikan bahwa backend menyimpan hasil provider, bukan nilai alamat
      * yang dikirim client.
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     private function fakeIndonesiaVerification(): void
     {
