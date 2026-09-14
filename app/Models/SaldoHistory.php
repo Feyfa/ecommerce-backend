@@ -27,7 +27,7 @@ class SaldoHistory extends Model
     /**
      * Mengambil user pemilik riwayat saldo.
      *
-     * @return BelongsTo  Relasi Eloquent menuju model induk yang terkait.
+     * @return BelongsTo Relasi Eloquent menuju model induk yang terkait.
      */
     public function user(): BelongsTo
     {
@@ -37,7 +37,7 @@ class SaldoHistory extends Model
     /**
      * Mengambil transaksi yang terkait dengan perubahan saldo.
      *
-     * @return BelongsTo  Relasi Eloquent menuju model induk yang terkait.
+     * @return BelongsTo Relasi Eloquent menuju model induk yang terkait.
      */
     public function transactionUser(): BelongsTo
     {
@@ -47,7 +47,7 @@ class SaldoHistory extends Model
     /**
      * Mengambil rekening pembayaran yang terkait dengan perubahan saldo.
      *
-     * @return BelongsTo  Relasi Eloquent menuju model induk yang terkait.
+     * @return BelongsTo Relasi Eloquent menuju model induk yang terkait.
      */
     public function paymentUser(): BelongsTo
     {

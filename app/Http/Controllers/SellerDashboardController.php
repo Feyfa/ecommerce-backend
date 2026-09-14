@@ -12,7 +12,7 @@ class SellerDashboardController extends Controller
      *
      * @param  SellerDashboardService  $sellerDashboardService  Layanan ringkasan dashboard seller.
      *
-     * @return void  Tidak mengembalikan nilai; dependency disimpan pada instance.
+     * @return void Tidak mengembalikan nilai; dependency disimpan pada instance.
      */
     public function __construct(protected SellerDashboardService $sellerDashboardService) {}
 
@@ -23,7 +23,7 @@ class SellerDashboardController extends Controller
      * dipanggil. Ringkasan, performa, transaksi terbaru, dan snapshot produk dikembalikan hanya untuk
      * toko tersebut.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function show(): JsonResponse
     {

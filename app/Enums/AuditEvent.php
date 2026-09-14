@@ -28,7 +28,7 @@ enum AuditEvent: string
      * Tujuan method ini untuk menjaga title user-facing tetap konsisten
      * tanpa menyimpan copy text presentasi di setiap row audit.
      *
-     * @return string  Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
+     * @return string Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
      */
     public function title(): string
     {
@@ -56,7 +56,7 @@ enum AuditEvent: string
      * Tujuan method ini untuk menyediakan deskripsi aman yang tidak
      * mengarang metode autentikasi ketika Clerk tidak mengirim datanya.
      *
-     * @return string  Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
+     * @return string Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
      */
     public function description(): string
     {
@@ -83,7 +83,7 @@ enum AuditEvent: string
     /**
      * Tujuan method ini untuk menyediakan label pendek pada filter dan badge UI.
      *
-     * @return string  Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
+     * @return string Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
      */
     public function label(): string
     {
@@ -111,7 +111,7 @@ enum AuditEvent: string
      * Mengelompokkan event agar persistence dan presentasi tidak perlu
      * mengulang pemetaan category di setiap caller.
      *
-     * @return string  Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
+     * @return string Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
      */
     public function category(): string
     {

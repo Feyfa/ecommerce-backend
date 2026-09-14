@@ -30,7 +30,7 @@ class ClerkSecurityServiceTest extends TestCase
     /**
      * Memverifikasi formatted session exposes mobile category and normalized android label.
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function test_formatted_session_exposes_mobile_category_and_normalized_android_label(): void
     {
@@ -71,7 +71,7 @@ class ClerkSecurityServiceTest extends TestCase
      * @param  string|null  $browserName  Nama browser pada fixture aktivitas session.
      * @param  string  $expected  Nilai hasil yang diharapkan oleh skenario pengujian.
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     #[DataProvider('deviceLabelCases')]
     public function test_device_label_uses_mobile_context(
@@ -97,7 +97,7 @@ class ClerkSecurityServiceTest extends TestCase
      * Menyediakan kombinasi browser, sistem operasi, tipe perangkat, konteks mobile, dan label yang
      * diharapkan. Dataset memastikan fallback label tetap konsisten untuk activity Clerk yang parsial.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public static function deviceLabelCases(): array
     {
@@ -117,7 +117,7 @@ class ClerkSecurityServiceTest extends TestCase
      * @param  bool|null  $emailVerified  Status verifikasi email provider yang diharapkan.
      * @param  bool  $expected  Nilai hasil yang diharapkan oleh skenario pengujian.
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     #[DataProvider('providerVerificationCases')]
     public function test_external_account_is_connected_after_oauth_is_verified(
@@ -157,7 +157,7 @@ class ClerkSecurityServiceTest extends TestCase
      * Menyediakan variasi status OAuth dan verifikasi email provider beserta hasil koneksi yang
      * diharapkan. Dataset mengunci perbedaan antara account terhubung dan account yang belum valid.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public static function providerVerificationCases(): array
     {
@@ -176,7 +176,7 @@ class ClerkSecurityServiceTest extends TestCase
      * @param  string  $message  Pesan kegagalan yang menjelaskan alasan operasi dihentikan.
      * @param  bool  $expected  Nilai hasil yang diharapkan oleh skenario pengujian.
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     #[DataProvider('externalAccountNotFoundCases')]
     public function test_only_external_account_not_found_errors_are_safe_to_ignore(string $message, bool $expected): void
@@ -191,7 +191,7 @@ class ClerkSecurityServiceTest extends TestCase
      * Menyediakan exception Clerk not-found serta kegagalan lain untuk membuktikan hanya kondisi
      * resource benar-benar hilang yang aman diabaikan.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public static function externalAccountNotFoundCases(): array
     {
@@ -205,7 +205,7 @@ class ClerkSecurityServiceTest extends TestCase
     /**
      * Memverifikasi external account deletion ids are hydrated per provider.
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function test_external_account_deletion_ids_are_hydrated_per_provider(): void
     {
@@ -250,7 +250,7 @@ class ClerkSecurityServiceTest extends TestCase
     /**
      * Memverifikasi google cleanup uses clerk external account id and verifies deletion.
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function test_google_cleanup_uses_clerk_external_account_id_and_verifies_deletion(): void
     {
@@ -288,7 +288,7 @@ class ClerkSecurityServiceTest extends TestCase
     /**
      * Memverifikasi failed google link cleanup only removes unverified account.
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function test_failed_google_link_cleanup_only_removes_unverified_account(): void
     {
@@ -334,7 +334,7 @@ class ClerkSecurityServiceTest extends TestCase
     /**
      * Memverifikasi failed google link cleanup preserves verified account.
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function test_failed_google_link_cleanup_preserves_verified_account(): void
     {
@@ -364,7 +364,7 @@ class ClerkSecurityServiceTest extends TestCase
     /**
      * Memverifikasi identification id cannot be used as external account deletion id.
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function test_identification_id_cannot_be_used_as_external_account_deletion_id(): void
     {
@@ -385,7 +385,7 @@ class ClerkSecurityServiceTest extends TestCase
     /**
      * Memverifikasi not found cleanup is rejected when external account is still connected.
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function test_not_found_cleanup_is_rejected_when_external_account_is_still_connected(): void
     {
@@ -422,7 +422,7 @@ class ClerkSecurityServiceTest extends TestCase
     /**
      * Memverifikasi not found cleanup is accepted when external account is no longer connected.
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function test_not_found_cleanup_is_accepted_when_external_account_is_no_longer_connected(): void
     {
@@ -463,7 +463,7 @@ class ClerkSecurityServiceTest extends TestCase
      * @param  array<string, mixed>|null  $additionalProperties  Metadata tambahan SDK untuk fixture external account.
      * @param  VerificationOauthVerificationStatus  $verificationStatus  Status verifikasi provider pada fixture pengujian.
      *
-     * @return ExternalAccountWithVerification  Hasil proses yang telah dinormalisasi sesuai kontrak function ini.
+     * @return ExternalAccountWithVerification Hasil proses yang telah dinormalisasi sesuai kontrak function ini.
      */
     private function makeExternalAccount(
         ExternalAccountWithVerificationObject $object,
@@ -502,7 +502,7 @@ class ClerkSecurityServiceTest extends TestCase
      *
      * @param  array  $externalAccounts  Daftar external account Clerk yang akan difilter atau diproses.
      *
-     * @return ClerkUser  Model identity user yang berhasil diperoleh dari Clerk.
+     * @return ClerkUser Model identity user yang berhasil diperoleh dari Clerk.
      */
     private function makeClerkUser(array $externalAccounts): ClerkUser
     {
@@ -519,7 +519,7 @@ class ClerkSecurityServiceTest extends TestCase
      *
      * @param  array  $externalAccounts  Daftar external account Clerk yang akan difilter atau diproses.
      *
-     * @return GetUserResponse  Hasil proses yang telah dinormalisasi sesuai kontrak function ini.
+     * @return GetUserResponse Hasil proses yang telah dinormalisasi sesuai kontrak function ini.
      */
     private function makeClerkUserResponse(array $externalAccounts): GetUserResponse
     {
@@ -550,7 +550,7 @@ class ClerkSecurityServiceTest extends TestCase
      *
      * @param  Users  $users  Users SDK palsu yang digunakan oleh unit test.
      *
-     * @return ClerkSecurityService  Hasil proses yang telah dinormalisasi sesuai kontrak function ini.
+     * @return ClerkSecurityService Hasil proses yang telah dinormalisasi sesuai kontrak function ini.
      */
     private function makeServiceWithUsers(Users $users): ClerkSecurityService
     {

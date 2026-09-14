@@ -17,7 +17,7 @@ class XenditService
      *
      * @param  string  $api_key  API key Xendit yang digunakan client provider.
      *
-     * @return void  Tidak mengembalikan nilai; dependency disimpan pada instance.
+     * @return void Tidak mengembalikan nilai; dependency disimpan pada instance.
      */
     public function __construct(string $api_key = '')
     {
@@ -42,7 +42,7 @@ class XenditService
      * @param  int  $expected_amount  Nominal yang diharapkan oleh virtual account.
      * @param  string  $expiration_date  Waktu kedaluwarsa virtual account.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function createVirtualAccount(string $external_id = '', string $bank_code = '', string $name = '', string $country = 'ID', string $currency = 'IDR', bool $is_single_use = false, bool $is_closed = false, int $expected_amount = 0, string $expiration_date = ''): array
     {
@@ -108,7 +108,7 @@ class XenditService
      * @param  string  $bank_account_number  Nomor virtual account pada skenario simulasi.
      * @param  int  $transfer_amount  Nominal transfer pada simulasi pembayaran.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function simulateVirtualAccountPool(string $bank_code = '', string $bank_account_number = '', int $transfer_amount = 0): array
     {
@@ -166,7 +166,7 @@ class XenditService
      * @param  string  $external_id  Identifier idempotensi yang dikirim ke provider.
      * @param  int  $amount  Nominal transaksi yang dikirim ke provider.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function simulateVirtualAccountFixed(string $external_id = '', int $amount = 0): array
     {
@@ -227,7 +227,7 @@ class XenditService
      * @param  string  $account_number  Nomor rekening tujuan pencairan.
      * @param  string  $description  Deskripsi pencairan yang dikirim kepada provider.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function disbursement(string $external_id = '', int $amount = 0, string $bank_code = '', string $account_holder_name = '', string $account_number = '', string $description = ''): array
     {

@@ -21,7 +21,7 @@ class RedirectIfAuthenticated
      * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next  Callback middleware berikutnya pada pipeline request.
      * @param  string  $guards  Daftar guard autentikasi yang akan diperiksa.
      *
-     * @return Response  Hasil proses yang telah dinormalisasi sesuai kontrak function ini.
+     * @return Response Hasil proses yang telah dinormalisasi sesuai kontrak function ini.
      */
     public function handle(Request $request, Closure $next, string ...$guards): Response
     {

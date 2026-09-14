@@ -13,7 +13,7 @@ class KeranjangService
      *
      * @param  ProductAvailabilityService  $productAvailabilityService  Service product availability yang digunakan oleh class ini.
      *
-     * @return void  Tidak mengembalikan nilai; dependency disimpan pada instance.
+     * @return void Tidak mengembalikan nilai; dependency disimpan pada instance.
      */
     public function __construct(private ProductAvailabilityService $productAvailabilityService) {}
 
@@ -26,7 +26,7 @@ class KeranjangService
      *
      * @param  string  $user_id_buyer  ID buyer pemilik cart, alamat, atau transaksi.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function getKeranjangs(string $user_id_buyer = ''): array
     {
@@ -195,15 +195,14 @@ class KeranjangService
      * @param  int  $cartQuantity  Quantity yang tersimpan pada item cart.
      * @param  int  $availableStock  Stok terbaru yang tersedia untuk produk.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function makeStockIssue(
         object $keranjang,
         string $code,
         int $cartQuantity,
         int $availableStock,
-    ): array
-    {
+    ): array {
         return [
             'code' => $code,
             'cart_id' => $keranjang->k_id,
@@ -227,7 +226,7 @@ class KeranjangService
      * @param  string  $buyerId  ID buyer yang menjadi scope operasi.
      * @param  array<int, string>  $cartIds  Daftar ID cart yang akan direkonsiliasi atau diperbarui.
      *
-     * @return void  Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
+     * @return void Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
      */
     public function uncheckCartItems(string $buyerId, array $cartIds): void
     {
@@ -251,7 +250,7 @@ class KeranjangService
      *
      * @param  array  $product_ids  Daftar ID produk yang akan diperiksa.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function checkProductUnavailableByIds(array $product_ids = []): array
     {
@@ -297,7 +296,7 @@ class KeranjangService
      *
      * @param  array  $product_ids  Daftar ID produk yang akan diperiksa.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function checkProductSoldOutByIds(array $product_ids = []): array
     {
@@ -309,7 +308,7 @@ class KeranjangService
      *
      * @param  string  $user_id_buyer  ID buyer pemilik cart, alamat, atau transaksi.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function checkKeranjangNotChecked(string $user_id_buyer = ''): array
     {
@@ -332,7 +331,7 @@ class KeranjangService
      *
      * @param  string  $user_id_buyer  ID buyer pemilik cart, alamat, atau transaksi.
      *
-     * @return void  Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
+     * @return void Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
      */
     public function updateCheckoutKeranjang(string $user_id_buyer = ''): void
     {
@@ -360,7 +359,7 @@ class KeranjangService
      *
      * @param  string  $user_id_buyer  ID buyer pemilik cart, alamat, atau transaksi.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function checkAlamatBuyerExist(string $user_id_buyer = ''): array
     {

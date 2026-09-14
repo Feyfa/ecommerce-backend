@@ -19,7 +19,7 @@ class InvoiceController extends Controller
      *
      * @param  Request  $request  Identitas dan parameter invoice.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function show(Request $request): JsonResponse
     {

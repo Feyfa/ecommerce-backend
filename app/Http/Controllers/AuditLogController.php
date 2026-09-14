@@ -26,7 +26,7 @@ class AuditLogController extends Controller
      *
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function index(Request $request): JsonResponse
     {
@@ -91,7 +91,7 @@ class AuditLogController extends Controller
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      * @param  string  $auditLog  Model audit log yang akan ditampilkan.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function show(Request $request, string $auditLog): JsonResponse
     {
@@ -118,7 +118,7 @@ class AuditLogController extends Controller
      *
      * @param  string  $date  Tanggal valid berformat YYYY-MM-DD.
      *
-     * @return string  Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
+     * @return string Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
      */
     private function startOfApplicationDay(string $date): string
     {
@@ -133,7 +133,7 @@ class AuditLogController extends Controller
      *
      * @param  string  $date  Tanggal valid berformat YYYY-MM-DD.
      *
-     * @return string  Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
+     * @return string Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
      */
     private function endOfApplicationDay(string $date): string
     {
@@ -148,7 +148,7 @@ class AuditLogController extends Controller
      *
      * @param  CarbonImmutable  $boundary  Batas waktu pada timezone aplikasi.
      *
-     * @return string  Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
+     * @return string Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
      */
     private function formatDatabaseBoundary(CarbonImmutable $boundary): string
     {
@@ -169,7 +169,7 @@ class AuditLogController extends Controller
      *
      * @param  string  $encodedCursor  Cursor URL-safe dari response sebelumnya.
      *
-     * @return bool  True ketika kondisi is valid cursor terpenuhi; false jika tidak.
+     * @return bool True ketika kondisi is valid cursor terpenuhi; false jika tidak.
      */
     private function isValidCursor(string $encodedCursor): bool
     {

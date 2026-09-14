@@ -67,6 +67,9 @@ jobs:
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
+      - name: Check backend formatting
+        run: composer format:check
+
       - name: Prepare Laravel testing environment
         run: |
           cp .env.example .env.testing

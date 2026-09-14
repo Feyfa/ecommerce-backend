@@ -19,7 +19,7 @@ class AuthSessionController extends Controller
      * @param  CompanyService  $companyService  Service company yang digunakan oleh class ini.
      * @param  AuditLogService  $auditLogService  Service audit log yang digunakan oleh class ini.
      *
-     * @return void  Tidak mengembalikan nilai; dependency disimpan pada instance.
+     * @return void Tidak mengembalikan nilai; dependency disimpan pada instance.
      */
     public function __construct(
         protected ClerkUserSyncService $clerkUserSyncService,
@@ -37,7 +37,7 @@ class AuthSessionController extends Controller
      *
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function show(Request $request): JsonResponse
     {
@@ -98,7 +98,7 @@ class AuthSessionController extends Controller
      *
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      *
-     * @return JsonResponse  Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
      */
     public function logout(Request $request): JsonResponse
     {

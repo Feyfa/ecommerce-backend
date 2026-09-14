@@ -17,7 +17,7 @@ class KeranjangServiceTest extends TestCase
     /**
      * Menyiapkan fixture dan dependency sebelum setiap pengujian.
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function setUp(): void
     {
@@ -29,7 +29,7 @@ class KeranjangServiceTest extends TestCase
     /**
      * Memverifikasi getKeranjangs.
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function test_getKeranjangs(): void
     {
@@ -47,7 +47,7 @@ class KeranjangServiceTest extends TestCase
     /**
      * Memverifikasi checkProductSoldOutByIds.
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function test_checkProductSoldOutByIds(): void
     {
@@ -69,7 +69,7 @@ class KeranjangServiceTest extends TestCase
      *
      * @test
      *
-     * @return void  Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
      */
     public function seller_address_does_not_count_as_an_enabled_buyer_address(): void
     {

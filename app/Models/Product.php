@@ -31,7 +31,7 @@ class Product extends Model
     /**
      * Mengambil seller pemilik produk.
      *
-     * @return BelongsTo  Relasi Eloquent menuju model induk yang terkait.
+     * @return BelongsTo Relasi Eloquent menuju model induk yang terkait.
      */
     public function seller(): BelongsTo
     {
@@ -41,7 +41,7 @@ class Product extends Model
     /**
      * Mengambil seluruh item keranjang yang merujuk produk ini.
      *
-     * @return HasMany  Relasi Eloquent menuju seluruh model turunan yang terkait.
+     * @return HasMany Relasi Eloquent menuju seluruh model turunan yang terkait.
      */
     public function keranjangs(): HasMany
     {
@@ -51,7 +51,7 @@ class Product extends Model
     /**
      * Mengambil seluruh gambar produk berdasarkan urutan tampil.
      *
-     * @return HasMany  Relasi Eloquent menuju seluruh model turunan yang terkait.
+     * @return HasMany Relasi Eloquent menuju seluruh model turunan yang terkait.
      */
     public function images(): HasMany
     {
@@ -61,7 +61,7 @@ class Product extends Model
     /**
      * Mengambil seluruh item transaksi yang merujuk produk ini.
      *
-     * @return HasMany  Relasi Eloquent menuju seluruh model turunan yang terkait.
+     * @return HasMany Relasi Eloquent menuju seluruh model turunan yang terkait.
      */
     public function transactionProducts(): HasMany
     {
@@ -77,7 +77,7 @@ class Product extends Model
      *
      * @param  Builder  $query  Query Eloquent yang akan ditambahkan kondisi tanpa dieksekusi langsung.
      *
-     * @return Builder  Query builder yang telah ditambahkan scope atau kondisi terkait.
+     * @return Builder Query builder yang telah ditambahkan scope atau kondisi terkait.
      */
     public function scopePurchasable(Builder $query): Builder
     {
@@ -109,7 +109,7 @@ class Product extends Model
      * @param  Builder  $query  Query Eloquent yang akan ditambahkan kondisi tanpa dieksekusi langsung.
      * @param  string  $stockFilter  Kelompok kondisi stok yang dipilih seller.
      *
-     * @return Builder  Query builder yang telah ditambahkan scope atau kondisi terkait.
+     * @return Builder Query builder yang telah ditambahkan scope atau kondisi terkait.
      */
     public function scopeWithStockCondition(Builder $query, string $stockFilter): Builder
     {
@@ -132,7 +132,7 @@ class Product extends Model
      * @param  Builder  $query  Query Eloquent yang akan ditambahkan kondisi tanpa dieksekusi langsung.
      * @param  string  $sortProduct  Pilihan urutan produk yang telah divalidasi.
      *
-     * @return Builder  Query builder yang telah ditambahkan scope atau kondisi terkait.
+     * @return Builder Query builder yang telah ditambahkan scope atau kondisi terkait.
      */
     public function scopeWithProductSort(Builder $query, string $sortProduct): Builder
     {

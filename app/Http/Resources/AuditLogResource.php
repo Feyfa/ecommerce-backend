@@ -21,7 +21,7 @@ class AuditLogResource extends JsonResource
      *
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      *
-     * @return array  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function toArray(Request $request): array
     {
@@ -71,7 +71,7 @@ class AuditLogResource extends JsonResource
      *
      * @param  array<string, mixed>  $context  Context audit yang telah dinormalisasi menjadi array.
      *
-     * @return array<string, mixed>  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array<string, mixed> Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function productPayload(array $context): array
     {
@@ -97,7 +97,7 @@ class AuditLogResource extends JsonResource
      * @param  array<string, mixed>  $context  Context audit yang telah dinormalisasi menjadi array.
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      *
-     * @return array<string, mixed>  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array<string, mixed> Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function addressPayload(array $context, Request $request): array
     {
@@ -283,7 +283,7 @@ class AuditLogResource extends JsonResource
      * @param  array<string, mixed>  $snapshot  Snapshot alamat yang tersimpan pada context audit.
      * @param  bool  $isDetailRoute  True ketika response berasal dari route detail owner-scoped.
      *
-     * @return array<string, mixed>  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array<string, mixed> Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function presentAddressSnapshot(array $snapshot, bool $isDetailRoute): array
     {
@@ -312,7 +312,7 @@ class AuditLogResource extends JsonResource
      * @param  array{field: string, label: string, before: mixed, after: mixed}  $change  Satu baris perubahan alamat dari context audit.
      * @param  bool  $isDetailRoute  True ketika response berasal dari route detail owner-scoped.
      *
-     * @return array{field: string, label: string, before: mixed, after: mixed}  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{field: string, label: string, before: mixed, after: mixed} Data terstruktur yang dihasilkan oleh proses ini.
      */
     private function presentAddressChange(array $change, bool $isDetailRoute): array
     {
@@ -345,7 +345,7 @@ class AuditLogResource extends JsonResource
      * @param  mixed  $reference  Referensi alamat utama sebelumnya atau penggantinya.
      * @param  bool  $isDetailRoute  True ketika response berasal dari route detail owner-scoped.
      *
-     * @return array<string, mixed>|null  Data terstruktur yang dihasilkan oleh proses ini, atau null ketika referensinya tidak tersedia.
+     * @return array<string, mixed>|null Data terstruktur yang dihasilkan oleh proses ini, atau null ketika referensinya tidak tersedia.
      */
     private function presentAddressReference(mixed $reference, bool $isDetailRoute): ?array
     {
@@ -370,7 +370,7 @@ class AuditLogResource extends JsonResource
      *
      * @param  string|null  $phone  Nomor telepon penuh yang tersimpan pada context audit.
      *
-     * @return string|null  Nilai teks yang telah dinormalisasi, atau null ketika sumber datanya tidak tersedia.
+     * @return string|null Nilai teks yang telah dinormalisasi, atau null ketika sumber datanya tidak tersedia.
      */
     private function maskPhone(?string $phone): ?string
     {
@@ -392,7 +392,7 @@ class AuditLogResource extends JsonResource
      *
      * @param  string|null  $name  Nama penerima penuh yang tersimpan pada context audit.
      *
-     * @return string|null  Nilai teks yang telah dinormalisasi, atau null ketika sumber datanya tidak tersedia.
+     * @return string|null Nilai teks yang telah dinormalisasi, atau null ketika sumber datanya tidak tersedia.
      */
     private function maskRecipientName(?string $name): ?string
     {
@@ -420,7 +420,7 @@ class AuditLogResource extends JsonResource
      *
      * @param  string|null  $ipAddress  IP penuh yang hanya disimpan backend.
      *
-     * @return string|null  Nilai teks yang telah dinormalisasi, atau null ketika sumber datanya tidak tersedia.
+     * @return string|null Nilai teks yang telah dinormalisasi, atau null ketika sumber datanya tidak tersedia.
      */
     private function maskIpAddress(?string $ipAddress): ?string
     {

@@ -20,7 +20,7 @@ class GeoapifyService
      * @param  float  $latitude  Koordinat lintang yang akan diverifikasi oleh provider.
      * @param  float  $longitude  Koordinat bujur yang akan diverifikasi oleh provider.
      *
-     * @return array<string, mixed>  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array<string, mixed> Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function verifyIndonesiaLocation(float $latitude, float $longitude): array
     {
@@ -80,7 +80,7 @@ class GeoapifyService
     /**
      * Menghentikan proses ketika verifikasi lokasi dari server tidak dapat diselesaikan.
      *
-     * @return never  Hasil proses yang telah dinormalisasi sesuai kontrak function ini.
+     * @return never Hasil proses yang telah dinormalisasi sesuai kontrak function ini.
      */
     private function throwUnavailable(): never
     {

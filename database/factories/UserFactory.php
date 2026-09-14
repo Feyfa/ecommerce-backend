@@ -14,7 +14,7 @@ class UserFactory extends Factory
      * yang dihasilkan digunakan sebagai fixture test tanpa bergantung pada identity provider
      * eksternal.
      *
-     * @return array<string, mixed>  Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array<string, mixed> Data terstruktur yang dihasilkan oleh proses ini.
      */
     public function definition(): array
     {
