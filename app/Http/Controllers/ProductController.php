@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Product;
 use App\Models\ProductImage;
+use App\Models\User;
 use App\Services\AuditLogService;
 use App\Services\OutboxRecorderService;
 use App\Services\ProductAvailabilityService;
@@ -80,7 +81,9 @@ class ProductController extends Controller
         // --- step 1 - end - validasi parameter seller, pagination, filter, dan sorting
 
         // --- step 2 - start - pastikan seller hanya membaca daftar produknya sendiri
-        if ($request->user()->id !== $validate['user_id_seller']) {
+        $user = $this->authenticatedUser($request);
+
+        if ($user->id !== $validate['user_id_seller']) {
             return response()->json(['status' => 403, 'message' => 'Forbidden'], 403);
         }
         // --- step 2 - end - pastikan seller hanya membaca daftar produknya sendiri
@@ -125,15 +128,20 @@ class ProductController extends Controller
         // Satu record lookahead membuktikan keberadaan batch berikutnya tanpa mengirimkannya ke frontend.
         $has_more = $products->count() > $per_page;
         $products = $products->take($per_page)->values();
-        $next_cursor = $has_more
-            ? $this->sellerProductCursorService->encode(
-                $products->last(),
+        $next_cursor = null;
+
+        if ($has_more) {
+            /** @var Product $lastProduct */
+            $lastProduct = $products->last();
+            $next_cursor = $this->sellerProductCursorService->encode(
+                $lastProduct,
                 $validate['user_id_seller'],
                 $search_product,
                 $stock_filter,
                 $sort_product,
-            )
-            : null;
+            );
+        }
+
         $products->each(
             fn (Product $product) => $this->sellerProductCursorService->hideInternalAttribute($product),
         );
@@ -178,7 +186,9 @@ class ProductController extends Controller
         // --- step 1 - end - validasi UUID seller dan produk
 
         // --- step 2 - start - pastikan seller hanya membaca produknya sendiri
-        if ($request->user()->id !== $validate['user_id_seller']) {
+        $user = $this->authenticatedUser($request);
+
+        if ($user->id !== $validate['user_id_seller']) {
             return response()->json(['status' => 403, 'message' => 'Forbidden'], 403);
         }
         // --- step 2 - end - pastikan seller hanya membaca produknya sendiri
@@ -218,8 +228,9 @@ class ProductController extends Controller
         }
 
         $validate = $validator->validate();
+        $user = $this->authenticatedUser($request);
 
-        if ($request->user()->id !== $validate['user_id_seller']) {
+        if ($user->id !== $validate['user_id_seller']) {
             return response()->json(['status' => 403, 'message' => 'Forbidden'], 403);
         }
 
@@ -250,7 +261,7 @@ class ProductController extends Controller
                 $storedPaths[$index] = $storedPath;
             }
 
-            $product = DB::transaction(function () use ($request, $validate, $storedPaths) {
+            $product = DB::transaction(function () use ($user, $request, $validate, $storedPaths) {
                 $product = Product::create([
                     'user_id_seller' => $validate['user_id_seller'],
                     'img' => $storedPaths[0],
@@ -264,7 +275,7 @@ class ProductController extends Controller
                 }
 
                 $product->load('images');
-                $this->auditLogService->recordProductCreated($request->user(), $product, $request);
+                $this->auditLogService->recordProductCreated($user, $product, $request);
                 $this->outboxRecorder->recordProductSync(
                     (string) $product->id,
                     OutboxRecorderService::SOURCE_PRODUCT_CREATED,
@@ -302,8 +313,9 @@ class ProductController extends Controller
             return response()->json(['status' => 422, 'message' => $idValidator->messages()], 422);
         }
 
+        $user = $this->authenticatedUser($request);
         $product = Product::with('images')
-            ->where('user_id_seller', $request->user()->id)
+            ->where('user_id_seller', $user->id)
             ->where('id', $id)
             ->first();
 
@@ -352,6 +364,7 @@ class ProductController extends Controller
 
             // --- step 4 - start - bangun ulang posisi gambar dan sinkronkan cover dalam transaksi
             $product = DB::transaction(function () use (
+                $user,
                 $request,
                 $product,
                 $validate,
@@ -378,7 +391,7 @@ class ProductController extends Controller
 
                 $product->load('images');
                 $this->auditLogService->recordProductUpdated(
-                    $request->user(),
+                    $user,
                     $product,
                     $request,
                     $this->productChanges($beforeValues, $product),
@@ -434,7 +447,9 @@ class ProductController extends Controller
         // --- step 1 - end - validasi UUID seller dan produk
 
         // --- step 2 - start - pastikan seller hanya menghapus produknya sendiri
-        if ($request->user()->id !== $validate['user_id_seller']) {
+        $user = $this->authenticatedUser($request);
+
+        if ($user->id !== $validate['user_id_seller']) {
             return response()->json(['status' => 403, 'message' => 'Forbidden'], 403);
         }
 
@@ -456,9 +471,9 @@ class ProductController extends Controller
         // --- step 3 - end - simpan snapshot audit sebelum produk dinonaktifkan
 
         // --- step 4 - start - soft-delete produk tanpa menghapus keranjang dan gambar
-        DB::transaction(function () use ($request, $product, $snapshot) {
+        DB::transaction(function () use ($user, $request, $product, $snapshot) {
             $product->delete();
-            $this->auditLogService->recordProductDeleted($request->user(), $product, $request, $snapshot);
+            $this->auditLogService->recordProductDeleted($user, $product, $request, $snapshot);
             $this->outboxRecorder->recordProductSync(
                 (string) $product->id,
                 OutboxRecorderService::SOURCE_PRODUCT_DELETED,
@@ -467,6 +482,24 @@ class ProductController extends Controller
         // --- step 4 - end - soft-delete produk tanpa menghapus keranjang dan gambar
 
         return response()->json(['status' => 200, 'message' => 'Delete Product Success'], 200);
+    }
+
+    /**
+     * Mengambil local user yang telah dipasang oleh middleware autentikasi API.
+     *
+     * Seluruh endpoint controller ini berada di dalam middleware `auth.api`, sehingga request yang
+     * mencapai controller selalu memiliki local User tanpa memerlukan query atau fallback tambahan.
+     *
+     * @param  Request  $request  Request API yang telah melewati middleware autentikasi.
+     *
+     * @return User Local user terautentikasi yang menjalankan operasi produk.
+     */
+    private function authenticatedUser(Request $request): User
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        return $user;
     }
 
     /**
@@ -657,8 +690,19 @@ class ProductController extends Controller
     private function imageChanges(Product $product, array $orderedImages): array
     {
         // --- step 1 - start - hitung urutan gambar sebelum dan sesudah update
-        $beforeIds = $product->images->pluck('id')->values()->all();
-        $afterExistingIds = collect($orderedImages)->pluck('id')->filter()->values()->all();
+        /** @var array<int, string> $beforeIds */
+        $beforeIds = $product->images
+            ->pluck('id')
+            ->values()
+            ->all();
+
+        /** @var array<int, string> $afterExistingIds */
+        $afterExistingIds = collect($orderedImages)
+            ->pluck('id')
+            ->filter()
+            ->values()
+            ->all();
+
         $beforeRetainedIds = array_values(array_filter(
             $beforeIds,
             static fn (string $id): bool => in_array($id, $afterExistingIds, true)
