@@ -14,10 +14,12 @@
         "meilisearch/meilisearch-php": "^1.0"
     },
     "require-dev": {
+        "larastan/larastan": "^2.9.14",
         "laravel/pint": "^1.0",
         "laravel/sail": "^1.18",
         "mockery/mockery": "^1.4.4",
         "nunomaduro/collision": "^7.0",
+        "phpstan/phpstan": "^1.12.17",
         "phpunit/phpunit": "^10.1",
         "spatie/laravel-ignition": "^2.0"
     },
@@ -34,6 +36,9 @@
         }
     },
     "scripts": {
+        "analyse": [
+            "@php vendor/bin/phpstan analyse --no-progress --memory-limit=1G"
+        ],
         "format": [
             "@php vendor/bin/pint"
         ],

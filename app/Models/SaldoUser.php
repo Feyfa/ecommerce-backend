@@ -22,7 +22,7 @@ class SaldoUser extends Model
     /**
      * Mengambil user pemilik saldo.
      *
-     * @return BelongsTo Relasi Eloquent menuju model induk yang terkait.
+     * @return BelongsTo<User, SaldoUser> Relasi Eloquent menuju user pemilik saldo.
      */
     public function user(): BelongsTo
     {

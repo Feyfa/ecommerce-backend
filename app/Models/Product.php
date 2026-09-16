@@ -31,7 +31,7 @@ class Product extends Model
     /**
      * Mengambil seller pemilik produk.
      *
-     * @return BelongsTo Relasi Eloquent menuju model induk yang terkait.
+     * @return BelongsTo<User, Product> Relasi Eloquent menuju seller pemilik produk.
      */
     public function seller(): BelongsTo
     {
@@ -41,7 +41,7 @@ class Product extends Model
     /**
      * Mengambil seluruh item keranjang yang merujuk produk ini.
      *
-     * @return HasMany Relasi Eloquent menuju seluruh model turunan yang terkait.
+     * @return HasMany<Keranjang> Relasi Eloquent menuju seluruh item keranjang yang terkait.
      */
     public function keranjangs(): HasMany
     {
@@ -51,7 +51,7 @@ class Product extends Model
     /**
      * Mengambil seluruh gambar produk berdasarkan urutan tampil.
      *
-     * @return HasMany Relasi Eloquent menuju seluruh model turunan yang terkait.
+     * @return HasMany<ProductImage> Relasi Eloquent menuju seluruh gambar produk.
      */
     public function images(): HasMany
     {
@@ -61,7 +61,7 @@ class Product extends Model
     /**
      * Mengambil seluruh item transaksi yang merujuk produk ini.
      *
-     * @return HasMany Relasi Eloquent menuju seluruh model turunan yang terkait.
+     * @return HasMany<TransactionProduct> Relasi Eloquent menuju seluruh item transaksi yang terkait.
      */
     public function transactionProducts(): HasMany
     {
@@ -75,9 +75,9 @@ class Product extends Model
      * pinpoint. Produk tanpa lokasi seller yang lengkap dikeluarkan sejak level query agar katalog,
      * keranjang, dan checkout memakai definisi ketersediaan yang sama.
      *
-     * @param  Builder  $query  Query Eloquent yang akan ditambahkan kondisi tanpa dieksekusi langsung.
+     * @param  Builder<Product>  $query  Query Eloquent yang akan ditambahkan kondisi tanpa dieksekusi langsung.
      *
-     * @return Builder Query builder yang telah ditambahkan scope atau kondisi terkait.
+     * @return Builder<Product> Query builder yang telah ditambahkan scope atau kondisi terkait.
      */
     public function scopePurchasable(Builder $query): Builder
     {
@@ -106,10 +106,10 @@ class Product extends Model
      * filter yang tidak dikenali dibiarkan menggunakan query awal supaya pemanggil dapat menerapkan
      * default secara eksplisit.
      *
-     * @param  Builder  $query  Query Eloquent yang akan ditambahkan kondisi tanpa dieksekusi langsung.
+     * @param  Builder<Product>  $query  Query Eloquent yang akan ditambahkan kondisi tanpa dieksekusi langsung.
      * @param  string  $stockFilter  Kelompok kondisi stok yang dipilih seller.
      *
-     * @return Builder Query builder yang telah ditambahkan scope atau kondisi terkait.
+     * @return Builder<Product> Query builder yang telah ditambahkan scope atau kondisi terkait.
      */
     public function scopeWithStockCondition(Builder $query, string $stockFilter): Builder
     {
@@ -129,10 +129,10 @@ class Product extends Model
      * Pilihan urutan diterjemahkan ke kolom dan arah yang telah diizinkan, lalu ID dipakai sebagai
      * tie-breaker agar cursor pagination menghasilkan urutan stabil.
      *
-     * @param  Builder  $query  Query Eloquent yang akan ditambahkan kondisi tanpa dieksekusi langsung.
+     * @param  Builder<Product>  $query  Query Eloquent yang akan ditambahkan kondisi tanpa dieksekusi langsung.
      * @param  string  $sortProduct  Pilihan urutan produk yang telah divalidasi.
      *
-     * @return Builder Query builder yang telah ditambahkan scope atau kondisi terkait.
+     * @return Builder<Product> Query builder yang telah ditambahkan scope atau kondisi terkait.
      */
     public function scopeWithProductSort(Builder $query, string $sortProduct): Builder
     {

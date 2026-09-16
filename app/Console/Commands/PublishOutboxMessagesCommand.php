@@ -31,8 +31,13 @@ class PublishOutboxMessagesCommand extends Command
             return self::SUCCESS;
         }
 
-        $batchSize = min(100, max(1, (int) ($this->option('batch') ?: config('outbox.batch_size'))));
-        $maxBatches = min(10, max(1, (int) ($this->option('max-batches') ?: config('outbox.max_batches'))));
+        /** @var int|string $batchSizeInput */
+        $batchSizeInput = $this->option('batch') ?: config('outbox.batch_size');
+        /** @var int|string $maxBatchesInput */
+        $maxBatchesInput = $this->option('max-batches') ?: config('outbox.max_batches');
+
+        $batchSize = min(100, max(1, (int) $batchSizeInput));
+        $maxBatches = min(10, max(1, (int) $maxBatchesInput));
         $summary = $publisher->publishDue($batchSize, $maxBatches);
 
         $this->info(sprintf(

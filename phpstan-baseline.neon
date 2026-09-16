@@ -1,0 +1,1191 @@
+parameters:
+	ignoreErrors:
+		-
+			message: "#^Cannot access property \\$id on mixed\\.$#"
+			count: 5
+			path: app/Http/Controllers/AlamatController.php
+
+		-
+			message: "#^Parameter \\#1 \\$string of function trim expects string, mixed given\\.$#"
+			count: 5
+			path: app/Http/Controllers/AlamatController.php
+
+		-
+			message: "#^Parameter \\#1 \\$user of method App\\\\Services\\\\AuditLogService\\:\\:recordAddressCreated\\(\\) expects App\\\\Models\\\\User, App\\\\Models\\\\User\\|null given\\.$#"
+			count: 1
+			path: app/Http/Controllers/AlamatController.php
+
+		-
+			message: "#^Parameter \\#1 \\$user of method App\\\\Services\\\\AuditLogService\\:\\:recordAddressDeleted\\(\\) expects App\\\\Models\\\\User, App\\\\Models\\\\User\\|null given\\.$#"
+			count: 1
+			path: app/Http/Controllers/AlamatController.php
+
+		-
+			message: "#^Parameter \\#1 \\$user of method App\\\\Services\\\\AuditLogService\\:\\:recordAddressSelected\\(\\) expects App\\\\Models\\\\User, App\\\\Models\\\\User\\|null given\\.$#"
+			count: 1
+			path: app/Http/Controllers/AlamatController.php
+
+		-
+			message: "#^Parameter \\#1 \\$user of method App\\\\Services\\\\AuditLogService\\:\\:recordAddressUpdated\\(\\) expects App\\\\Models\\\\User, App\\\\Models\\\\User\\|null given\\.$#"
+			count: 1
+			path: app/Http/Controllers/AlamatController.php
+
+		-
+			message: "#^Part \\$searchAlamat \\(mixed\\) of encapsed string cannot be cast to string\\.$#"
+			count: 20
+			path: app/Http/Controllers/AlamatController.php
+
+		-
+			message: "#^Call to an undefined method Illuminate\\\\Database\\\\ConnectionInterface\\:\\:getDriverName\\(\\)\\.$#"
+			count: 1
+			path: app/Http/Controllers/AuditLogController.php
+
+		-
+			message: "#^Cannot access property \\$id on App\\\\Models\\\\User\\|null\\.$#"
+			count: 2
+			path: app/Http/Controllers/AuditLogController.php
+
+		-
+			message: "#^Cannot cast mixed to string\\.$#"
+			count: 1
+			path: app/Http/Controllers/AuditLogController.php
+
+		-
+			message: "#^Parameter \\#2 \\$tz of static method Carbon\\\\CarbonImmutable\\:\\:parse\\(\\) expects DateTimeZone\\|string\\|null, mixed given\\.$#"
+			count: 2
+			path: app/Http/Controllers/AuditLogController.php
+
+		-
+			message: "#^Cannot cast mixed to string\\.$#"
+			count: 1
+			path: app/Http/Controllers/AuthSessionController.php
+
+		-
+			message: "#^Parameter \\#1 \\$user of method App\\\\Services\\\\AuditLogService\\:\\:recordLogout\\(\\) expects App\\\\Models\\\\User, App\\\\Models\\\\User\\|null given\\.$#"
+			count: 1
+			path: app/Http/Controllers/AuthSessionController.php
+
+		-
+			message: "#^Cannot access property \\$id on App\\\\Models\\\\User\\|null\\.$#"
+			count: 1
+			path: app/Http/Controllers/BelanjaController.php
+
+		-
+			message: "#^Argument of an invalid type mixed supplied for foreach, only iterables are supported\\.$#"
+			count: 1
+			path: app/Http/Controllers/CheckoutController.php
+
+		-
+			message: "#^Cannot access offset 'p_id' on mixed\\.$#"
+			count: 1
+			path: app/Http/Controllers/CheckoutController.php
+
+		-
+			message: "#^Cannot access property \\$id on mixed\\.$#"
+			count: 2
+			path: app/Http/Controllers/CheckoutController.php
+
+		-
+			message: "#^Cannot cast mixed to string\\.$#"
+			count: 1
+			path: app/Http/Controllers/CheckoutController.php
+
+		-
+			message: "#^Parameter \\#2 \\$clientSnapshot of method App\\\\Services\\\\CheckoutService\\:\\:checkoutSnapshotChanged\\(\\) expects array, mixed given\\.$#"
+			count: 1
+			path: app/Http/Controllers/CheckoutController.php
+
+		-
+			message: "#^Parameter \\$noteds of method App\\\\Services\\\\CheckoutService\\:\\:buildCheckoutSnapshot\\(\\) expects array, mixed given\\.$#"
+			count: 2
+			path: app/Http/Controllers/CheckoutController.php
+
+		-
+			message: "#^Parameter \\$paymentSlug of method App\\\\Services\\\\CheckoutService\\:\\:buildCheckoutSnapshot\\(\\) expects string, mixed given\\.$#"
+			count: 2
+			path: app/Http/Controllers/CheckoutController.php
+
+		-
+			message: "#^Parameter \\$shippingOptions of method App\\\\Services\\\\CheckoutService\\:\\:buildCheckoutSnapshot\\(\\) expects array, mixed given\\.$#"
+			count: 2
+			path: app/Http/Controllers/CheckoutController.php
+
+		-
+			message: "#^Variable \\$transactionInvoiceId on left side of \\?\\? always exists and is not nullable\\.$#"
+			count: 1
+			path: app/Http/Controllers/CheckoutController.php
+
+		-
+			message: "#^Cannot access property \\$id on mixed\\.$#"
+			count: 4
+			path: app/Http/Controllers/CompanyController.php
+
+		-
+			message: "#^Cannot call method getClientOriginalExtension\\(\\) on array\\<int, Illuminate\\\\Http\\\\UploadedFile\\>\\|Illuminate\\\\Http\\\\UploadedFile\\|null\\.$#"
+			count: 1
+			path: app/Http/Controllers/CompanyController.php
+
+		-
+			message: "#^Parameter \\#1 \\$path of method Illuminate\\\\Filesystem\\\\FilesystemAdapter\\:\\:exists\\(\\) expects string, mixed given\\.$#"
+			count: 1
+			path: app/Http/Controllers/CompanyController.php
+
+		-
+			message: "#^Parameter \\#1 \\$paths of method Illuminate\\\\Filesystem\\\\FilesystemAdapter\\:\\:delete\\(\\) expects array\\|string, mixed given\\.$#"
+			count: 1
+			path: app/Http/Controllers/CompanyController.php
+
+		-
+			message: "#^Parameter \\#1 \\$paths of method Illuminate\\\\Filesystem\\\\FilesystemAdapter\\:\\:delete\\(\\) expects array\\|string, string\\|false given\\.$#"
+			count: 1
+			path: app/Http/Controllers/CompanyController.php
+
+		-
+			message: "#^Access to an undefined property App\\\\Models\\\\TransactionInvoice\\:\\:\\$expiry_time\\.$#"
+			count: 1
+			path: app/Http/Controllers/InvoiceController.php
+
+		-
+			message: "#^Access to an undefined property App\\\\Models\\\\TransactionInvoice\\:\\:\\$gross_amount\\.$#"
+			count: 1
+			path: app/Http/Controllers/InvoiceController.php
+
+		-
+			message: "#^Access to an undefined property App\\\\Models\\\\TransactionInvoice\\:\\:\\$order_id\\.$#"
+			count: 1
+			path: app/Http/Controllers/InvoiceController.php
+
+		-
+			message: "#^Access to an undefined property App\\\\Models\\\\TransactionInvoice\\:\\:\\$transaction_status\\.$#"
+			count: 2
+			path: app/Http/Controllers/InvoiceController.php
+
+		-
+			message: "#^Access to an undefined property App\\\\Models\\\\TransactionInvoice\\:\\:\\$transaction_time\\.$#"
+			count: 1
+			path: app/Http/Controllers/InvoiceController.php
+
+		-
+			message: "#^Access to an undefined property App\\\\Models\\\\TransactionInvoice\\:\\:\\$va_biller_code\\.$#"
+			count: 1
+			path: app/Http/Controllers/InvoiceController.php
+
+		-
+			message: "#^Access to an undefined property App\\\\Models\\\\TransactionInvoice\\:\\:\\$va_number\\.$#"
+			count: 1
+			path: app/Http/Controllers/InvoiceController.php
+
+		-
+			message: "#^Cannot access property \\$id on mixed\\.$#"
+			count: 1
+			path: app/Http/Controllers/KeranjangController.php
+
+		-
+			message: "#^Parameter \\#1 \\$array of function array_unique expects array, mixed given\\.$#"
+			count: 1
+			path: app/Http/Controllers/KeranjangController.php
+
+		-
+			message: "#^Parameter \\#1 \\$product_ids of method App\\\\Services\\\\KeranjangService\\:\\:checkProductUnavailableByIds\\(\\) expects array, mixed given\\.$#"
+			count: 1
+			path: app/Http/Controllers/KeranjangController.php
+
+		-
+			message: "#^Parameter \\#1 \\$sellerId of method App\\\\Services\\\\ProductAvailabilityService\\:\\:sellerHasVerifiedAddress\\(\\) expects string, string\\|null given\\.$#"
+			count: 1
+			path: app/Http/Controllers/KeranjangController.php
+
+		-
+			message: "#^Parameter \\#1 \\$user_id_buyer of method App\\\\Services\\\\KeranjangService\\:\\:checkAlamatBuyerExist\\(\\) expects string, mixed given\\.$#"
+			count: 1
+			path: app/Http/Controllers/KeranjangController.php
+
+		-
+			message: "#^Parameter \\#1 \\$user_id_buyer of method App\\\\Services\\\\KeranjangService\\:\\:checkKeranjangNotChecked\\(\\) expects string, mixed given\\.$#"
+			count: 1
+			path: app/Http/Controllers/KeranjangController.php
+
+		-
+			message: "#^Parameter \\#1 \\$user_id_buyer of method App\\\\Services\\\\KeranjangService\\:\\:getKeranjangs\\(\\) expects string, mixed given\\.$#"
+			count: 4
+			path: app/Http/Controllers/KeranjangController.php
+
+		-
+			message: "#^Parameter \\#1 \\$user_id_buyer of method App\\\\Services\\\\KeranjangService\\:\\:updateCheckoutKeranjang\\(\\) expects string, mixed given\\.$#"
+			count: 1
+			path: app/Http/Controllers/KeranjangController.php
+
+		-
+			message: "#^Parameter \\#2 \\$buyerId of method App\\\\Http\\\\Controllers\\\\KeranjangController\\:\\:buyerOwnershipResponse\\(\\) expects string, mixed given\\.$#"
+			count: 1
+			path: app/Http/Controllers/KeranjangController.php
+
+		-
+			message: "#^Unable to resolve the template type TKey in call to function collect$#"
+			count: 2
+			path: app/Http/Controllers/KeranjangController.php
+
+		-
+			message: "#^Unable to resolve the template type TValue in call to function collect$#"
+			count: 2
+			path: app/Http/Controllers/KeranjangController.php
+
+		-
+			message: "#^Cannot access property \\$id on mixed\\.$#"
+			count: 5
+			path: app/Http/Controllers/PaymentController.php
+
+		-
+			message: "#^Parameter \\#1 \\$string of function trim expects string, mixed given\\.$#"
+			count: 4
+			path: app/Http/Controllers/PaymentController.php
+
+		-
+			message: "#^Parameter \\$amount of method App\\\\Services\\\\XenditService\\:\\:simulateVirtualAccountFixed\\(\\) expects int, float\\|int given\\.$#"
+			count: 1
+			path: app/Http/Controllers/PaymentController.php
+
+		-
+			message: "#^Parameter \\$search of method App\\\\Services\\\\PaymentService\\:\\:getWithdrawalPayments\\(\\) expects string, mixed given\\.$#"
+			count: 3
+			path: app/Http/Controllers/PaymentController.php
+
+		-
+			message: "#^Part \\$request\\-\\>paymentSlug \\(mixed\\) of encapsed string cannot be cast to string\\.$#"
+			count: 1
+			path: app/Http/Controllers/PaymentController.php
+
+		-
+			message: "#^Cannot access property \\$id on App\\\\Models\\\\User\\|null\\.$#"
+			count: 5
+			path: app/Http/Controllers/ProductController.php
+
+		-
+			message: "#^Parameter \\#1 \\$product of method App\\\\Services\\\\SellerProductCursorService\\:\\:encode\\(\\) expects App\\\\Models\\\\Product, App\\\\Models\\\\Product\\|null given\\.$#"
+			count: 1
+			path: app/Http/Controllers/ProductController.php
+
+		-
+			message: "#^Parameter \\#1 \\$user of method App\\\\Services\\\\AuditLogService\\:\\:recordProductCreated\\(\\) expects App\\\\Models\\\\User, App\\\\Models\\\\User\\|null given\\.$#"
+			count: 1
+			path: app/Http/Controllers/ProductController.php
+
+		-
+			message: "#^Parameter \\#1 \\$user of method App\\\\Services\\\\AuditLogService\\:\\:recordProductDeleted\\(\\) expects App\\\\Models\\\\User, App\\\\Models\\\\User\\|null given\\.$#"
+			count: 1
+			path: app/Http/Controllers/ProductController.php
+
+		-
+			message: "#^Parameter \\#1 \\$user of method App\\\\Services\\\\AuditLogService\\:\\:recordProductUpdated\\(\\) expects App\\\\Models\\\\User, App\\\\Models\\\\User\\|null given\\.$#"
+			count: 1
+			path: app/Http/Controllers/ProductController.php
+
+		-
+			message: "#^Parameter \\#2 \\$callback of function array_filter expects \\(callable\\(mixed\\)\\: bool\\)\\|null, Closure\\(string\\)\\: bool given\\.$#"
+			count: 1
+			path: app/Http/Controllers/ProductController.php
+
+		-
+			message: "#^Cannot access property \\$id on mixed\\.$#"
+			count: 3
+			path: app/Http/Controllers/SaldoController.php
+
+		-
+			message: "#^Parameter \\#1 \\$json of function json_decode expects string, mixed given\\.$#"
+			count: 1
+			path: app/Http/Controllers/SaldoController.php
+
+		-
+			message: "#^Parameter \\#1 \\$num of function number_format expects float, float\\|int\\<min, \\-1\\>\\|int\\<1, 1000000\\>\\|string given\\.$#"
+			count: 1
+			path: app/Http/Controllers/SaldoController.php
+
+		-
+			message: "#^Parameter \\#1 \\$string of function trim expects string, mixed given\\.$#"
+			count: 2
+			path: app/Http/Controllers/SaldoController.php
+
+		-
+			message: "#^Parameter \\#2 \\$account of method App\\\\Services\\\\PaymentService\\:\\:getWithdrawalPayment\\(\\) expects string, mixed given\\.$#"
+			count: 1
+			path: app/Http/Controllers/SaldoController.php
+
+		-
+			message: "#^Parameter \\#2 \\$start_date of method App\\\\Services\\\\SaldoService\\:\\:getSaldoHistory\\(\\) expects string, mixed given\\.$#"
+			count: 1
+			path: app/Http/Controllers/SaldoController.php
+
+		-
+			message: "#^Parameter \\#3 \\$end_date of method App\\\\Services\\\\SaldoService\\:\\:getSaldoHistory\\(\\) expects string, mixed given\\.$#"
+			count: 1
+			path: app/Http/Controllers/SaldoController.php
+
+		-
+			message: "#^Parameter \\#3 \\$price of method App\\\\Services\\\\SaldoService\\:\\:saveSaldoAfterDisbursement\\(\\) expects int, float\\|int\\<min, \\-1\\>\\|int\\<1, 1000000\\>\\|string given\\.$#"
+			count: 1
+			path: app/Http/Controllers/SaldoController.php
+
+		-
+			message: "#^Parameter \\#4 \\$saldo_history_current_ids of method App\\\\Services\\\\SaldoService\\:\\:getSaldoHistory\\(\\) expects array, mixed given\\.$#"
+			count: 1
+			path: app/Http/Controllers/SaldoController.php
+
+		-
+			message: "#^Parameter \\$account_number of method App\\\\Services\\\\XenditService\\:\\:disbursement\\(\\) expects string, mixed given\\.$#"
+			count: 1
+			path: app/Http/Controllers/SaldoController.php
+
+		-
+			message: "#^Parameter \\$amount of method App\\\\Services\\\\XenditService\\:\\:disbursement\\(\\) expects int, float\\|int\\<min, \\-1\\>\\|int\\<1, 1000000\\>\\|string given\\.$#"
+			count: 1
+			path: app/Http/Controllers/SaldoController.php
+
+		-
+			message: "#^Cannot access property \\$clerk_user_id on mixed\\.$#"
+			count: 1
+			path: app/Http/Controllers/SecurityController.php
+
+		-
+			message: "#^Cannot cast mixed to string\\.$#"
+			count: 2
+			path: app/Http/Controllers/SecurityController.php
+
+		-
+			message: "#^Cannot access property \\$id on mixed\\.$#"
+			count: 2
+			path: app/Http/Controllers/TransactionController.php
+
+		-
+			message: "#^Parameter \\#1 \\$string of function trim expects string, mixed given\\.$#"
+			count: 1
+			path: app/Http/Controllers/TransactionController.php
+
+		-
+			message: "#^Parameter \\#2 \\$user_type of method App\\\\Services\\\\TransactionService\\:\\:getTransaction\\(\\) expects string, mixed given\\.$#"
+			count: 2
+			path: app/Http/Controllers/TransactionController.php
+
+		-
+			message: "#^Cannot access property \\$id on App\\\\Models\\\\User\\|null\\.$#"
+			count: 1
+			path: app/Http/Controllers/UserController.php
+
+		-
+			message: "#^Cannot call method getClientOriginalExtension\\(\\) on array\\<int, Illuminate\\\\Http\\\\UploadedFile\\>\\|Illuminate\\\\Http\\\\UploadedFile\\|null\\.$#"
+			count: 1
+			path: app/Http/Controllers/UserController.php
+
+		-
+			message: "#^Parameter \\#1 \\$paths of method Illuminate\\\\Filesystem\\\\FilesystemAdapter\\:\\:delete\\(\\) expects array\\|string, string\\|false given\\.$#"
+			count: 1
+			path: app/Http/Controllers/UserController.php
+
+		-
+			message: "#^Property App\\\\Models\\\\User\\:\\:\\$img \\(string\\|null\\) does not accept string\\|false\\.$#"
+			count: 1
+			path: app/Http/Controllers/UserController.php
+
+		-
+			message: "#^Property App\\\\Models\\\\User\\:\\:\\$jenis_kelamin \\(string\\|null\\) does not accept mixed\\.$#"
+			count: 1
+			path: app/Http/Controllers/UserController.php
+
+		-
+			message: "#^Property App\\\\Models\\\\User\\:\\:\\$tanggal_lahir \\(string\\|null\\) does not accept mixed\\.$#"
+			count: 1
+			path: app/Http/Controllers/UserController.php
+
+		-
+			message: "#^Else branch is unreachable because ternary operator condition is always true\\.$#"
+			count: 1
+			path: app/Http/Resources/AuditLogResource.php
+
+		-
+			message: "#^Offset 'field' on array\\{field\\: string, label\\: string, before\\: mixed, after\\: mixed\\} on left side of \\?\\? always exists and is not nullable\\.$#"
+			count: 3
+			path: app/Http/Resources/AuditLogResource.php
+
+		-
+			message: "#^Parameter \\#1 \\$callback of function array_map expects \\(callable\\(mixed\\)\\: mixed\\)\\|null, Closure\\(array\\)\\: array\\{field\\: string, label\\: string, before\\: mixed, after\\: mixed\\} given\\.$#"
+			count: 3
+			path: app/Http/Resources/AuditLogResource.php
+
+		-
+			message: "#^Parameter \\#1 \\$change of method App\\\\Http\\\\Resources\\\\AuditLogResource\\:\\:presentAddressChange\\(\\) expects array\\{field\\: string, label\\: string, before\\: mixed, after\\: mixed\\}, array given\\.$#"
+			count: 1
+			path: app/Http/Resources/AuditLogResource.php
+
+		-
+			message: "#^Parameter \\#1 \\$change of method App\\\\Http\\\\Resources\\\\AuditLogResource\\:\\:presentCompanyChange\\(\\) expects array\\{field\\: string, label\\: string, before\\: mixed, after\\: mixed\\}, array given\\.$#"
+			count: 1
+			path: app/Http/Resources/AuditLogResource.php
+
+		-
+			message: "#^Parameter \\#1 \\$change of method App\\\\Http\\\\Resources\\\\AuditLogResource\\:\\:presentProfileChange\\(\\) expects array\\{field\\: string, label\\: string, before\\: mixed, after\\: mixed\\}, array given\\.$#"
+			count: 1
+			path: app/Http/Resources/AuditLogResource.php
+
+		-
+			message: "#^Parameter \\#1 \\$name of method App\\\\Http\\\\Resources\\\\AuditLogResource\\:\\:maskRecipientName\\(\\) expects string\\|null, mixed given\\.$#"
+			count: 1
+			path: app/Http/Resources/AuditLogResource.php
+
+		-
+			message: "#^Parameter \\#1 \\$phone of method App\\\\Http\\\\Resources\\\\AuditLogResource\\:\\:maskPhone\\(\\) expects string\\|null, mixed given\\.$#"
+			count: 3
+			path: app/Http/Resources/AuditLogResource.php
+
+		-
+			message: "#^Parameter \\#2 \\$array of function array_map expects array, mixed given\\.$#"
+			count: 3
+			path: app/Http/Resources/AuditLogResource.php
+
+		-
+			message: "#^Cannot cast mixed to string\\.$#"
+			count: 11
+			path: app/Providers/AppServiceProvider.php
+
+		-
+			message: "#^Parameter \\#2 \\$apiKey of class Meilisearch\\\\Client constructor expects string\\|null, mixed given\\.$#"
+			count: 1
+			path: app/Providers/AppServiceProvider.php
+
+		-
+			message: "#^Cannot cast mixed to float\\.$#"
+			count: 2
+			path: app/Services/AlamatService.php
+
+		-
+			message: "#^Cannot cast mixed to string\\.$#"
+			count: 1
+			path: app/Services/AlamatService.php
+
+		-
+			message: "#^Part \\$verifiedLocation\\['formatted_address'\\] \\(mixed\\) of encapsed string cannot be cast to string\\.$#"
+			count: 1
+			path: app/Services/AlamatService.php
+
+		-
+			message: "#^Call to an undefined method Illuminate\\\\Database\\\\ConnectionInterface\\:\\:getDriverName\\(\\)\\.$#"
+			count: 1
+			path: app/Services/AuditLogService.php
+
+		-
+			message: "#^Cannot cast mixed to string\\.$#"
+			count: 2
+			path: app/Services/AuditLogService.php
+
+		-
+			message: "#^Cannot access property \\$name on mixed\\.$#"
+			count: 2
+			path: app/Services/BuyerProductSearchService.php
+
+		-
+			message: "#^Cannot call method getTimestamp\\(\\) on mixed\\.$#"
+			count: 2
+			path: app/Services/BuyerProductSearchService.php
+
+		-
+			message: "#^Cannot call method toIso8601String\\(\\) on mixed\\.$#"
+			count: 2
+			path: app/Services/BuyerProductSearchService.php
+
+		-
+			message: "#^Cannot cast mixed to int\\.$#"
+			count: 1
+			path: app/Services/BuyerProductSearchService.php
+
+		-
+			message: "#^Cannot cast mixed to string\\.$#"
+			count: 1
+			path: app/Services/BuyerProductSearchService.php
+
+		-
+			message: "#^Access to an undefined property App\\\\Models\\\\Keranjang\\:\\:\\$k_total_price\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Cannot access offset 'k_user_id_seller' on mixed\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Cannot access offset 'u_name_seller' on mixed\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Cannot access offset 0 on mixed\\.$#"
+			count: 2
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Cannot access property \\$alamat on App\\\\Models\\\\Alamat\\|null\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Cannot access property \\$latitude on App\\\\Models\\\\Alamat\\|null\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Cannot access property \\$longitude on App\\\\Models\\\\Alamat\\|null\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:buildCheckoutSnapshot\\(\\) has parameter \\$noteds with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:buildCheckoutSnapshot\\(\\) has parameter \\$shippingOptions with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:buildCheckoutSnapshot\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:changeStockProductAfterCheckout\\(\\) has parameter \\$checkouts with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:changeStockProductAfterCheckout\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:checkoutCartIds\\(\\) has parameter \\$checkouts with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:checkoutSnapshotChanged\\(\\) has parameter \\$backendSnapshot with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:checkoutSnapshotChanged\\(\\) has parameter \\$clientSnapshot with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:deleteKeranjangAfterCheckoutForBuyer\\(\\) has parameter \\$checkouts with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:deleteKeranjangAfterCheckoutForBuyer\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:formatCheckoutSnapshotForFrontend\\(\\) has parameter \\$checkoutSnapshot with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:formatCheckoutSnapshotForFrontend\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:generateCheckoutKey\\(\\) has parameter \\$checkoutSnapshot with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:generateFormatKeranjangs\\(\\) has parameter \\$keranjangs with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:generateFormatKeranjangs\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:generateFormatKurirs\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:getAlamatBuyer\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:getKeranjangCheckout\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:hasUnverifiedSellerAddress\\(\\) has parameter \\$checkouts with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:lockAndValidateCheckoutItems\\(\\) has parameter \\$checkoutSnapshot with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:reconcileCheckoutCart\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:saveCheckoutToDatabase\\(\\) has parameter \\$checkouts with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:saveCheckoutToDatabase\\(\\) has parameter \\$dataXendit with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:saveCheckoutToDatabase\\(\\) has parameter \\$kurirs with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:saveCheckoutToDatabase\\(\\) has parameter \\$noteds with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:saveCheckoutToDatabase\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Parameter \\#1 \\$keranjangs of method App\\\\Services\\\\CheckoutService\\:\\:generateFormatKeranjangs\\(\\) expects array, mixed given\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Parameter \\#1 \\$reasons of method App\\\\Services\\\\ProductAvailabilityService\\:\\:hasOnlyUnavailableReason\\(\\) expects array\\<string, string\\>, mixed given\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Parameter \\#2 \\$data of function hash expects string, string\\|false given\\.$#"
+			count: 1
+			path: app/Services/CheckoutService.php
+
+		-
+			message: "#^Cannot cast mixed to string\\.$#"
+			count: 2
+			path: app/Services/Clerk/ClerkBackendClientService.php
+
+		-
+			message: "#^Parameter \\$authorizedParties of class Clerk\\\\Backend\\\\Helpers\\\\Jwks\\\\AuthenticateRequestOptions constructor expects array\\<string\\>\\|null, mixed given\\.$#"
+			count: 1
+			path: app/Services/Clerk/ClerkBackendClientService.php
+
+		-
+			message: "#^Cannot cast mixed to string\\.$#"
+			count: 1
+			path: app/Services/Clerk/ClerkSecurityService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\Clerk\\\\ClerkSecurityService\\:\\:cleanupFailedGoogleAccountLinks\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/Clerk/ClerkSecurityService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\Clerk\\\\ClerkSecurityService\\:\\:deleteInvalidProviderAccounts\\(\\) has parameter \\$externalAccounts with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/Clerk/ClerkSecurityService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\Clerk\\\\ClerkSecurityService\\:\\:deleteProviderAccounts\\(\\) has parameter \\$externalAccounts with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/Clerk/ClerkSecurityService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\Clerk\\\\ClerkSecurityService\\:\\:ensureProviderAccountsAreDeleted\\(\\) has parameter \\$deletedExternalAccounts with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/Clerk/ClerkSecurityService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\Clerk\\\\ClerkSecurityService\\:\\:formatPasskeys\\(\\) has parameter \\$passkeys with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/Clerk/ClerkSecurityService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\Clerk\\\\ClerkSecurityService\\:\\:formatPasskeys\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/Clerk/ClerkSecurityService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\Clerk\\\\ClerkSecurityService\\:\\:formatSession\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/Clerk/ClerkSecurityService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\Clerk\\\\ClerkSecurityService\\:\\:getActiveSessions\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/Clerk/ClerkSecurityService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\Clerk\\\\ClerkSecurityService\\:\\:getProviderAccounts\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/Clerk/ClerkSecurityService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\Clerk\\\\ClerkSecurityService\\:\\:getSummary\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/Clerk/ClerkSecurityService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\Clerk\\\\ClerkSecurityService\\:\\:revokeOtherSessions\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/Clerk/ClerkSecurityService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\Clerk\\\\ClerkSecurityService\\:\\:revokeSession\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/Clerk/ClerkSecurityService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\Clerk\\\\ClerkSecurityService\\:\\:validateGoogleAccountLink\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/Clerk/ClerkSecurityService.php
+
+		-
+			message: "#^Cannot access property \\$id on App\\\\Models\\\\User\\|null\\.$#"
+			count: 1
+			path: app/Services/Clerk/ClerkUserSyncService.php
+
+		-
+			message: "#^If condition is always true\\.$#"
+			count: 1
+			path: app/Services/Clerk/ClerkUserSyncService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\Clerk\\\\ClerkUserSyncService\\:\\:syncClerkUserWithStatus\\(\\) should return array\\{user\\: App\\\\Models\\\\User, was_created\\: bool\\} but returns array\\{user\\: App\\\\Models\\\\User\\|null, was_created\\: bool\\}\\.$#"
+			count: 1
+			path: app/Services/Clerk/ClerkUserSyncService.php
+
+		-
+			message: "#^Right side of && is always true\\.$#"
+			count: 1
+			path: app/Services/Clerk/ClerkUserSyncService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\CompanyService\\:\\:getCompany\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/CompanyService.php
+
+		-
+			message: "#^Cannot cast mixed to int\\.$#"
+			count: 1
+			path: app/Services/GeoapifyService.php
+
+		-
+			message: "#^Cannot cast mixed to string\\.$#"
+			count: 2
+			path: app/Services/GeoapifyService.php
+
+		-
+			message: "#^Access to an undefined property App\\\\Models\\\\Keranjang\\:\\:\\$is_purchasable\\.$#"
+			count: 1
+			path: app/Services/KeranjangService.php
+
+		-
+			message: "#^Access to an undefined property App\\\\Models\\\\Keranjang\\:\\:\\$is_selectable\\.$#"
+			count: 1
+			path: app/Services/KeranjangService.php
+
+		-
+			message: "#^Access to an undefined property App\\\\Models\\\\Keranjang\\:\\:\\$k_checked\\.$#"
+			count: 2
+			path: app/Services/KeranjangService.php
+
+		-
+			message: "#^Access to an undefined property App\\\\Models\\\\Keranjang\\:\\:\\$k_checkout\\.$#"
+			count: 2
+			path: app/Services/KeranjangService.php
+
+		-
+			message: "#^Access to an undefined property App\\\\Models\\\\Keranjang\\:\\:\\$k_id\\.$#"
+			count: 6
+			path: app/Services/KeranjangService.php
+
+		-
+			message: "#^Access to an undefined property App\\\\Models\\\\Keranjang\\:\\:\\$k_total_price\\.$#"
+			count: 1
+			path: app/Services/KeranjangService.php
+
+		-
+			message: "#^Access to an undefined property App\\\\Models\\\\Keranjang\\:\\:\\$k_user_id_seller\\.$#"
+			count: 1
+			path: app/Services/KeranjangService.php
+
+		-
+			message: "#^Access to an undefined property App\\\\Models\\\\Keranjang\\:\\:\\$p_deleted_at\\.$#"
+			count: 1
+			path: app/Services/KeranjangService.php
+
+		-
+			message: "#^Access to an undefined property App\\\\Models\\\\Keranjang\\:\\:\\$p_exists_id\\.$#"
+			count: 1
+			path: app/Services/KeranjangService.php
+
+		-
+			message: "#^Access to an undefined property App\\\\Models\\\\Keranjang\\:\\:\\$stock_issue\\.$#"
+			count: 1
+			path: app/Services/KeranjangService.php
+
+		-
+			message: "#^Access to an undefined property App\\\\Models\\\\Keranjang\\:\\:\\$unavailable_reason\\.$#"
+			count: 1
+			path: app/Services/KeranjangService.php
+
+		-
+			message: "#^Access to an undefined property object\\:\\:\\$k_id\\.$#"
+			count: 1
+			path: app/Services/KeranjangService.php
+
+		-
+			message: "#^Access to an undefined property object\\:\\:\\$k_user_id_seller\\.$#"
+			count: 1
+			path: app/Services/KeranjangService.php
+
+		-
+			message: "#^Access to an undefined property object\\:\\:\\$p_id\\.$#"
+			count: 1
+			path: app/Services/KeranjangService.php
+
+		-
+			message: "#^Access to an undefined property object\\:\\:\\$p_name\\.$#"
+			count: 1
+			path: app/Services/KeranjangService.php
+
+		-
+			message: "#^Access to an undefined property object\\:\\:\\$u_seller_name\\.$#"
+			count: 1
+			path: app/Services/KeranjangService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\KeranjangService\\:\\:checkAlamatBuyerExist\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/KeranjangService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\KeranjangService\\:\\:checkKeranjangNotChecked\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/KeranjangService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\KeranjangService\\:\\:checkProductSoldOutByIds\\(\\) has parameter \\$product_ids with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/KeranjangService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\KeranjangService\\:\\:checkProductSoldOutByIds\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/KeranjangService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\KeranjangService\\:\\:checkProductUnavailableByIds\\(\\) has parameter \\$product_ids with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/KeranjangService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\KeranjangService\\:\\:checkProductUnavailableByIds\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/KeranjangService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\KeranjangService\\:\\:getKeranjangs\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/KeranjangService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\KeranjangService\\:\\:makeStockIssue\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/KeranjangService.php
+
+		-
+			message: "#^Parameter \\#1 \\$sellerIds of method App\\\\Services\\\\ProductAvailabilityService\\:\\:verifiedSellerIds\\(\\) expects array\\<int, string\\>, array\\<mixed\\> given\\.$#"
+			count: 2
+			path: app/Services/KeranjangService.php
+
+		-
+			message: "#^Unable to resolve the template type T in call to function array_values$#"
+			count: 3
+			path: app/Services/KeranjangService.php
+
+		-
+			message: "#^Anonymous function should return App\\\\Models\\\\OutboxMessage but returns App\\\\Models\\\\OutboxMessage\\|null\\.$#"
+			count: 1
+			path: app/Services/OutboxPublisherService.php
+
+		-
+			message: "#^Cannot call method toIso8601String\\(\\) on mixed\\.$#"
+			count: 1
+			path: app/Services/OutboxPublisherService.php
+
+		-
+			message: "#^Cannot cast mixed to int\\.$#"
+			count: 5
+			path: app/Services/OutboxPublisherService.php
+
+		-
+			message: "#^Cannot cast mixed to string\\.$#"
+			count: 1
+			path: app/Services/OutboxPublisherService.php
+
+		-
+			message: "#^Else branch is unreachable because ternary operator condition is always true\\.$#"
+			count: 1
+			path: app/Services/OutboxPublisherService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\PaymentService\\:\\:getCheckoutPayment\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/PaymentService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\PaymentService\\:\\:getWithdrawalPayment\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/PaymentService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\PaymentService\\:\\:getWithdrawalPayments\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/PaymentService.php
+
+		-
+			message: "#^Parameter \\#1 \\$string of function trim expects string, mixed given\\.$#"
+			count: 1
+			path: app/Services/PaymentService.php
+
+		-
+			message: "#^Access to an undefined property App\\\\Models\\\\SaldoHistory\\:\\:\\$buyer_name\\.$#"
+			count: 2
+			path: app/Services/SaldoService.php
+
+		-
+			message: "#^Access to an undefined property App\\\\Models\\\\SaldoHistory\\:\\:\\$payment_account\\.$#"
+			count: 2
+			path: app/Services/SaldoService.php
+
+		-
+			message: "#^Access to an undefined property App\\\\Models\\\\SaldoHistory\\:\\:\\$payment_name\\.$#"
+			count: 2
+			path: app/Services/SaldoService.php
+
+		-
+			message: "#^Access to an undefined property App\\\\Models\\\\SaldoHistory\\:\\:\\$transaction_number\\.$#"
+			count: 2
+			path: app/Services/SaldoService.php
+
+		-
+			message: "#^Cannot access property \\$saldo_income on App\\\\Models\\\\SaldoUser\\|null\\.$#"
+			count: 2
+			path: app/Services/SaldoService.php
+
+		-
+			message: "#^Cannot access property \\$saldo_refund on App\\\\Models\\\\SaldoUser\\|null\\.$#"
+			count: 2
+			path: app/Services/SaldoService.php
+
+		-
+			message: "#^Cannot call method save\\(\\) on App\\\\Models\\\\SaldoUser\\|null\\.$#"
+			count: 1
+			path: app/Services/SaldoService.php
+
+		-
+			message: "#^Match expression does not handle remaining values\\: string\\|null$#"
+			count: 4
+			path: app/Services/SaldoService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\SaldoService\\:\\:getSaldo\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/SaldoService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\SaldoService\\:\\:getSaldoById\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/SaldoService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\SaldoService\\:\\:getSaldoHistory\\(\\) has parameter \\$saldo_history_current_ids with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/SaldoService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\SaldoService\\:\\:getSaldoHistory\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/SaldoService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\SaldoService\\:\\:saveSaldoAfterDisbursement\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/SaldoService.php
+
+		-
+			message: "#^Parameter \\#1 \\$num of function number_format expects float, float\\|null given\\.$#"
+			count: 2
+			path: app/Services/SaldoService.php
+
+		-
+			message: "#^Access to an undefined property App\\\\Models\\\\TransactionUser\\:\\:\\$buyer_name\\.$#"
+			count: 1
+			path: app/Services/SellerDashboardService.php
+
+		-
+			message: "#^Access to an undefined property App\\\\Models\\\\TransactionUser\\:\\:\\$invoice_status\\.$#"
+			count: 1
+			path: app/Services/SellerDashboardService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\SellerDashboardService\\:\\:getDashboard\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/SellerDashboardService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\SellerDashboardService\\:\\:getPerformance\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/SellerDashboardService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\SellerDashboardService\\:\\:getProductSnapshot\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/SellerDashboardService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\SellerDashboardService\\:\\:getRecentTransactions\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/SellerDashboardService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\SellerDashboardService\\:\\:getSummary\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/SellerDashboardService.php
+
+		-
+			message: "#^Return type of call to method Illuminate\\\\Database\\\\Eloquent\\\\Collection\\<int,App\\\\Models\\\\TransactionUser\\>\\:\\:map\\(\\) contains unresolvable type\\.$#"
+			count: 1
+			path: app/Services/SellerDashboardService.php
+
+		-
+			message: "#^Cannot cast mixed to string\\.$#"
+			count: 1
+			path: app/Services/SellerProductCursorService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\SellerProductCursorService\\:\\:primaryValue\\(\\) should return float\\|string\\|null but returns mixed\\.$#"
+			count: 1
+			path: app/Services/SellerProductCursorService.php
+
+		-
+			message: "#^Cannot access property \\$alamat_buyer on mixed\\.$#"
+			count: 1
+			path: app/Services/TransactionService.php
+
+		-
+			message: "#^Cannot access property \\$expired_at on mixed\\.$#"
+			count: 3
+			path: app/Services/TransactionService.php
+
+		-
+			message: "#^Cannot access property \\$id on mixed\\.$#"
+			count: 1
+			path: app/Services/TransactionService.php
+
+		-
+			message: "#^Cannot access property \\$invoice_id on mixed\\.$#"
+			count: 2
+			path: app/Services/TransactionService.php
+
+		-
+			message: "#^Cannot access property \\$invoice_status on mixed\\.$#"
+			count: 1
+			path: app/Services/TransactionService.php
+
+		-
+			message: "#^Cannot access property \\$payment_account on mixed\\.$#"
+			count: 1
+			path: app/Services/TransactionService.php
+
+		-
+			message: "#^Cannot access property \\$payment_name on mixed\\.$#"
+			count: 1
+			path: app/Services/TransactionService.php
+
+		-
+			message: "#^Cannot access property \\$products on mixed\\.$#"
+			count: 1
+			path: app/Services/TransactionService.php
+
+		-
+			message: "#^Cannot access property \\$total_price on mixed\\.$#"
+			count: 1
+			path: app/Services/TransactionService.php
+
+		-
+			message: "#^Cannot access property \\$transaction_date on mixed\\.$#"
+			count: 3
+			path: app/Services/TransactionService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\TransactionService\\:\\:getPendingBuyerInvoices\\(\\) return type with generic class Illuminate\\\\Support\\\\Collection does not specify its types\\: TKey, TValue$#"
+			count: 1
+			path: app/Services/TransactionService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\TransactionService\\:\\:getTransaction\\(\\) has parameter \\$filters with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/TransactionService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\TransactionService\\:\\:getTransaction\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/TransactionService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\TransactionService\\:\\:prepareTransactionRows\\(\\) has parameter \\$transactions with generic class Illuminate\\\\Support\\\\Collection but does not specify its types\\: TKey, TValue$#"
+			count: 1
+			path: app/Services/TransactionService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\TransactionService\\:\\:prepareTransactionRows\\(\\) return type with generic class Illuminate\\\\Support\\\\Collection does not specify its types\\: TKey, TValue$#"
+			count: 1
+			path: app/Services/TransactionService.php
+
+		-
+			message: "#^Cannot access offset 'message' on mixed\\.$#"
+			count: 4
+			path: app/Services/XenditService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\XenditService\\:\\:createVirtualAccount\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/XenditService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\XenditService\\:\\:disbursement\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/XenditService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\XenditService\\:\\:simulateVirtualAccountFixed\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/XenditService.php
+
+		-
+			message: "#^Method App\\\\Services\\\\XenditService\\:\\:simulateVirtualAccountPool\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: app/Services/XenditService.php

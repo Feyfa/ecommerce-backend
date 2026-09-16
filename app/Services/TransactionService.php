@@ -113,7 +113,7 @@ class TransactionService
      * level tersebut. Daftar pending buyer dapat mengelompokkan hasilnya kembali per invoice tanpa
      * mengubah sumber data seller atau transaksi yang sudah dibayar.
      *
-     * @return Builder Query builder dengan join invoice, buyer, seller, dan perusahaan seller.
+     * @return Builder<TransactionUser> Query transaksi dengan join invoice, buyer, seller, dan perusahaan seller.
      */
     private function createBaseTransactionQuery(): Builder
     {
@@ -132,11 +132,11 @@ class TransactionService
      * response buyer karena seller tidak boleh menerima data pembayaran buyer tersebut. Total invoice
      * hanya dipakai pada item pending yang dikelompokkan; row reguler memakai total paket toko.
      *
-     * @param  Builder  $query  Query transaksi dasar yang akan menerima kolom response.
+     * @param  Builder<TransactionUser>  $query  Query transaksi dasar yang akan menerima kolom response.
      * @param  bool  $includePaymentAccount  Menentukan apakah nomor virtual account buyer disertakan.
      * @param  bool  $useInvoiceTotal  Menentukan apakah total invoice dipakai alih-alih total paket toko.
      *
-     * @return Builder Query transaksi dengan kolom response yang telah dipilih.
+     * @return Builder<TransactionUser> Query transaksi dengan kolom response yang telah dipilih.
      */
     private function selectTransactionFields(Builder $query, bool $includePaymentAccount = false, bool $useInvoiceTotal = false): Builder
     {
@@ -178,7 +178,7 @@ class TransactionService
      * seluruh paket pada invoice ikut dimuat agar modal buyer tidak kehilangan toko lain hanya karena
      * keyword hanya cocok dengan satu produk atau seller.
      *
-     * @param  Builder  $filteredTransactions  Query buyer yang sudah dibatasi ownership, search, dan tanggal.
+     * @param  Builder<TransactionUser>  $filteredTransactions  Query buyer yang sudah dibatasi ownership, search, dan tanggal.
      * @param  string  $userId  ID buyer pemilik invoice pending yang akan dimuat.
      * @param  string  $sortOrder  Arah urutan tanggal transaksi, asc atau desc.
      *
@@ -287,11 +287,11 @@ class TransactionService
     /**
      * Membatasi query transaksi berdasarkan peran buyer atau seller.
      *
-     * @param  Builder  $query  Query Eloquent yang akan ditambahkan kondisi tanpa dieksekusi langsung.
+     * @param  Builder<TransactionUser>  $query  Query Eloquent yang akan ditambahkan kondisi tanpa dieksekusi langsung.
      * @param  string  $user_id  ID user yang menjadi scope data atau mutasi.
      * @param  string  $user_type  Perspektif buyer atau seller yang menentukan scope transaksi.
      *
-     * @return Builder Query builder yang telah ditambahkan scope atau kondisi terkait.
+     * @return Builder<TransactionUser> Query builder yang telah ditambahkan scope atau kondisi terkait.
      */
     private function applyUserTypeFilter($query, string $user_id, string $user_type): Builder
     {
@@ -309,10 +309,10 @@ class TransactionService
      * produk melalui relasi terkait. Seluruh kondisi dikelompokkan agar filter lain tetap digabungkan
      * menggunakan logika AND.
      *
-     * @param  Builder  $query  Query Eloquent yang akan ditambahkan kondisi tanpa dieksekusi langsung.
+     * @param  Builder<TransactionUser>  $query  Query Eloquent yang akan ditambahkan kondisi tanpa dieksekusi langsung.
      * @param  string  $search  Kata kunci pencarian yang akan diterapkan.
      *
-     * @return Builder Query builder yang telah ditambahkan scope atau kondisi terkait.
+     * @return Builder<TransactionUser> Query builder yang telah ditambahkan scope atau kondisi terkait.
      */
     private function applySearchFilter($query, string $search): Builder
     {
@@ -348,11 +348,11 @@ class TransactionService
      * Tanggal awal dan akhir dikonversi menjadi batas hari yang sesuai sebelum kondisi query
      * ditambahkan. Filter hanya diterapkan ketika kedua nilai telah lolos validasi format.
      *
-     * @param  Builder  $query  Query Eloquent yang akan ditambahkan kondisi tanpa dieksekusi langsung.
+     * @param  Builder<TransactionUser>  $query  Query Eloquent yang akan ditambahkan kondisi tanpa dieksekusi langsung.
      * @param  string  $date_from  Tanggal awal filter transaksi.
      * @param  string  $date_to  Tanggal akhir filter transaksi.
      *
-     * @return Builder Query builder yang telah ditambahkan scope atau kondisi terkait.
+     * @return Builder<TransactionUser> Query builder yang telah ditambahkan scope atau kondisi terkait.
      */
     private function applyDateFilter($query, string $date_from, string $date_to): Builder
     {
@@ -385,10 +385,10 @@ class TransactionService
      * Status pilihan dipetakan ke kolom status transaksi yang diizinkan. Nilai di luar kontrak tidak
      * membentuk kondisi query arbitrer.
      *
-     * @param  Builder  $query  Query Eloquent yang akan ditambahkan kondisi tanpa dieksekusi langsung.
+     * @param  Builder<TransactionUser>  $query  Query Eloquent yang akan ditambahkan kondisi tanpa dieksekusi langsung.
      * @param  string  $status  Status bisnis yang akan diterapkan atau difilter.
      *
-     * @return Builder Query builder yang telah ditambahkan scope atau kondisi terkait.
+     * @return Builder<TransactionUser> Query builder yang telah ditambahkan scope atau kondisi terkait.
      */
     private function applyStatusFilter($query, string $status): Builder
     {

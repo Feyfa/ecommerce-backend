@@ -626,7 +626,7 @@ class AuditLogService
      * @param  string  $idempotencySource  Sumber stabil untuk hash unique.
      * @param  string  $subjectType  Tipe object yang terkena aktivitas.
      * @param  string  $subjectId  Identifier object yang terkena aktivitas.
-     * @param  array  $extraContext  Metadata tambahan yang sudah di-allow-list.
+     * @param  array<string, mixed>  $extraContext  Metadata tambahan yang sudah di-allow-list.
      * @param  string|null  $requestId  Correlation ID request untuk idempotensi dan penelusuran.
      *
      * @return AuditLog Model audit log yang berhasil ditemukan atau dicatat.

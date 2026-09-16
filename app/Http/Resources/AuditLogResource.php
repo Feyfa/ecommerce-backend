@@ -3,11 +3,14 @@
 namespace App\Http\Resources;
 
 use App\Enums\AuditEvent;
+use App\Models\AuditLog;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * Resource user-facing yang mencegah metadata internal audit ikut terekspos.
+ *
+ * @mixin AuditLog
  */
 class AuditLogResource extends JsonResource
 {
@@ -21,7 +24,7 @@ class AuditLogResource extends JsonResource
      *
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array<string, mixed> Data audit yang aman untuk mode response saat ini.
      */
     public function toArray(Request $request): array
     {

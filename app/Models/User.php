@@ -33,7 +33,7 @@ class User extends Authenticatable
     /**
      * Mengambil seluruh produk yang dimiliki user sebagai seller.
      *
-     * @return HasMany Relasi Eloquent menuju seluruh model turunan yang terkait.
+     * @return HasMany<Product> Relasi Eloquent menuju seluruh produk milik seller.
      */
     public function products(): HasMany
     {
@@ -43,7 +43,7 @@ class User extends Authenticatable
     /**
      * Mengambil seluruh item keranjang milik user sebagai buyer.
      *
-     * @return HasMany Relasi Eloquent menuju seluruh model turunan yang terkait.
+     * @return HasMany<Keranjang> Relasi Eloquent menuju seluruh item keranjang milik buyer.
      */
     public function buyerKeranjangs(): HasMany
     {
@@ -53,7 +53,7 @@ class User extends Authenticatable
     /**
      * Mengambil seluruh item keranjang yang menjual produk user.
      *
-     * @return HasMany Relasi Eloquent menuju seluruh model turunan yang terkait.
+     * @return HasMany<Keranjang> Relasi Eloquent menuju seluruh item keranjang yang terkait dengan seller.
      */
     public function sellerKeranjangs(): HasMany
     {
@@ -63,7 +63,7 @@ class User extends Authenticatable
     /**
      * Mengambil seluruh alamat milik user.
      *
-     * @return HasMany Relasi Eloquent menuju seluruh model turunan yang terkait.
+     * @return HasMany<Alamat> Relasi Eloquent menuju seluruh alamat milik user.
      */
     public function alamats(): HasMany
     {
@@ -73,7 +73,7 @@ class User extends Authenticatable
     /**
      * Mengambil profil toko milik user.
      *
-     * @return HasOne Relasi Eloquent menuju satu model turunan yang terkait.
+     * @return HasOne<Company> Relasi Eloquent menuju profil toko milik user.
      */
     public function company(): HasOne
     {
@@ -83,7 +83,7 @@ class User extends Authenticatable
     /**
      * Mengambil saldo yang dimiliki user.
      *
-     * @return HasOne Relasi Eloquent menuju satu model turunan yang terkait.
+     * @return HasOne<SaldoUser> Relasi Eloquent menuju saldo milik user.
      */
     public function saldoUser(): HasOne
     {
@@ -93,7 +93,7 @@ class User extends Authenticatable
     /**
      * Mengambil seluruh audit yang dimiliki user sebagai actor.
      *
-     * @return HasMany Relasi Eloquent menuju seluruh model turunan yang terkait.
+     * @return HasMany<AuditLog> Relasi Eloquent menuju seluruh audit milik actor.
      */
     public function auditLogs(): HasMany
     {

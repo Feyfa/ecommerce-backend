@@ -53,7 +53,8 @@ class ProductAvailabilityService
             return [];
         }
 
-        return Alamat::whereIn('user_id', $sellerIds)
+        /** @var array<int, string> $verifiedSellerIds */
+        $verifiedSellerIds = Alamat::whereIn('user_id', $sellerIds)
             ->where('type', 'seller')
             ->where('enable', 1)
             ->get()
@@ -62,6 +63,8 @@ class ProductAvailabilityService
             ->unique()
             ->values()
             ->all();
+
+        return $verifiedSellerIds;
     }
 
     /**
