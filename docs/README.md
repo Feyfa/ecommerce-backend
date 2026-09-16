@@ -125,6 +125,9 @@ alias path as inline code for a file owned by another repository.
 - [TOK-49 AlamatController PHPStan Debt QA](qa/tok-49-alamat-controller-phpstan.md)
   Tracks authenticated-user and address-search type narrowing, focused baseline reduction, and release evidence.
 
+- [TOK-50 ProductController PHPStan Debt QA](qa/tok-50-product-controller-phpstan.md)
+  Tracks authenticated-user, cursor-product, and image-ID type narrowing with focused baseline reduction.
+
 - [Commit Guidelines](development/commit-guidelines.md)
   Explains how to keep commits focused on one purpose and separate unrelated changes.
 
@@ -200,6 +203,7 @@ docs/
     tok-40-laravel-pint.md
     tok-41-phpstan-larastan.md
     tok-49-alamat-controller-phpstan.md
+    tok-50-product-controller-phpstan.md
 
   development/
     commit-guidelines.md
