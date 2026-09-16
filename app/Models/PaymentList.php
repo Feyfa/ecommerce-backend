@@ -23,7 +23,7 @@ class PaymentList extends Model
     /**
      * Mengambil seluruh rekening user untuk metode pembayaran ini.
      *
-     * @return HasMany Relasi Eloquent menuju seluruh model turunan yang terkait.
+     * @return HasMany<PaymentUser> Relasi Eloquent menuju seluruh rekening user yang terkait.
      */
     public function paymentUsers(): HasMany
     {

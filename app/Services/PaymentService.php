@@ -131,12 +131,13 @@ class PaymentService
      * Nilai acak yang aman untuk sandbox dibentuk sesuai kontrak identitas yang diperlukan provider.
      * Helper ini hanya mendukung simulasi dan tidak mengambil data pribadi user produksi.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{status: 'success', user: array<string, string>} Data user simulasi beserta status keberhasilan.
      */
     public function generateFakeUser(): array
     {
         $faker = Faker::create('id_ID');
 
+        /** @var array<string, string> $user */
         $user = [
             'name' => $faker->name,
             'email' => $faker->unique()->safeEmail,

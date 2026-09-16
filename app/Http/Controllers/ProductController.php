@@ -10,6 +10,7 @@ use App\Services\ProductAvailabilityService;
 use App\Services\SellerProductCursorService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
@@ -232,6 +233,7 @@ class ProductController extends Controller
         // --- step 1 - end - validasi data produk, file, manifest urutan, dan seller
 
         // --- step 2 - start - susun manifest final sebelum menyimpan file
+        /** @var array<int, array{file: UploadedFile}> $orderedImages */
         $orderedImages = $this->resolveImageOrder($request);
         $storedPaths = [];
         // --- step 2 - end - susun manifest final sebelum menyimpan file
@@ -339,6 +341,7 @@ class ProductController extends Controller
                 }
             }
 
+            /** @var array<int, array{id?: string, path: string}> $orderedImages */
             $keptIds = collect($orderedImages)->pluck('id')->filter()->all();
             $keptPaths = collect($orderedImages)->pluck('path')->filter()->all();
             $deletedPaths = $product->images
@@ -521,7 +524,7 @@ class ProductController extends Controller
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      * @param  Product|null  $product  Model produk yang menjadi target atau sumber data.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array<int, array{file: UploadedFile}|array{id: string, path: string}> Manifest gambar baru dan existing sesuai urutan request.
      */
     private function resolveImageOrder(Request $request, ?Product $product = null): array
     {
@@ -530,6 +533,7 @@ class ProductController extends Controller
         $uploadedImages = $request->file('images', []);
         $existingImages = $product ? $product->images->keyBy('id') : collect();
         $usedNewIndexes = [];
+        /** @var array<int, array{file: UploadedFile}|array{id: string, path: string}> $orderedImages */
         $orderedImages = [];
         // --- step 1 - end - ambil manifest kiriman dan gambar lama milik produk
 
@@ -538,6 +542,7 @@ class ProductController extends Controller
             throw new InvalidArgumentException('Image order and uploaded images must be arrays.');
         }
 
+        /** @var array<int, UploadedFile> $uploadedImages */
         if (count($imageOrder) < 1 || count($imageOrder) > 5) {
             throw new InvalidArgumentException('Product must have between 1 and 5 images.');
         }
@@ -566,6 +571,7 @@ class ProductController extends Controller
                 throw new InvalidArgumentException('Image order contains an image that does not belong to this product.');
             }
 
+            /** @var ProductImage $image */
             $image = $existingImages->get($token);
             $orderedImages[] = ['id' => $image->id, 'path' => $image->path];
         }

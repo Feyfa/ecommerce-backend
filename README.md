@@ -30,6 +30,26 @@ The equivalent direct Pint commands are:
 ./vendor/bin/pint --test
 ```
 
+## Backend Static Analysis
+
+The backend uses PHPStan through Larastan to analyse Laravel application code
+with PHP 8.3. Install the locked Composer dependencies, then run:
+
+```bash
+composer analyse
+```
+
+The repository configuration analyses `app/` at `level: max`. With the locked
+PHPStan 1.12 series, `max` is level 9. Existing behavior-sensitive findings are
+tracked in `phpstan-baseline.neon`; new findings and stale baseline entries fail
+the command and the backend CI gate.
+
+Do not regenerate or expand the baseline merely to make CI pass. Correct a new
+finding when the change is behavior-preserving, or move a behavior-sensitive
+correction into a focused follow-up task. See
+[`docs/setup/local-native-development.md`](docs/setup/local-native-development.md#backend-static-analysis)
+for the local workflow.
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:

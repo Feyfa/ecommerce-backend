@@ -23,6 +23,7 @@ class SyncBuyerProductSearchJob implements ShouldQueue
 
     public int $timeout = 60;
 
+    /** @var array<int, int> Jeda retry job dalam satuan detik. */
     public array $backoff = [5, 30, 120];
 
     /**

@@ -324,6 +324,42 @@ The direct equivalents are `./vendor/bin/pint` and
 `./vendor/bin/pint --test`. Both commands must run with the project's supported
 PHP runtime.
 
+## Backend Static Analysis
+
+The backend runs PHPStan through Larastan with PHP 8.3. Install the exact
+development dependencies from `composer.lock`, then run the repository command:
+
+```bash
+composer install
+composer analyse
+```
+
+`phpstan.neon.dist` is the authoritative configuration. It analyses `app/` at
+`level: max`, loads the Larastan extension, and enables unmatched-ignore
+reporting. The locked Laravel 10, Larastan 2.9, and PHPStan 1.12 combination
+means `max` currently resolves to level 9. Expanding analysis to routes,
+database files, or tests, and upgrading to PHPStan 2 are separate adoption
+changes.
+
+`phpstan-baseline.neon` contains only findings that already existed when this
+gate was introduced and could not be corrected safely without changing runtime
+behavior. Use this workflow when analysis fails:
+
+1. Inspect the new finding and verify the relevant callers, framework contract,
+   query, persistence behavior, and tests.
+2. Correct it when an accurate PHPDoc generic, array shape, model relation type,
+   or another behavior-preserving change is sufficient.
+3. Do not weaken the level, exclude a source path, add a broad ignore, or
+   regenerate the whole baseline.
+4. If correcting the finding requires branching, null handling, query changes,
+   state changes, or a business decision, preserve the evidence and create a
+   focused follow-up task instead of changing behavior only for PHPStan.
+5. Remove or narrow an existing baseline entry when its underlying finding is
+   fixed. `composer analyse` must continue to fail when an entry becomes stale.
+
+Backend CI prepares the Laravel testing environment, runs `composer analyse` as
+a blocking step, and only then proceeds to migrations and the PHPUnit suite.
+
 ## Automated Test Resource Safety
 
 Local PHPUnit runs use an isolated SQLite in-memory database configured by `phpunit.xml`. They must never reuse the PostgreSQL development database from `.env`, because database-resetting traits such as `RefreshDatabase` recreate the active test schema.

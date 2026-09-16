@@ -217,6 +217,18 @@ Do not force step comments into a simple function that has no meaningful interna
 
 Add contextual comments when they explain intent, business rules, state relationships, side effects, compatibility constraints, edge cases, race conditions, or regressions that are not obvious from the code. Prefer comments that explain why the logic exists and avoid comments that merely translate syntax.
 
+## Static Analysis
+
+Run `composer analyse` for changes under `app/` and for dependency or configuration changes that can affect PHP type resolution. Treat the command as a blocking local and CI check.
+
+The repository starts PHPStan through Larastan with the scope and level defined in `phpstan.neon.dist`. Keep analysis focused on the configured paths unless a separate task explicitly expands the adoption scope.
+
+Fix a finding directly only when the correction can be proven without changing runtime control flow, queries, persistence, public API responses, side effects, framework contracts, or business rules. Prefer accurate PHPDoc generics, array shapes, relationship types, and other metadata that describe the existing implementation. Do not add a broad ignore rule, exclude a source path, weaken the configured level, or use an inaccurate `mixed` type merely to make analysis pass.
+
+Existing findings that require behavior-sensitive changes may remain in `phpstan-baseline.neon` until a focused task resolves them. New findings must not be added to the baseline merely to pass CI. Do not regenerate the baseline wholesale; remove or narrow an entry when the related legacy finding is fixed, and keep unmatched-baseline reporting enabled so stale entries fail validation.
+
+Do not silently baseline a finding that indicates a plausible security vulnerability, data corruption risk, or unsafe transaction behavior. Stop the affected change batch, preserve the evidence, and report the finding for an explicit scoped decision.
+
 ## Command And Approval Readability
 
 - Keep simple commands on one line when they remain easy to read and review.

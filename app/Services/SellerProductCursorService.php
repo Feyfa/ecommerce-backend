@@ -71,7 +71,7 @@ class SellerProductCursorService
      * @param  string  $stockFilter  Filter kondisi stok aktif.
      * @param  string  $sortProduct  Urutan produk aktif.
      *
-     * @return array{value: float|string|null, id: string} Posisi keyset tervalidasi untuk query berikutnya.
+     * @return array{value: float|int|string|null, id: string} Posisi keyset tervalidasi untuk query berikutnya.
      *
      * @throws ValidationException Ketika cursor tidak valid atau tidak kompatibel dengan request.
      */
@@ -108,7 +108,10 @@ class SellerProductCursorService
             $this->throwInvalidCursor();
         }
 
-        return $payload['position'];
+        /** @var array{value: float|int|string|null, id: string} $position */
+        $position = $payload['position'];
+
+        return $position;
     }
 
     /**
@@ -145,11 +148,11 @@ class SellerProductCursorService
      * Nilai null selalu ditempatkan paling akhir. Setelah cursor mencapai kelompok null, UUID tetap
      * menjadi tie-breaker agar setiap row hanya memiliki satu posisi deterministik.
      *
-     * @param  Builder  $query  Query produk seller yang telah menerima ownership dan filter aktif.
-     * @param  array{value: float|string|null, id: string}|null  $position  Posisi cursor atau null untuk batch pertama.
+     * @param  Builder<Product>  $query  Query produk seller yang telah menerima ownership dan filter aktif.
+     * @param  array{value: float|int|string|null, id: string}|null  $position  Posisi cursor atau null untuk batch pertama.
      * @param  string  $sortProduct  Urutan produk aktif yang menentukan operator pembanding.
      *
-     * @return Builder Query yang telah dibatasi ke data setelah cursor.
+     * @return Builder<Product> Query yang telah dibatasi ke data setelah cursor.
      */
     public function applyBoundary(Builder $query, ?array $position, string $sortProduct): Builder
     {
@@ -183,10 +186,10 @@ class SellerProductCursorService
     /**
      * Menerapkan primary sort dan UUID tie-breaker yang sama dengan kontrak cursor.
      *
-     * @param  Builder  $query  Query produk seller yang akan diurutkan.
+     * @param  Builder<Product>  $query  Query produk seller yang akan diurutkan.
      * @param  string  $sortProduct  Pilihan sorting yang telah divalidasi controller.
      *
-     * @return Builder Query dengan urutan deterministik dan nilai null di posisi terakhir.
+     * @return Builder<Product> Query dengan urutan deterministik dan nilai null di posisi terakhir.
      */
     public function applyOrder(Builder $query, string $sortProduct): Builder
     {

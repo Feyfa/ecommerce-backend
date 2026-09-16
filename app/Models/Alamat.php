@@ -38,7 +38,7 @@ class Alamat extends Model
     /**
      * Mengambil user pemilik alamat.
      *
-     * @return BelongsTo Relasi Eloquent menuju model induk yang terkait.
+     * @return BelongsTo<User, Alamat> Relasi Eloquent menuju user pemilik alamat.
      */
     public function user(): BelongsTo
     {
