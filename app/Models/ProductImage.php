@@ -30,7 +30,7 @@ class ProductImage extends Model
     /**
      * Mengambil produk pemilik gambar.
      *
-     * @return BelongsTo Relasi Eloquent menuju model induk yang terkait.
+     * @return BelongsTo<Product, ProductImage> Relasi Eloquent menuju produk pemilik gambar.
      */
     public function product(): BelongsTo
     {

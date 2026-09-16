@@ -119,6 +119,9 @@ alias path as inline code for a file owned by another repository.
 - [TOK-34 Seller Cursor Pagination QA](qa/tok-34-seller-cursor-pagination.md)
   Tracks the bounded Seller Product cursor contract, coordinated rollout, and PostgreSQL query-plan evidence.
 
+- [TOK-41 PHPStan and Larastan QA](qa/tok-41-phpstan-larastan.md)
+  Tracks the PHP 8.3 static-analysis configuration, safe legacy corrections, baseline inventory, and validation evidence.
+
 - [Commit Guidelines](development/commit-guidelines.md)
   Explains how to keep commits focused on one purpose and separate unrelated changes.
 
@@ -192,6 +195,7 @@ docs/
     tok-32-product-pagination.md
     tok-34-seller-cursor-pagination.md
     tok-40-laravel-pint.md
+    tok-41-phpstan-larastan.md
 
   development/
     commit-guidelines.md

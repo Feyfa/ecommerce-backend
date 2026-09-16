@@ -75,6 +75,9 @@ jobs:
           cp .env.example .env.testing
           php artisan key:generate --env=testing --force
 
+      - name: Run static analysis
+        run: composer analyse
+
       - name: Run database migrations
         run: php artisan migrate --env=testing --force
 

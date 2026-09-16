@@ -23,7 +23,7 @@ class Keranjang extends Model
     /**
      * Mengambil produk yang disimpan pada item keranjang.
      *
-     * @return BelongsTo Relasi Eloquent menuju model induk yang terkait.
+     * @return BelongsTo<Product, Keranjang> Relasi Eloquent menuju produk yang disimpan.
      */
     public function product(): BelongsTo
     {
@@ -33,7 +33,7 @@ class Keranjang extends Model
     /**
      * Mengambil buyer pemilik item keranjang.
      *
-     * @return BelongsTo Relasi Eloquent menuju model induk yang terkait.
+     * @return BelongsTo<User, Keranjang> Relasi Eloquent menuju buyer pemilik item keranjang.
      */
     public function buyer(): BelongsTo
     {
@@ -43,7 +43,7 @@ class Keranjang extends Model
     /**
      * Mengambil seller pemilik produk pada item keranjang.
      *
-     * @return BelongsTo Relasi Eloquent menuju model induk yang terkait.
+     * @return BelongsTo<User, Keranjang> Relasi Eloquent menuju seller pemilik produk.
      */
     public function seller(): BelongsTo
     {

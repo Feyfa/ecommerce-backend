@@ -25,7 +25,7 @@ class Company extends Model
     /**
      * Mengambil user pemilik profil toko.
      *
-     * @return BelongsTo Relasi Eloquent menuju model induk yang terkait.
+     * @return BelongsTo<User, Company> Relasi Eloquent menuju user pemilik profil toko.
      */
     public function user(): BelongsTo
     {

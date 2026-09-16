@@ -29,7 +29,10 @@ class PruneOutboxMessagesCommand extends Command
             return self::SUCCESS;
         }
 
-        $retentionDays = max(1, (int) ($this->option('days') ?: config('outbox.published_retention_days')));
+        /** @var int|string $retentionDaysInput */
+        $retentionDaysInput = $this->option('days') ?: config('outbox.published_retention_days');
+
+        $retentionDays = max(1, (int) $retentionDaysInput);
         $deleted = $publisher->prunePublished($retentionDays);
 
         $this->info("Deleted {$deleted} published outbox messages older than {$retentionDays} days.");

@@ -230,7 +230,7 @@ class SellerDashboardService
      *
      * @param  string  $user_id  ID user yang menjadi scope data atau mutasi.
      *
-     * @return Builder Query builder yang telah ditambahkan scope atau kondisi terkait.
+     * @return Builder<TransactionUser> Query transaksi seller yang sudah selesai dan dibayar.
      */
     private function doneTransactionQuery(string $user_id): Builder
     {
@@ -246,7 +246,7 @@ class SellerDashboardService
      *
      * @param  string  $user_id  ID user yang menjadi scope data atau mutasi.
      *
-     * @return Builder Query builder yang telah ditambahkan scope atau kondisi terkait.
+     * @return Builder<TransactionUser> Query pesanan baru yang masih perlu diproses seller.
      */
     private function newOrderQuery(string $user_id): Builder
     {
