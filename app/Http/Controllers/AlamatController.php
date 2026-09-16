@@ -6,6 +6,7 @@ use App\Models\Alamat;
 use App\Models\User;
 use App\Services\AlamatService;
 use App\Services\AuditLogService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -39,29 +40,24 @@ class AlamatController extends Controller
     public function getAlamatBuyer(Request $request): JsonResponse
     {
         // --- step 1 - start - validasi user
-        $user_id = optional(auth()->user())->id;
-        $userExists = User::where('id', $user_id)->exists();
+        $user = $this->resolveAuthenticatedUser($request);
 
-        if (! $userExists) {
+        if ($user === null) {
             return response()->json(['result' => 'error', 'message' => 'Unauthorized'], 401);
         }
+
+        $user_id = $user->id;
         // --- step 1 - end - validasi user
 
         // --- step 2 - start - ambil daftar alamat
         $alamats = Alamat::where('user_id', $user_id)
             ->where('type', 'buyer');
 
-        if (! empty($request->searchAlamat) && trim($request->searchAlamat) != '') {
-            $searchAlamat = $request->searchAlamat;
-            $alamats->where(function ($query) use ($searchAlamat) {
-                $query->where('place', 'ILIKE', "%{$searchAlamat}%")
-                    ->orWhere('name', 'ILIKE', "%{$searchAlamat}%")
-                    ->orWhere('phone', 'ILIKE', "%{$searchAlamat}%")
-                    ->orWhere('alamat', 'ILIKE', "%{$searchAlamat}%");
-            });
-        }
+        $this->applyBuyerAddressSearch($alamats, $request);
 
-        $alamats = $alamats->orderBy('enable', 'DESC')->limit(5)
+        $alamats = $alamats
+            ->orderBy('enable', 'DESC')
+            ->limit(5)
             ->get();
         // --- step 2 - end - ambil daftar alamat
 
@@ -82,12 +78,13 @@ class AlamatController extends Controller
     public function addAlamatBuyer(Request $request): JsonResponse
     {
         // --- step 1 - start - validasi user
-        $user_id = optional(auth()->user())->id;
-        $userExists = User::where('id', $user_id)->exists();
+        $user = $this->resolveAuthenticatedUser($request);
 
-        if (! $userExists) {
+        if ($user === null) {
             return response()->json(['result' => 'error', 'message' => 'Unauthorized'], 401);
         }
+
+        $user_id = $user->id;
         // --- step 1 - end - validasi user
 
         // --- step 2 - start - validasi parameter request
@@ -108,7 +105,7 @@ class AlamatController extends Controller
         $locationAttributes = $this->alamatService->locationAttributes($request);
 
         // --- step 3 - start - simpan alamat dan status aktif secara atomik
-        $addressLimitReached = DB::transaction(function () use ($user_id, $request, $locationAttributes): bool {
+        $addressLimitReached = DB::transaction(function () use ($user, $user_id, $request, $locationAttributes): bool {
             // Lock parent user agar dua request alamat pertama atau keenam tidak dapat
             // melewati invariant hanya karena belum ada row alamat yang bisa dikunci.
             User::where('id', $user_id)->lockForUpdate()->first();
@@ -138,7 +135,7 @@ class AlamatController extends Controller
 
             // Audit ikut di dalam transaction agar kegagalan pencatatan membatalkan
             // alamat baru dan tidak meninggalkan mutasi tanpa jejak.
-            $this->auditLogService->recordAddressCreated($request->user(), $alamat, $request);
+            $this->auditLogService->recordAddressCreated($user, $alamat, $request);
 
             return false;
         });
@@ -152,17 +149,10 @@ class AlamatController extends Controller
         $alamats = Alamat::where('user_id', $user_id)
             ->where('type', 'buyer');
 
-        if (! empty($request->searchAlamat) && trim($request->searchAlamat) != '') {
-            $searchAlamat = $request->searchAlamat;
-            $alamats->where(function ($query) use ($searchAlamat) {
-                $query->where('place', 'ILIKE', "%{$searchAlamat}%")
-                    ->orWhere('name', 'ILIKE', "%{$searchAlamat}%")
-                    ->orWhere('phone', 'ILIKE', "%{$searchAlamat}%")
-                    ->orWhere('alamat', 'ILIKE', "%{$searchAlamat}%");
-            });
-        }
+        $this->applyBuyerAddressSearch($alamats, $request);
 
-        $alamats = $alamats->orderBy('enable', 'DESC')
+        $alamats = $alamats
+            ->orderBy('enable', 'DESC')
             ->get();
         // --- step 4 - end - ambil daftar alamat
 
@@ -183,18 +173,19 @@ class AlamatController extends Controller
     public function deleteAlamatBuyer(string $id, Request $request): JsonResponse
     {
         // --- step 1 - start - validasi user
-        $user_id = optional(auth()->user())->id;
-        $userExists = User::where('id', $user_id)->exists();
+        $user = $this->resolveAuthenticatedUser($request);
 
-        if (! $userExists) {
+        if ($user === null) {
             return response()->json(['result' => 'error', 'message' => 'Unauthorized'], 401);
         }
+
+        $user_id = $user->id;
         // --- step 1 - end - validasi user
 
         // --- step 2 - start - hapus alamat dan pilih fallback terverifikasi secara atomik
         // Batasi pencarian berdasarkan buyer terautentikasi agar UUID yang terekspos
         // tidak dapat digunakan untuk menghapus alamat milik user lain.
-        $alamatDeleted = DB::transaction(function () use ($id, $user_id, $request): bool {
+        $alamatDeleted = DB::transaction(function () use ($id, $user, $user_id, $request): bool {
             User::where('id', $user_id)->lockForUpdate()->first();
             $buyerAddresses = Alamat::where('user_id', $user_id)
                 ->where('type', 'buyer')
@@ -226,7 +217,7 @@ class AlamatController extends Controller
             }
 
             $this->auditLogService->recordAddressDeleted(
-                $request->user(),
+                $user,
                 $alamat,
                 $request,
                 $snapshot,
@@ -245,17 +236,10 @@ class AlamatController extends Controller
         $alamats = Alamat::where('user_id', $user_id)
             ->where('type', 'buyer');
 
-        if (! empty($request->searchAlamat) && trim($request->searchAlamat) != '') {
-            $searchAlamat = $request->searchAlamat;
-            $alamats->where(function ($query) use ($searchAlamat) {
-                $query->where('place', 'ILIKE', "%{$searchAlamat}%")
-                    ->orWhere('name', 'ILIKE', "%{$searchAlamat}%")
-                    ->orWhere('phone', 'ILIKE', "%{$searchAlamat}%")
-                    ->orWhere('alamat', 'ILIKE', "%{$searchAlamat}%");
-            });
-        }
+        $this->applyBuyerAddressSearch($alamats, $request);
 
-        $alamats = $alamats->orderBy('enable', 'DESC')
+        $alamats = $alamats
+            ->orderBy('enable', 'DESC')
             ->get();
         // --- step 3 - end - ambil daftar alamat
 
@@ -277,16 +261,17 @@ class AlamatController extends Controller
     public function setEnableAlamatBuyer(string $id, Request $request): JsonResponse
     {
         // --- step 1 - start - validasi user
-        $user_id = optional(auth()->user())->id;
-        $userExists = User::where('id', $user_id)->exists();
+        $user = $this->resolveAuthenticatedUser($request);
 
-        if (! $userExists) {
+        if ($user === null) {
             return response()->json(['result' => 'error', 'message' => 'Unauthorized'], 401);
         }
+
+        $user_id = $user->id;
         // --- step 1 - end - validasi user
 
         // --- step 2 - start - pilih alamat terverifikasi secara atomik
-        $selectionResult = DB::transaction(function () use ($user_id, $id, $request): string {
+        $selectionResult = DB::transaction(function () use ($user, $user_id, $id, $request): string {
             User::where('id', $user_id)->lockForUpdate()->first();
             $buyerAddresses = Alamat::where('user_id', $user_id)
                 ->where('type', 'buyer')
@@ -313,7 +298,7 @@ class AlamatController extends Controller
             $alamat->update(['enable' => 1]);
 
             $this->auditLogService->recordAddressSelected(
-                $request->user(),
+                $user,
                 $alamat,
                 $request,
                 $previousAlamat ? $this->addressReference($previousAlamat) : null,
@@ -339,17 +324,10 @@ class AlamatController extends Controller
         $alamats = Alamat::where('user_id', $user_id)
             ->where('type', 'buyer');
 
-        if (! empty($request->searchAlamat) && trim($request->searchAlamat) != '') {
-            $searchAlamat = $request->searchAlamat;
-            $alamats->where(function ($query) use ($searchAlamat) {
-                $query->where('place', 'ILIKE', "%{$searchAlamat}%")
-                    ->orWhere('name', 'ILIKE', "%{$searchAlamat}%")
-                    ->orWhere('phone', 'ILIKE', "%{$searchAlamat}%")
-                    ->orWhere('alamat', 'ILIKE', "%{$searchAlamat}%");
-            });
-        }
+        $this->applyBuyerAddressSearch($alamats, $request);
 
-        $alamats = $alamats->orderBy('enable', 'DESC')
+        $alamats = $alamats
+            ->orderBy('enable', 'DESC')
             ->get();
         // --- step 3 - end - ambil daftar alamat
 
@@ -378,12 +356,13 @@ class AlamatController extends Controller
     public function updateAlamatBuyer(string $id, Request $request): JsonResponse
     {
         // --- step 1 - start - validasi user
-        $user_id = optional(auth()->user())->id;
-        $userExists = User::where('id', $user_id)->exists();
+        $user = $this->resolveAuthenticatedUser($request);
 
-        if (! $userExists) {
+        if ($user === null) {
             return response()->json(['result' => 'error', 'message' => 'Unauthorized'], 401);
         }
+
+        $user_id = $user->id;
         // --- step 1 - end - validasi user
 
         // --- step 2 - start - validasi parameter request
@@ -413,7 +392,7 @@ class AlamatController extends Controller
         $locationAttributes = $this->alamatService->locationAttributes($request);
         $beforeValues = $this->auditLogService->addressSnapshot($alamat);
 
-        DB::transaction(function () use ($alamat, $request, $locationAttributes, $beforeValues): void {
+        DB::transaction(function () use ($user, $alamat, $request, $locationAttributes, $beforeValues): void {
             $alamat->fill(array_merge([
                 'place' => $request->place,
                 'name' => $request->name,
@@ -422,7 +401,7 @@ class AlamatController extends Controller
             $alamat->save();
 
             $this->auditLogService->recordAddressUpdated(
-                $request->user(),
+                $user,
                 $alamat,
                 $request,
                 $this->addressChanges($beforeValues, $alamat),
@@ -434,21 +413,62 @@ class AlamatController extends Controller
         $alamats = Alamat::where('user_id', $user_id)
             ->where('type', 'buyer');
 
-        if (! empty($request->searchAlamat) && trim($request->searchAlamat) != '') {
-            $searchAlamat = $request->searchAlamat;
-            $alamats->where(function ($query) use ($searchAlamat) {
-                $query->where('place', 'ILIKE', "%{$searchAlamat}%")
-                    ->orWhere('name', 'ILIKE', "%{$searchAlamat}%")
-                    ->orWhere('phone', 'ILIKE', "%{$searchAlamat}%")
-                    ->orWhere('alamat', 'ILIKE', "%{$searchAlamat}%");
-            });
-        }
+        $this->applyBuyerAddressSearch($alamats, $request);
 
-        $alamats = $alamats->orderBy('enable', 'DESC')
+        $alamats = $alamats
+            ->orderBy('enable', 'DESC')
             ->get();
         // --- step 5 - end - ambil daftar alamat
 
         return response()->json(['result' => 'success', 'alamats' => $alamats, 'message' => 'Alamat Berhasil Diubah']);
+    }
+
+    /**
+     * Mengambil model user lokal yang terautentikasi dan masih tersedia di database.
+     *
+     * Pemeriksaan instance mempersempit kontrak user resolver, sedangkan pengecekan database
+     * mempertahankan penolakan existing ketika row user tidak lagi tersedia.
+     *
+     * @param  Request  $request  Request API yang menyediakan authenticated user resolver.
+     *
+     * @return User|null Model user lokal yang valid, atau null ketika request tidak memiliki user aktif.
+     */
+    private function resolveAuthenticatedUser(Request $request): ?User
+    {
+        $user = $request->user();
+
+        if (! $user instanceof User || ! User::where('id', $user->id)->exists()) {
+            return null;
+        }
+
+        return $user;
+    }
+
+    /**
+     * Menerapkan pencarian alamat buyer berdasarkan keyword string dari request.
+     *
+     * Empty-value semantics dan keyword asli dipertahankan agar refactor tipe tidak mengubah hasil
+     * pencarian existing pada label, penerima, telepon, atau alamat lengkap.
+     *
+     * @param  Builder<Alamat>  $query  Query alamat buyer yang akan diberi kondisi pencarian.
+     * @param  Request  $request  Request yang dapat membawa keyword pencarian alamat.
+     *
+     * @return void Query yang diberikan diperbarui langsung ketika keyword pencarian tidak kosong.
+     */
+    private function applyBuyerAddressSearch(Builder $query, Request $request): void
+    {
+        $searchAlamat = $request->string('searchAlamat')->toString();
+
+        if (empty($searchAlamat) || trim($searchAlamat) == '') {
+            return;
+        }
+
+        $query->where(function ($query) use ($searchAlamat) {
+            $query->where('place', 'ILIKE', "%{$searchAlamat}%")
+                ->orWhere('name', 'ILIKE', "%{$searchAlamat}%")
+                ->orWhere('phone', 'ILIKE', "%{$searchAlamat}%")
+                ->orWhere('alamat', 'ILIKE', "%{$searchAlamat}%");
+        });
     }
 
     /**
