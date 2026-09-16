@@ -1,41 +1,6 @@
 parameters:
 	ignoreErrors:
 		-
-			message: "#^Cannot access property \\$id on mixed\\.$#"
-			count: 5
-			path: app/Http/Controllers/AlamatController.php
-
-		-
-			message: "#^Parameter \\#1 \\$string of function trim expects string, mixed given\\.$#"
-			count: 5
-			path: app/Http/Controllers/AlamatController.php
-
-		-
-			message: "#^Parameter \\#1 \\$user of method App\\\\Services\\\\AuditLogService\\:\\:recordAddressCreated\\(\\) expects App\\\\Models\\\\User, App\\\\Models\\\\User\\|null given\\.$#"
-			count: 1
-			path: app/Http/Controllers/AlamatController.php
-
-		-
-			message: "#^Parameter \\#1 \\$user of method App\\\\Services\\\\AuditLogService\\:\\:recordAddressDeleted\\(\\) expects App\\\\Models\\\\User, App\\\\Models\\\\User\\|null given\\.$#"
-			count: 1
-			path: app/Http/Controllers/AlamatController.php
-
-		-
-			message: "#^Parameter \\#1 \\$user of method App\\\\Services\\\\AuditLogService\\:\\:recordAddressSelected\\(\\) expects App\\\\Models\\\\User, App\\\\Models\\\\User\\|null given\\.$#"
-			count: 1
-			path: app/Http/Controllers/AlamatController.php
-
-		-
-			message: "#^Parameter \\#1 \\$user of method App\\\\Services\\\\AuditLogService\\:\\:recordAddressUpdated\\(\\) expects App\\\\Models\\\\User, App\\\\Models\\\\User\\|null given\\.$#"
-			count: 1
-			path: app/Http/Controllers/AlamatController.php
-
-		-
-			message: "#^Part \\$searchAlamat \\(mixed\\) of encapsed string cannot be cast to string\\.$#"
-			count: 20
-			path: app/Http/Controllers/AlamatController.php
-
-		-
 			message: "#^Call to an undefined method Illuminate\\\\Database\\\\ConnectionInterface\\:\\:getDriverName\\(\\)\\.$#"
 			count: 1
 			path: app/Http/Controllers/AuditLogController.php
