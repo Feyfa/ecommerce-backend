@@ -122,6 +122,9 @@ alias path as inline code for a file owned by another repository.
 - [TOK-41 PHPStan and Larastan QA](qa/tok-41-phpstan-larastan.md)
   Tracks the PHP 8.3 static-analysis configuration, safe legacy corrections, baseline inventory, and validation evidence.
 
+- [TOK-49 AlamatController PHPStan Debt QA](qa/tok-49-alamat-controller-phpstan.md)
+  Tracks authenticated-user and address-search type narrowing, focused baseline reduction, and release evidence.
+
 - [Commit Guidelines](development/commit-guidelines.md)
   Explains how to keep commits focused on one purpose and separate unrelated changes.
 
@@ -196,6 +199,7 @@ docs/
     tok-34-seller-cursor-pagination.md
     tok-40-laravel-pint.md
     tok-41-phpstan-larastan.md
+    tok-49-alamat-controller-phpstan.md
 
   development/
     commit-guidelines.md
