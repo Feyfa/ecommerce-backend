@@ -221,36 +221,6 @@ parameters:
 			path: app/Http/Controllers/PaymentController.php
 
 		-
-			message: "#^Cannot access property \\$id on App\\\\Models\\\\User\\|null\\.$#"
-			count: 5
-			path: app/Http/Controllers/ProductController.php
-
-		-
-			message: "#^Parameter \\#1 \\$product of method App\\\\Services\\\\SellerProductCursorService\\:\\:encode\\(\\) expects App\\\\Models\\\\Product, App\\\\Models\\\\Product\\|null given\\.$#"
-			count: 1
-			path: app/Http/Controllers/ProductController.php
-
-		-
-			message: "#^Parameter \\#1 \\$user of method App\\\\Services\\\\AuditLogService\\:\\:recordProductCreated\\(\\) expects App\\\\Models\\\\User, App\\\\Models\\\\User\\|null given\\.$#"
-			count: 1
-			path: app/Http/Controllers/ProductController.php
-
-		-
-			message: "#^Parameter \\#1 \\$user of method App\\\\Services\\\\AuditLogService\\:\\:recordProductDeleted\\(\\) expects App\\\\Models\\\\User, App\\\\Models\\\\User\\|null given\\.$#"
-			count: 1
-			path: app/Http/Controllers/ProductController.php
-
-		-
-			message: "#^Parameter \\#1 \\$user of method App\\\\Services\\\\AuditLogService\\:\\:recordProductUpdated\\(\\) expects App\\\\Models\\\\User, App\\\\Models\\\\User\\|null given\\.$#"
-			count: 1
-			path: app/Http/Controllers/ProductController.php
-
-		-
-			message: "#^Parameter \\#2 \\$callback of function array_filter expects \\(callable\\(mixed\\)\\: bool\\)\\|null, Closure\\(string\\)\\: bool given\\.$#"
-			count: 1
-			path: app/Http/Controllers/ProductController.php
-
-		-
 			message: "#^Cannot access property \\$id on mixed\\.$#"
 			count: 3
 			path: app/Http/Controllers/SaldoController.php
