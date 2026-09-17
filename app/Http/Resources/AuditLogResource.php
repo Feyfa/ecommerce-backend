@@ -6,6 +6,7 @@ use App\Enums\AuditEvent;
 use App\Models\AuditLog;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use UnexpectedValueException;
 
 /**
  * Resource user-facing yang mencegah metadata internal audit ikut terekspos.
@@ -29,9 +30,7 @@ class AuditLogResource extends JsonResource
     public function toArray(Request $request): array
     {
         // --- step 1 - start - normalisasi enum dan context sebelum membentuk contract response
-        $event = $this->event instanceof AuditEvent
-            ? $this->event
-            : AuditEvent::from((string) $this->event);
+        $event = $this->resolveAuditEvent($this->event);
         $context = is_array($this->context) ? $this->context : [];
         // --- step 1 - end - normalisasi enum dan context sebelum membentuk contract response
 
@@ -107,6 +106,8 @@ class AuditLogResource extends JsonResource
         // --- step 1 - start - tentukan mode detail sebelum menyamarkan data alamat
         $isDetailRoute = $request->routeIs('audit-logs.show');
         $snapshot = $context['address_snapshot'] ?? null;
+        /** @var array<int, array<string, mixed>> $changes */
+        $changes = $context['changes'] ?? [];
         // --- step 1 - end - tentukan mode detail sebelum menyamarkan data alamat
 
         // --- step 2 - start - susun payload alamat sesuai mode response
@@ -121,7 +122,7 @@ class AuditLogResource extends JsonResource
                 : null,
             'changes' => array_map(
                 fn (array $change): array => $this->presentAddressChange($change, $isDetailRoute),
-                $context['changes'] ?? []
+                $changes
             ),
             'previous_address' => $this->presentAddressReference($context['previous_address'] ?? null, $isDetailRoute),
             'replacement_address' => $this->presentAddressReference($context['replacement_address'] ?? null, $isDetailRoute),
@@ -145,6 +146,8 @@ class AuditLogResource extends JsonResource
     {
         $isDetailRoute = $request->routeIs('audit-logs.show');
         $snapshot = $context['profile_snapshot'] ?? null;
+        /** @var array<int, array<string, mixed>> $changes */
+        $changes = $context['changes'] ?? [];
 
         return [
             'subject' => [
@@ -157,7 +160,7 @@ class AuditLogResource extends JsonResource
                 : null,
             'changes' => array_map(
                 fn (array $change): array => $this->presentProfileChange($change, $isDetailRoute),
-                $context['changes'] ?? []
+                $changes
             ),
         ];
     }
@@ -178,6 +181,8 @@ class AuditLogResource extends JsonResource
     {
         $isDetailRoute = $request->routeIs('audit-logs.show');
         $snapshot = $context['company_snapshot'] ?? null;
+        /** @var array<int, array<string, mixed>> $changes */
+        $changes = $context['changes'] ?? [];
 
         return [
             'subject' => [
@@ -190,7 +195,7 @@ class AuditLogResource extends JsonResource
                 : null,
             'changes' => array_map(
                 fn (array $change): array => $this->presentCompanyChange($change, $isDetailRoute),
-                $context['changes'] ?? []
+                $changes
             ),
         ];
     }
@@ -205,10 +210,12 @@ class AuditLogResource extends JsonResource
      */
     private function presentProfileSnapshot(array $snapshot, bool $isDetailRoute): array
     {
+        $phone = $snapshot['phone'] ?? null;
+
         return [
             'phone' => $isDetailRoute
-                ? ($snapshot['phone'] ?? null)
-                : $this->maskPhone($snapshot['phone'] ?? null),
+                ? $phone
+                : $this->maskPhone(is_string($phone) ? $phone : null),
             'tanggal_lahir' => $snapshot['tanggal_lahir'] ?? null,
             'jenis_kelamin' => $snapshot['jenis_kelamin'] ?? null,
             'has_profile_image' => (bool) ($snapshot['has_profile_image'] ?? false),
@@ -218,10 +225,10 @@ class AuditLogResource extends JsonResource
     /**
      * Menyamarkan perubahan nomor telepon saat payload dipakai pada collection.
      *
-     * @param  array{field: string, label: string, before: mixed, after: mixed}  $change  Satu baris perubahan profil.
+     * @param  array<string, mixed>  $change  Satu baris perubahan profil dari context audit persisten.
      * @param  bool  $isDetailRoute  True ketika response berasal dari route detail owner-scoped.
      *
-     * @return array{field: string, label: string, before: mixed, after: mixed} Data perubahan yang aman untuk mode response.
+     * @return array<string, mixed> Data perubahan yang aman untuk mode response.
      */
     private function presentProfileChange(array $change, bool $isDetailRoute): array
     {
@@ -246,12 +253,14 @@ class AuditLogResource extends JsonResource
      */
     private function presentCompanySnapshot(array $snapshot, bool $isDetailRoute): array
     {
+        $phone = $snapshot['phone'] ?? null;
+
         return [
             'name' => $snapshot['name'] ?? null,
             'email' => $snapshot['email'] ?? null,
             'phone' => $isDetailRoute
-                ? ($snapshot['phone'] ?? null)
-                : $this->maskPhone($snapshot['phone'] ?? null),
+                ? $phone
+                : $this->maskPhone(is_string($phone) ? $phone : null),
             'description' => $snapshot['description'] ?? null,
             'formatted_address' => $snapshot['formatted_address'] ?? null,
             'address_detail' => $snapshot['address_detail'] ?? null,
@@ -262,10 +271,10 @@ class AuditLogResource extends JsonResource
     /**
      * Menyamarkan perubahan nomor telepon toko saat payload dipakai pada collection.
      *
-     * @param  array{field: string, label: string, before: mixed, after: mixed}  $change  Satu baris perubahan profil toko.
+     * @param  array<string, mixed>  $change  Satu baris perubahan profil toko dari context audit persisten.
      * @param  bool  $isDetailRoute  True ketika response berasal dari route detail owner-scoped.
      *
-     * @return array{field: string, label: string, before: mixed, after: mixed} Data perubahan yang aman untuk mode response.
+     * @return array<string, mixed> Data perubahan yang aman untuk mode response.
      */
     private function presentCompanyChange(array $change, bool $isDetailRoute): array
     {
@@ -290,14 +299,16 @@ class AuditLogResource extends JsonResource
      */
     private function presentAddressSnapshot(array $snapshot, bool $isDetailRoute): array
     {
+        $recipientName = $snapshot['recipient_name'] ?? null;
+        $phone = $snapshot['phone'] ?? null;
         $presented = [
             'place' => $snapshot['place'] ?? null,
             'recipient_name' => $isDetailRoute
-                ? ($snapshot['recipient_name'] ?? null)
-                : $this->maskRecipientName($snapshot['recipient_name'] ?? null),
+                ? $recipientName
+                : $this->maskRecipientName(is_string($recipientName) ? $recipientName : null),
             'phone' => $isDetailRoute
-                ? ($snapshot['phone'] ?? null)
-                : $this->maskPhone($snapshot['phone'] ?? null),
+                ? $phone
+                : $this->maskPhone(is_string($phone) ? $phone : null),
             'formatted_address' => $snapshot['formatted_address'] ?? null,
             'enable' => $snapshot['enable'] ?? null,
         ];
@@ -312,10 +323,10 @@ class AuditLogResource extends JsonResource
     /**
      * Menyamarkan nilai before/after pada perubahan field yang memuat data pribadi.
      *
-     * @param  array{field: string, label: string, before: mixed, after: mixed}  $change  Satu baris perubahan alamat dari context audit.
+     * @param  array<string, mixed>  $change  Satu baris perubahan alamat dari context audit persisten.
      * @param  bool  $isDetailRoute  True ketika response berasal dari route detail owner-scoped.
      *
-     * @return array{field: string, label: string, before: mixed, after: mixed} Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array<string, mixed> Data perubahan alamat yang aman untuk mode response.
      */
     private function presentAddressChange(array $change, bool $isDetailRoute): array
     {
@@ -356,13 +367,37 @@ class AuditLogResource extends JsonResource
             return null;
         }
 
+        $recipientName = $reference['recipient_name'] ?? null;
+
         return [
             'id' => $reference['id'] ?? null,
             'place' => $reference['place'] ?? null,
             'recipient_name' => $isDetailRoute
-                ? ($reference['recipient_name'] ?? null)
-                : $this->maskRecipientName($reference['recipient_name'] ?? null),
+                ? $recipientName
+                : $this->maskRecipientName(is_string($recipientName) ? $recipientName : null),
         ];
+    }
+
+    /**
+     * Menormalisasi cast event audit tanpa menghapus fallback untuk data persisten lama.
+     *
+     * @param  mixed  $event  Nilai event dari model audit yang biasanya sudah melalui enum cast.
+     *
+     * @return AuditEvent Enum event yang digunakan untuk membentuk response audit.
+     *
+     * @throws UnexpectedValueException Ketika nilai event bukan enum hasil cast maupun string legacy.
+     */
+    private function resolveAuditEvent(mixed $event): AuditEvent
+    {
+        if ($event instanceof AuditEvent) {
+            return $event;
+        }
+
+        if (! is_string($event)) {
+            throw new UnexpectedValueException('Audit event must be an AuditEvent enum or legacy string value.');
+        }
+
+        return AuditEvent::from($event);
     }
 
     /**

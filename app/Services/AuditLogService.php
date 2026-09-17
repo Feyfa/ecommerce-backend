@@ -9,6 +9,7 @@ use App\Models\Company;
 use App\Models\Product;
 use App\Models\User;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Connection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -712,7 +713,10 @@ class AuditLogService
      */
     private function resolveClerkSessionId(Request $request): string
     {
-        return trim((string) $request->attributes->get('clerk_session_id', ''));
+        /** @var string $clerkSessionId */
+        $clerkSessionId = $request->attributes->get('clerk_session_id', '');
+
+        return trim((string) $clerkSessionId);
     }
 
     /**
@@ -724,7 +728,9 @@ class AuditLogService
      */
     private function resolveRequestId(Request $request): string
     {
-        $requestId = trim((string) $request->attributes->get('request_id', ''));
+        /** @var string $requestId */
+        $requestId = $request->attributes->get('request_id', '');
+        $requestId = trim((string) $requestId);
 
         return Str::isUuid($requestId) ? $requestId : (string) Str::uuid();
     }
@@ -739,7 +745,9 @@ class AuditLogService
      */
     private function formatDatabaseTimestamp(CarbonInterface $timestamp): string
     {
-        $driver = AuditLog::query()->getConnection()->getDriverName();
+        /** @var Connection $connection */
+        $connection = AuditLog::query()->getConnection();
+        $driver = $connection->getDriverName();
 
         return $driver === 'pgsql'
             ? $timestamp->toIso8601String()

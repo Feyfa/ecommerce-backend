@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Enums\AuditEvent;
 use App\Http\Resources\AuditLogResource;
 use App\Models\AuditLog;
+use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Connection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -41,7 +43,7 @@ class AuditLogController extends Controller
                 'string',
                 'max:2048',
                 function (string $attribute, mixed $value, callable $fail): void {
-                    if (! $this->isValidCursor((string) $value)) {
+                    if (! is_string($value) || ! $this->isValidCursor($value)) {
                         $fail('The cursor field is invalid.');
                     }
                 },
@@ -51,7 +53,7 @@ class AuditLogController extends Controller
         // --- step 1 - end - validasi filter dan batasi ukuran halaman sebelum query dijalankan
 
         // --- step 2 - start - susun query owner-scoped dengan order cursor yang deterministik
-        $user = $request->user();
+        $user = $this->authenticatedUser($request);
         $perPage = (int) ($validated['per_page'] ?? 20);
         $from = isset($validated['from']) ? $this->startOfApplicationDay($validated['from']) : null;
         $to = isset($validated['to']) ? $this->endOfApplicationDay($validated['to']) : null;
@@ -96,8 +98,9 @@ class AuditLogController extends Controller
     public function show(Request $request, string $auditLog): JsonResponse
     {
         // --- step 1 - start - resolve row hanya melalui actor user aktif agar id user lain menghasilkan 404
+        $user = $this->authenticatedUser($request);
         $audit = AuditLog::query()
-            ->where('actor_user_id', $request->user()->id)
+            ->where('actor_user_id', $user->id)
             ->whereKey($auditLog)
             ->firstOrFail();
         // --- step 1 - end - resolve row hanya melalui actor user aktif agar id user lain menghasilkan 404
@@ -122,7 +125,7 @@ class AuditLogController extends Controller
      */
     private function startOfApplicationDay(string $date): string
     {
-        $boundary = CarbonImmutable::parse($date, config('app.timezone'))->startOfDay();
+        $boundary = CarbonImmutable::parse($date, $this->applicationTimezone())->startOfDay();
 
         return $this->formatDatabaseBoundary($boundary);
     }
@@ -137,7 +140,7 @@ class AuditLogController extends Controller
      */
     private function endOfApplicationDay(string $date): string
     {
-        $boundary = CarbonImmutable::parse($date, config('app.timezone'))->endOfDay();
+        $boundary = CarbonImmutable::parse($date, $this->applicationTimezone())->endOfDay();
 
         return $this->formatDatabaseBoundary($boundary);
     }
@@ -152,11 +155,44 @@ class AuditLogController extends Controller
      */
     private function formatDatabaseBoundary(CarbonImmutable $boundary): string
     {
-        $driver = AuditLog::query()->getConnection()->getDriverName();
+        /** @var Connection $connection */
+        $connection = AuditLog::query()->getConnection();
+        $driver = $connection->getDriverName();
 
         return $driver === 'pgsql'
             ? $boundary->toIso8601String()
             : $boundary->format('Y-m-d H:i:s');
+    }
+
+    /**
+     * Mengambil local user yang telah dipasang oleh middleware autentikasi API.
+     *
+     * Seluruh endpoint audit berada di dalam middleware `auth.api`, sehingga request yang mencapai
+     * controller selalu memiliki local User tanpa memerlukan query atau response branch tambahan.
+     *
+     * @param  Request  $request  Request API yang telah melewati middleware autentikasi.
+     *
+     * @return User Local user terautentikasi yang membaca audit miliknya.
+     */
+    private function authenticatedUser(Request $request): User
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        return $user;
+    }
+
+    /**
+     * Mengambil timezone aplikasi untuk membentuk batas tanggal audit.
+     *
+     * @return string Timezone aplikasi yang diteruskan ke Carbon.
+     */
+    private function applicationTimezone(): string
+    {
+        /** @var string $timezone */
+        $timezone = config('app.timezone');
+
+        return $timezone;
     }
 
     /**

@@ -292,6 +292,55 @@ class AuditLogTest extends TestCase
     }
 
     /**
+     * Memastikan context audit lama yang tidak lengkap tetap dapat ditampilkan secara defensif.
+     *
+     * Perubahan tanpa key field tetap dipertahankan, sedangkan nama penerima dan nomor telepon
+     * non-string tidak diteruskan ke masker yang hanya menerima string.
+     *
+     * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
+     */
+    public function test_collection_handles_legacy_audit_context_without_required_change_fields(): void
+    {
+        $user = $this->createUser();
+
+        AuditLog::create([
+            'actor_user_id' => $user->id,
+            'actor_clerk_user_id' => $user->clerk_user_id,
+            'event' => AuditEvent::ADDRESS_UPDATED,
+            'category' => AuditEvent::ADDRESS_UPDATED->category(),
+            'subject_type' => 'address',
+            'subject_id' => (string) Str::uuid(),
+            'context' => [
+                'address_snapshot' => [
+                    'place' => 'Rumah',
+                    'recipient_name' => 12345,
+                    'phone' => 628123456789,
+                    'formatted_address' => 'Jakarta',
+                    'enable' => true,
+                ],
+                'changes' => [
+                    [
+                        'label' => 'Perubahan lama',
+                        'before' => 'Sebelum',
+                        'after' => 'Sesudah',
+                    ],
+                ],
+            ],
+            'ip_address' => '127.0.0.1',
+            'idempotency_key' => hash('sha256', 'legacy-audit-context'),
+            'occurred_at' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->getJson('/api/audit-logs')
+            ->assertOk()
+            ->assertJsonPath('data.0.address_snapshot.recipient_name', null)
+            ->assertJsonPath('data.0.address_snapshot.phone', null)
+            ->assertJsonPath('data.0.changes.0.label', 'Perubahan lama')
+            ->assertJsonMissingPath('data.0.changes.0.field');
+    }
+
+    /**
      * Memastikan request id tersedia pada response dan row audit.
      *
      * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.
