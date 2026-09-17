@@ -21,14 +21,14 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->singleton(
             XenditService::class,
-            fn () => new XenditService((string) config('xendit.key')),
+            fn () => new XenditService($this->configurationString('xendit.key')),
         );
 
         $this->app->singleton(
             Client::class,
             fn () => new Client(
-                (string) config('meilisearch.host'),
-                config('meilisearch.key'),
+                $this->configurationString('meilisearch.host'),
+                $this->nullableConfigurationString('meilisearch.key'),
             ),
         );
     }
@@ -66,7 +66,7 @@ class AppServiceProvider extends ServiceProvider
         }
 
         // --- step 1 - start - resolve konfigurasi final termasuk override DATABASE_URL
-        $connectionName = (string) config('database.default');
+        $connectionName = $this->configurationString('database.default');
         $connectionConfig = config("database.connections.{$connectionName}");
 
         if (! is_array($connectionConfig)) {
@@ -112,8 +112,8 @@ class AppServiceProvider extends ServiceProvider
         }
 
         // --- step 1 - start - pastikan standard test tidak memakai driver eksternal
-        $queueConnection = (string) config('queue.default');
-        $cacheStore = (string) config('cache.default');
+        $queueConnection = $this->configurationString('queue.default');
+        $cacheStore = $this->configurationString('cache.default');
 
         if ($queueConnection !== 'sync' || $cacheStore !== 'array') {
             throw new RuntimeException(
@@ -124,10 +124,10 @@ class AppServiceProvider extends ServiceProvider
         // --- step 1 - end - pastikan standard test tidak memakai driver eksternal
 
         // --- step 2 - start - validasi namespace dan koneksi Redis testing
-        $redisHost = (string) config('database.redis.default.host');
-        $redisPrefix = (string) config('database.redis.options.prefix');
-        $redisDatabase = (string) config('database.redis.default.database');
-        $redisCacheDatabase = (string) config('database.redis.cache.database');
+        $redisHost = $this->configurationString('database.redis.default.host');
+        $redisPrefix = $this->configurationString('database.redis.options.prefix');
+        $redisDatabase = $this->configurationString('database.redis.default.database');
+        $redisCacheDatabase = $this->configurationString('database.redis.cache.database');
 
         if (
             ! $this->isLoopbackHost($redisHost)
@@ -143,9 +143,9 @@ class AppServiceProvider extends ServiceProvider
         // --- step 2 - end - validasi namespace dan koneksi Redis testing
 
         // --- step 3 - start - validasi host dan index Meilisearch testing
-        $meilisearchHost = (string) config('meilisearch.host');
+        $meilisearchHost = $this->configurationString('meilisearch.host');
         $meilisearchHostname = (string) parse_url($meilisearchHost, PHP_URL_HOST);
-        $meilisearchIndex = (string) config('buyer_product_search.index');
+        $meilisearchIndex = $this->configurationString('buyer_product_search.index');
 
         if (
             ! $this->isLoopbackHost($meilisearchHostname)
@@ -157,6 +157,50 @@ class AppServiceProvider extends ServiceProvider
             );
         }
         // --- step 3 - end - validasi host dan index Meilisearch testing
+    }
+
+    /**
+     * Mengambil konfigurasi yang harus digunakan sebagai string.
+     *
+     * Nilai null dinormalisasi menjadi string kosong untuk mempertahankan behavior cast konfigurasi
+     * sebelumnya, sedangkan validasi scalar digunakan bersama konfigurasi string opsional.
+     *
+     * @param  string  $key  Key konfigurasi Laravel yang akan diambil.
+     *
+     * @return string Nilai konfigurasi yang sudah dinormalisasi menjadi string.
+     *
+     * @throws RuntimeException Ketika nilai konfigurasi bukan scalar atau null.
+     */
+    private function configurationString(string $key): string
+    {
+        return $this->nullableConfigurationString($key) ?? '';
+    }
+
+    /**
+     * Mengambil konfigurasi string opsional tanpa mengubah nilai null.
+     *
+     * Nilai scalar dinormalisasi menjadi string, sedangkan array dan object ditolak karena tidak
+     * dapat digunakan sebagai konfigurasi string oleh dependency aplikasi.
+     *
+     * @param  string  $key  Key konfigurasi Laravel yang akan diambil.
+     *
+     * @return string|null Nilai konfigurasi yang dinormalisasi atau null ketika tidak diatur.
+     *
+     * @throws RuntimeException Ketika nilai konfigurasi bukan scalar atau null.
+     */
+    private function nullableConfigurationString(string $key): ?string
+    {
+        $value = config($key);
+
+        if ($value === null) {
+            return null;
+        }
+
+        if (! is_scalar($value)) {
+            throw new RuntimeException("Configuration [{$key}] must be a scalar value or null.");
+        }
+
+        return (string) $value;
     }
 
     /**
