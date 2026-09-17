@@ -1,26 +1,6 @@
 parameters:
 	ignoreErrors:
 		-
-			message: "#^Call to an undefined method Illuminate\\\\Database\\\\ConnectionInterface\\:\\:getDriverName\\(\\)\\.$#"
-			count: 1
-			path: app/Http/Controllers/AuditLogController.php
-
-		-
-			message: "#^Cannot access property \\$id on App\\\\Models\\\\User\\|null\\.$#"
-			count: 2
-			path: app/Http/Controllers/AuditLogController.php
-
-		-
-			message: "#^Cannot cast mixed to string\\.$#"
-			count: 1
-			path: app/Http/Controllers/AuditLogController.php
-
-		-
-			message: "#^Parameter \\#2 \\$tz of static method Carbon\\\\CarbonImmutable\\:\\:parse\\(\\) expects DateTimeZone\\|string\\|null, mixed given\\.$#"
-			count: 2
-			path: app/Http/Controllers/AuditLogController.php
-
-		-
 			message: "#^Cannot cast mixed to string\\.$#"
 			count: 1
 			path: app/Http/Controllers/AuthSessionController.php
@@ -331,51 +311,6 @@ parameters:
 			path: app/Http/Controllers/UserController.php
 
 		-
-			message: "#^Else branch is unreachable because ternary operator condition is always true\\.$#"
-			count: 1
-			path: app/Http/Resources/AuditLogResource.php
-
-		-
-			message: "#^Offset 'field' on array\\{field\\: string, label\\: string, before\\: mixed, after\\: mixed\\} on left side of \\?\\? always exists and is not nullable\\.$#"
-			count: 3
-			path: app/Http/Resources/AuditLogResource.php
-
-		-
-			message: "#^Parameter \\#1 \\$callback of function array_map expects \\(callable\\(mixed\\)\\: mixed\\)\\|null, Closure\\(array\\)\\: array\\{field\\: string, label\\: string, before\\: mixed, after\\: mixed\\} given\\.$#"
-			count: 3
-			path: app/Http/Resources/AuditLogResource.php
-
-		-
-			message: "#^Parameter \\#1 \\$change of method App\\\\Http\\\\Resources\\\\AuditLogResource\\:\\:presentAddressChange\\(\\) expects array\\{field\\: string, label\\: string, before\\: mixed, after\\: mixed\\}, array given\\.$#"
-			count: 1
-			path: app/Http/Resources/AuditLogResource.php
-
-		-
-			message: "#^Parameter \\#1 \\$change of method App\\\\Http\\\\Resources\\\\AuditLogResource\\:\\:presentCompanyChange\\(\\) expects array\\{field\\: string, label\\: string, before\\: mixed, after\\: mixed\\}, array given\\.$#"
-			count: 1
-			path: app/Http/Resources/AuditLogResource.php
-
-		-
-			message: "#^Parameter \\#1 \\$change of method App\\\\Http\\\\Resources\\\\AuditLogResource\\:\\:presentProfileChange\\(\\) expects array\\{field\\: string, label\\: string, before\\: mixed, after\\: mixed\\}, array given\\.$#"
-			count: 1
-			path: app/Http/Resources/AuditLogResource.php
-
-		-
-			message: "#^Parameter \\#1 \\$name of method App\\\\Http\\\\Resources\\\\AuditLogResource\\:\\:maskRecipientName\\(\\) expects string\\|null, mixed given\\.$#"
-			count: 1
-			path: app/Http/Resources/AuditLogResource.php
-
-		-
-			message: "#^Parameter \\#1 \\$phone of method App\\\\Http\\\\Resources\\\\AuditLogResource\\:\\:maskPhone\\(\\) expects string\\|null, mixed given\\.$#"
-			count: 3
-			path: app/Http/Resources/AuditLogResource.php
-
-		-
-			message: "#^Parameter \\#2 \\$array of function array_map expects array, mixed given\\.$#"
-			count: 3
-			path: app/Http/Resources/AuditLogResource.php
-
-		-
 			message: "#^Cannot cast mixed to string\\.$#"
 			count: 11
 			path: app/Providers/AppServiceProvider.php
@@ -399,16 +334,6 @@ parameters:
 			message: "#^Part \\$verifiedLocation\\['formatted_address'\\] \\(mixed\\) of encapsed string cannot be cast to string\\.$#"
 			count: 1
 			path: app/Services/AlamatService.php
-
-		-
-			message: "#^Call to an undefined method Illuminate\\\\Database\\\\ConnectionInterface\\:\\:getDriverName\\(\\)\\.$#"
-			count: 1
-			path: app/Services/AuditLogService.php
-
-		-
-			message: "#^Cannot cast mixed to string\\.$#"
-			count: 2
-			path: app/Services/AuditLogService.php
 
 		-
 			message: "#^Cannot access property \\$name on mixed\\.$#"
