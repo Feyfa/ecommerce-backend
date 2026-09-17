@@ -131,6 +131,9 @@ alias path as inline code for a file owned by another repository.
 - [TOK-51 Audit Log PHPStan Debt QA](qa/tok-51-audit-log-phpstan.md)
   Tracks defensive persisted-context typing and focused audit-log baseline reduction.
 
+- [TOK-52 AppServiceProvider PHPStan Debt QA](qa/tok-52-app-service-provider-phpstan.md)
+  Tracks typed string configuration normalization and focused provider baseline reduction.
+
 - [Commit Guidelines](development/commit-guidelines.md)
   Explains how to keep commits focused on one purpose and separate unrelated changes.
 
