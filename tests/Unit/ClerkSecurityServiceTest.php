@@ -286,6 +286,25 @@ class ClerkSecurityServiceTest extends TestCase
     }
 
     /**
+     * Memastikan metadata deletion ID non-string diabaikan dan model ID Clerk tetap menjadi fallback.
+     *
+     * @return void Tidak mengembalikan nilai; fallback ID diverifikasi melalui assertion.
+     */
+    public function test_non_string_external_account_deletion_id_uses_model_id_fallback(): void
+    {
+        $googleAccount = $this->makeExternalAccount(
+            ExternalAccountWithVerificationObject::GoogleAccount,
+            'oauth_google',
+            'eac_google',
+            ['external_account_id' => ['invalid']]
+        );
+        $service = new ClerkSecurityService(new ClerkBackendClientService());
+        $method = new ReflectionMethod($service, 'getExternalAccountDeletionId');
+
+        $this->assertSame('eac_google', $method->invoke($service, $googleAccount));
+    }
+
+    /**
      * Memverifikasi failed google link cleanup only removes unverified account.
      *
      * @return void Tidak mengembalikan nilai; kegagalan skenario dinyatakan melalui assertion.

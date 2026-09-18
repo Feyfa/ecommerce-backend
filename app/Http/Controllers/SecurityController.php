@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use App\Services\Clerk\ClerkSecurityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -303,13 +304,19 @@ class SecurityController extends Controller
      */
     private function resolveClerkUserId(Request $request): string
     {
-        $clerkUserId = (string) $request->attributes->get('clerk_user_id', '');
+        $clerkUserId = $request->attributes->get('clerk_user_id');
 
-        if ($clerkUserId !== '') {
+        if (is_string($clerkUserId) && $clerkUserId !== '') {
             return $clerkUserId;
         }
 
-        return (string) optional($request->user())->clerk_user_id;
+        $user = $request->user();
+
+        if (! $user instanceof User) {
+            return '';
+        }
+
+        return $user->clerk_user_id ?? '';
     }
 
     /**
@@ -322,6 +329,8 @@ class SecurityController extends Controller
      */
     private function resolveClerkSessionId(Request $request): string
     {
-        return (string) $request->attributes->get('clerk_session_id', '');
+        $clerkSessionId = $request->attributes->get('clerk_session_id');
+
+        return is_string($clerkSessionId) ? $clerkSessionId : '';
     }
 }
