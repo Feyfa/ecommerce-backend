@@ -5,6 +5,7 @@ namespace App\Services\Clerk;
 use App\Models\User as LocalUser;
 use Carbon\Carbon;
 use Clerk\Backend\Models\Components\ExternalAccountWithVerification;
+use Clerk\Backend\Models\Components\Passkey;
 use Clerk\Backend\Models\Components\Session;
 use Clerk\Backend\Models\Components\SessionActivityResponse;
 use Clerk\Backend\Models\Components\User as ClerkUser;
@@ -16,6 +17,20 @@ use Psr\Http\Message\ResponseInterface;
 use RuntimeException;
 use Throwable;
 
+/**
+ * Mengelola pembacaan dan perubahan state keamanan akun yang dimiliki Clerk.
+ *
+ * @phpstan-type SessionPayload array{
+ *     id: string,
+ *     status: string,
+ *     is_current: bool,
+ *     is_mobile: bool,
+ *     device_label: string,
+ *     location_label: string|null,
+ *     last_active_at: string|null,
+ *     last_active_at_timestamp: int
+ * }
+ */
 class ClerkSecurityService
 {
     /**
@@ -39,7 +54,38 @@ class ClerkSecurityService
      *
      * @param  string  $clerkUserId  ID user pada Clerk yang telah berasal dari token terverifikasi.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{
+     *     sign_in_methods: list<array{
+     *         key: string,
+     *         label: string,
+     *         status: string,
+     *         status_label: string,
+     *         description: string,
+     *         action_label: string,
+     *         is_enabled: bool,
+     *         feature_available?: bool,
+     *         meta?: array{
+     *             total: int,
+     *             passkeys: list<array{
+     *                 id: string,
+     *                 name: string,
+     *                 last_used_at: string|null,
+     *                 last_used_at_timestamp: int
+     *             }>
+     *         }
+     *     }>,
+     *     additional_protections: list<array{
+     *         key: string,
+     *         label: string,
+     *         status: string,
+     *         status_label: string,
+     *         description: string,
+     *         action_label: string,
+     *         is_enabled: bool,
+     *         feature_available: bool,
+     *         meta: array{totp_enabled: bool, backup_code_enabled: bool}
+     *     }>
+     * } Ringkasan metode login dan perlindungan keamanan akun.
      */
     public function getSummary(string $clerkUserId): array
     {
@@ -119,7 +165,10 @@ class ClerkSecurityService
      * @param  string  $clerkUserId  ID user pada Clerk yang telah berasal dari token terverifikasi.
      * @param  string  $currentSessionId  ID session Clerk yang sedang digunakan dan harus dipertahankan.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{
+     *     current_session_id: string,
+     *     sessions: list<SessionPayload>
+     * } Session aktif beserta ID session yang sedang digunakan.
      */
     public function getActiveSessions(string $clerkUserId, string $currentSessionId): array
     {
@@ -162,7 +211,7 @@ class ClerkSecurityService
      * @param  string  $currentSessionId  ID session Clerk yang sedang digunakan dan harus dipertahankan.
      * @param  string  $sessionId  ID session Clerk yang menjadi target operasi.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{revoked_session_id: string} ID session Clerk yang berhasil dicabut.
      */
     public function revokeSession(string $clerkUserId, string $currentSessionId, string $sessionId): array
     {
@@ -193,7 +242,10 @@ class ClerkSecurityService
      * @param  string  $clerkUserId  ID user pada Clerk yang telah berasal dari token terverifikasi.
      * @param  string  $currentSessionId  ID session Clerk yang sedang digunakan dan harus dipertahankan.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{
+     *     revoked_total: int,
+     *     revoked_session_ids: list<string>
+     * } Jumlah dan ID session lain yang berhasil dicabut.
      */
     public function revokeOtherSessions(string $clerkUserId, string $currentSessionId): array
     {
@@ -232,7 +284,11 @@ class ClerkSecurityService
      * @param  string  $clerkUserId  ID user pada Clerk yang telah berasal dari token terverifikasi.
      * @param  LocalUser  $localUser  Model user lokal yang sedang dihubungkan dengan identity provider.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{
+     *     provider: string,
+     *     email: string,
+     *     external_account_id: string
+     * } Akun Google terverifikasi yang cocok dengan user lokal.
      */
     public function validateGoogleAccountLink(string $clerkUserId, LocalUser $localUser): array
     {
@@ -301,7 +357,7 @@ class ClerkSecurityService
      *
      * @param  string  $clerkUserId  ID user pada Clerk yang telah berasal dari token terverifikasi.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{removed_total: int} Jumlah external account Google sementara yang dibersihkan.
      */
     public function cleanupFailedGoogleAccountLinks(string $clerkUserId): array
     {
@@ -505,7 +561,7 @@ class ClerkSecurityService
      * @param  ClerkUser  $clerkUser  Model identity user yang diperoleh dari Clerk.
      * @param  string  $provider  Nama provider OAuth yang sedang diperiksa.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return list<ExternalAccountWithVerification> External account milik provider yang diminta.
      */
     private function getProviderAccounts(ClerkUser $clerkUser, string $provider): array
     {
@@ -572,7 +628,7 @@ class ClerkSecurityService
      * tidak lagi terhubung.
      *
      * @param  ClerkUser  $clerkUser  Model identity user yang diperoleh dari Clerk.
-     * @param  array  $externalAccounts  Daftar external account Clerk yang akan difilter atau diproses.
+     * @param  list<ExternalAccountWithVerification>  $externalAccounts  External account yang akan dihapus dan diverifikasi ulang.
      *
      * @return void Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
      */
@@ -598,7 +654,7 @@ class ClerkSecurityService
      * tanpa menghapus akun provider yang sudah valid.
      *
      * @param  ClerkUser  $clerkUser  Model identity user yang diperoleh dari Clerk.
-     * @param  array  $externalAccounts  Daftar external account Clerk yang akan difilter atau diproses.
+     * @param  list<ExternalAccountWithVerification>  $externalAccounts  External account yang akan dibandingkan dengan account valid.
      * @param  string  $validExternalAccountId  ID resource external account yang valid untuk penghapusan.
      *
      * @return void Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
@@ -624,10 +680,10 @@ class ClerkSecurityService
      */
     private function getExternalAccountDeletionId(ExternalAccountWithVerification $externalAccount): string
     {
-        $externalAccountId = trim((string) (
-            $externalAccount->additionalProperties['external_account_id']
-            ?? ''
-        ));
+        $externalAccountIdValue = $externalAccount->additionalProperties['external_account_id'] ?? null;
+        $externalAccountId = is_string($externalAccountIdValue)
+            ? trim($externalAccountIdValue)
+            : '';
 
         if (str_starts_with($externalAccountId, 'eac_')) {
             return $externalAccountId;
@@ -674,7 +730,7 @@ class ClerkSecurityService
      * ketika external account memang sudah tidak ada pada user Clerk terbaru.
      *
      * @param  string  $clerkUserId  ID user pada Clerk yang telah berasal dari token terverifikasi.
-     * @param  array  $deletedExternalAccounts  Daftar external account yang telah dihapus pada proses sebelumnya.
+     * @param  list<ExternalAccountWithVerification>  $deletedExternalAccounts  Account yang harus sudah tidak terdapat pada state Clerk terbaru.
      *
      * @return void Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
      */
@@ -758,21 +814,28 @@ class ClerkSecurityService
      * Hanya nama, waktu dibuat, dan metadata tampilan yang diperlukan yang diproyeksikan dari passkey
      * Clerk. Material kredensial WebAuthn tidak dimasukkan ke payload frontend.
      *
-     * @param  array  $passkeys  Daftar passkey Clerk yang akan diproyeksikan secara aman.
+     * @param  list<Passkey>  $passkeys  Daftar passkey Clerk yang akan diproyeksikan secara aman.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return list<array{
+     *     id: string,
+     *     name: string,
+     *     last_used_at: string|null,
+     *     last_used_at_timestamp: int
+     * }> Passkey yang telah dibatasi pada metadata tampilan yang aman.
      */
     private function formatPasskeys(array $passkeys): array
     {
         return collect($passkeys)
-            ->map(function ($passkey) {
+            ->map(function (Passkey $passkey) {
                 $lastUsedAt = $this->normalizeTimestamp($passkey->lastUsedAt);
+                /** @var int $lastUsedAtTimestamp */
+                $lastUsedAtTimestamp = $lastUsedAt?->timestamp ?? 0;
 
                 return [
                     'id' => $passkey->id,
                     'name' => $passkey->name ?: 'Passkey tanpa nama',
                     'last_used_at' => $lastUsedAt?->toIso8601String(),
-                    'last_used_at_timestamp' => $lastUsedAt?->timestamp ?? 0,
+                    'last_used_at_timestamp' => $lastUsedAtTimestamp,
                 ];
             })
             ->filter(fn (array $passkey) => $passkey['id'] !== null && $passkey['id'] !== '')
@@ -790,12 +853,14 @@ class ClerkSecurityService
      * @param  Session  $session  Model session Clerk yang akan diproyeksikan.
      * @param  string  $currentSessionId  ID session Clerk yang sedang digunakan dan harus dipertahankan.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return SessionPayload Metadata session yang aman ditampilkan frontend.
      */
     private function formatSession(Session $session, string $currentSessionId): array
     {
         $activity = $session->latestActivity;
         $lastActiveAt = $this->normalizeTimestamp($session->lastActiveAt);
+        /** @var int $lastActiveAtTimestamp */
+        $lastActiveAtTimestamp = $lastActiveAt?->timestamp ?? 0;
 
         return [
             'id' => $session->id,
@@ -805,7 +870,7 @@ class ClerkSecurityService
             'device_label' => $this->resolveDeviceLabel($activity),
             'location_label' => $this->resolveLocationLabel($activity),
             'last_active_at' => $lastActiveAt?->toIso8601String(),
-            'last_active_at_timestamp' => $lastActiveAt?->timestamp ?? 0,
+            'last_active_at_timestamp' => $lastActiveAtTimestamp,
         ];
     }
 
