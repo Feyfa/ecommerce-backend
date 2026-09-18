@@ -438,7 +438,9 @@ FRONTEND_URL=https://app.ecommerce.dev
 
 Notes:
 
-- `FRONTEND_URL` is used directly as the backend Clerk authorized party source and CORS allowed origin source.
+- `CLERK_SECRET_KEY` must resolve to a non-empty string. Empty or non-string runtime
+  configuration is rejected before the Clerk SDK is constructed.
+- `FRONTEND_URL` is used directly as the backend Clerk authorized party source and CORS allowed origin source. The resulting `clerk.authorized_parties` configuration must remain an array containing only strings; malformed runtime overrides are rejected instead of disabling origin verification silently.
 - The backend no longer requires a separate `CLERK_AUTHORIZED_PARTIES` env because that value would only duplicate `FRONTEND_URL` in the current architecture.
 - The current backend runtime only requires `CLERK_SECRET_KEY` for Clerk request authentication in this project.
 - `CLERK_FEATURE_PASSKEY` and `CLERK_FEATURE_TOTP` describe environment capability in the Security summary. They default to enabled locally and must remain disabled on staging and production while those Clerk instances do not support the features.

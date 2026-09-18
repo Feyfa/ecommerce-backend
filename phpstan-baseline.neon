@@ -1,16 +1,6 @@
 parameters:
 	ignoreErrors:
 		-
-			message: "#^Cannot cast mixed to string\\.$#"
-			count: 1
-			path: app/Http/Controllers/AuthSessionController.php
-
-		-
-			message: "#^Parameter \\#1 \\$user of method App\\\\Services\\\\AuditLogService\\:\\:recordLogout\\(\\) expects App\\\\Models\\\\User, App\\\\Models\\\\User\\|null given\\.$#"
-			count: 1
-			path: app/Http/Controllers/AuthSessionController.php
-
-		-
 			message: "#^Cannot access property \\$id on App\\\\Models\\\\User\\|null\\.$#"
 			count: 1
 			path: app/Http/Controllers/BelanjaController.php
@@ -519,16 +509,6 @@ parameters:
 			message: "#^Parameter \\#2 \\$data of function hash expects string, string\\|false given\\.$#"
 			count: 1
 			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Cannot cast mixed to string\\.$#"
-			count: 2
-			path: app/Services/Clerk/ClerkBackendClientService.php
-
-		-
-			message: "#^Parameter \\$authorizedParties of class Clerk\\\\Backend\\\\Helpers\\\\Jwks\\\\AuthenticateRequestOptions constructor expects array\\<string\\>\\|null, mixed given\\.$#"
-			count: 1
-			path: app/Services/Clerk/ClerkBackendClientService.php
 
 		-
 			message: "#^Cannot access property \\$id on App\\\\Models\\\\User\\|null\\.$#"
