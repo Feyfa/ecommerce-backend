@@ -256,16 +256,6 @@ parameters:
 			path: app/Http/Controllers/SaldoController.php
 
 		-
-			message: "#^Cannot access property \\$clerk_user_id on mixed\\.$#"
-			count: 1
-			path: app/Http/Controllers/SecurityController.php
-
-		-
-			message: "#^Cannot cast mixed to string\\.$#"
-			count: 2
-			path: app/Http/Controllers/SecurityController.php
-
-		-
 			message: "#^Cannot access property \\$id on mixed\\.$#"
 			count: 2
 			path: app/Http/Controllers/TransactionController.php
@@ -539,76 +529,6 @@ parameters:
 			message: "#^Parameter \\$authorizedParties of class Clerk\\\\Backend\\\\Helpers\\\\Jwks\\\\AuthenticateRequestOptions constructor expects array\\<string\\>\\|null, mixed given\\.$#"
 			count: 1
 			path: app/Services/Clerk/ClerkBackendClientService.php
-
-		-
-			message: "#^Cannot cast mixed to string\\.$#"
-			count: 1
-			path: app/Services/Clerk/ClerkSecurityService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\Clerk\\\\ClerkSecurityService\\:\\:cleanupFailedGoogleAccountLinks\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/Clerk/ClerkSecurityService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\Clerk\\\\ClerkSecurityService\\:\\:deleteInvalidProviderAccounts\\(\\) has parameter \\$externalAccounts with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/Clerk/ClerkSecurityService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\Clerk\\\\ClerkSecurityService\\:\\:deleteProviderAccounts\\(\\) has parameter \\$externalAccounts with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/Clerk/ClerkSecurityService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\Clerk\\\\ClerkSecurityService\\:\\:ensureProviderAccountsAreDeleted\\(\\) has parameter \\$deletedExternalAccounts with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/Clerk/ClerkSecurityService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\Clerk\\\\ClerkSecurityService\\:\\:formatPasskeys\\(\\) has parameter \\$passkeys with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/Clerk/ClerkSecurityService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\Clerk\\\\ClerkSecurityService\\:\\:formatPasskeys\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/Clerk/ClerkSecurityService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\Clerk\\\\ClerkSecurityService\\:\\:formatSession\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/Clerk/ClerkSecurityService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\Clerk\\\\ClerkSecurityService\\:\\:getActiveSessions\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/Clerk/ClerkSecurityService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\Clerk\\\\ClerkSecurityService\\:\\:getProviderAccounts\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/Clerk/ClerkSecurityService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\Clerk\\\\ClerkSecurityService\\:\\:getSummary\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/Clerk/ClerkSecurityService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\Clerk\\\\ClerkSecurityService\\:\\:revokeOtherSessions\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/Clerk/ClerkSecurityService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\Clerk\\\\ClerkSecurityService\\:\\:revokeSession\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/Clerk/ClerkSecurityService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\Clerk\\\\ClerkSecurityService\\:\\:validateGoogleAccountLink\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/Clerk/ClerkSecurityService.php
 
 		-
 			message: "#^Cannot access property \\$id on App\\\\Models\\\\User\\|null\\.$#"

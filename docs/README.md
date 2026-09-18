@@ -134,6 +134,9 @@ alias path as inline code for a file owned by another repository.
 - [TOK-52 AppServiceProvider PHPStan Debt QA](qa/tok-52-app-service-provider-phpstan.md)
   Tracks typed string configuration normalization and focused provider baseline reduction.
 
+- [TOK-53 Clerk Security PHPStan Debt QA](qa/tok-53-clerk-security-phpstan.md)
+  Tracks authenticated request narrowing and typed Clerk security response contracts.
+
 - [Commit Guidelines](development/commit-guidelines.md)
   Explains how to keep commits focused on one purpose and separate unrelated changes.
 
