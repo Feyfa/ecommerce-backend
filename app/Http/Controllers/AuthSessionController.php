@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use App\Services\AuditLogService;
 use App\Services\Clerk\ClerkUserSyncService;
 use App\Services\CompanyService;
@@ -42,7 +43,8 @@ class AuthSessionController extends Controller
     public function show(Request $request): JsonResponse
     {
         // --- step 1 - start - ambil identity provider yang sudah diverifikasi middleware
-        $clerkUserId = (string) $request->attributes->get('clerk_user_id', '');
+        $clerkUserIdAttribute = $request->attributes->get('clerk_user_id', '');
+        $clerkUserId = is_string($clerkUserIdAttribute) ? $clerkUserIdAttribute : '';
         // --- step 1 - end - ambil identity provider yang sudah diverifikasi middleware
 
         if ($clerkUserId === '') {
@@ -102,7 +104,16 @@ class AuthSessionController extends Controller
      */
     public function logout(Request $request): JsonResponse
     {
-        $auditLog = $this->auditLogService->recordLogout($request->user(), $request);
+        $user = $request->user();
+
+        if (! $user instanceof User) {
+            return response()->json([
+                'status' => 401,
+                'message' => 'Unauthorized',
+            ], 401);
+        }
+
+        $auditLog = $this->auditLogService->recordLogout($user, $request);
 
         return response()->json([
             'status' => 200,
