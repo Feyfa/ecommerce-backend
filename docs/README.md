@@ -140,6 +140,9 @@ alias path as inline code for a file owned by another repository.
 - [TOK-54 Clerk Auth Bootstrap PHPStan Debt QA](qa/tok-54-clerk-auth-bootstrap-phpstan.md)
   Tracks auth bootstrap identity narrowing and fail-closed Clerk configuration contracts.
 
+- [TOK-55 Clerk User Sync PHPStan Debt QA](qa/tok-55-clerk-user-sync-phpstan.md)
+  Tracks primary-email narrowing and non-null local-user reload contracts during Clerk synchronization.
+
 - [Commit Guidelines](development/commit-guidelines.md)
   Explains how to keep commits focused on one purpose and separate unrelated changes.
 

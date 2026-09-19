@@ -113,7 +113,7 @@ class ClerkUserSyncService
             // --- step 1 - end - cari user lokal berdasarkan clerk_user_id
 
             // --- step 2 - start - jika belum ada coba attach ke email lokal yang sama
-            if (! $user && $primaryEmail) {
+            if (! $user) {
                 $user = User::query()
                     ->whereNull('clerk_user_id')
                     ->whereRaw('LOWER(email) = ?', [mb_strtolower($primaryEmail)])
@@ -132,10 +132,7 @@ class ClerkUserSyncService
 
             // --- step 4 - start - sinkronkan identity utama dari Clerk
             $user->clerk_user_id = $clerkUser->id;
-
-            if ($primaryEmail) {
-                $user->email = $primaryEmail;
-            }
+            $user->email = $primaryEmail;
 
             if ($displayName !== '') {
                 $user->name = $displayName;
@@ -147,6 +144,10 @@ class ClerkUserSyncService
             $displayNameChanged = $user->wasChanged('name');
 
             $syncedUser = $user->fresh();
+
+            if (! $syncedUser instanceof User) {
+                throw new RuntimeException('Synced local user could not be reloaded.');
+            }
 
             if ($displayNameChanged) {
                 // Nama user menjadi fallback label toko ketika profil company belum memiliki nama yang dapat dipakai.

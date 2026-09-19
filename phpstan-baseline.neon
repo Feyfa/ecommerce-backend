@@ -511,26 +511,6 @@ parameters:
 			path: app/Services/CheckoutService.php
 
 		-
-			message: "#^Cannot access property \\$id on App\\\\Models\\\\User\\|null\\.$#"
-			count: 1
-			path: app/Services/Clerk/ClerkUserSyncService.php
-
-		-
-			message: "#^If condition is always true\\.$#"
-			count: 1
-			path: app/Services/Clerk/ClerkUserSyncService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\Clerk\\\\ClerkUserSyncService\\:\\:syncClerkUserWithStatus\\(\\) should return array\\{user\\: App\\\\Models\\\\User, was_created\\: bool\\} but returns array\\{user\\: App\\\\Models\\\\User\\|null, was_created\\: bool\\}\\.$#"
-			count: 1
-			path: app/Services/Clerk/ClerkUserSyncService.php
-
-		-
-			message: "#^Right side of && is always true\\.$#"
-			count: 1
-			path: app/Services/Clerk/ClerkUserSyncService.php
-
-		-
 			message: "#^Method App\\\\Services\\\\CompanyService\\:\\:getCompany\\(\\) return type has no value type specified in iterable type array\\.$#"
 			count: 1
 			path: app/Services/CompanyService.php
