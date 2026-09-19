@@ -144,7 +144,8 @@ alias path as inline code for a file owned by another repository.
   Tracks primary-email narrowing and non-null local-user reload contracts during Clerk synchronization.
 
 - [TOK-56 Buyer Catalog PHPStan Debt QA](qa/tok-56-buyer-catalog-phpstan.md)
-  Tracks authenticated-buyer and Meilisearch document type narrowing with focused baseline reduction.
+  Tracks authenticated-buyer and Meilisearch document type narrowing with focused baseline reduction,
+  plus the synthetic payment placeholder that moves Faker to a development-only dependency.
 
 - [Commit Guidelines](development/commit-guidelines.md)
   Explains how to keep commits focused on one purpose and separate unrelated changes.
