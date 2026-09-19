@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\PaymentList;
 use App\Models\PaymentUser;
-use Faker\Factory as Faker;
 
 class PaymentService
 {
@@ -126,24 +125,81 @@ class PaymentService
     }
 
     /**
-     * Membuat data user simulasi untuk pengujian pembayaran.
+     * Membuat profil user sintetis untuk simulasi pemeriksaan rekening pembayaran.
      *
-     * Nilai acak yang aman untuk sandbox dibentuk sesuai kontrak identitas yang diperlukan provider.
-     * Helper ini hanya mendukung simulasi dan tidak mengambil data pribadi user produksi.
+     * Profil dipilih dari data statis yang aman untuk sandbox sehingga endpoint tetap memberikan
+     * placeholder pemilik rekening tanpa mengunduh dependency Faker pada image production. Data ini
+     * tidak merepresentasikan pemilik rekening sebenarnya dan tidak digunakan untuk verifikasi bank.
      *
-     * @return array{status: 'success', user: array<string, string>} Data user simulasi beserta status keberhasilan.
+     * @return array{status: 'success', user: array{name: string, email: string, phone: string, address: string}} Data user sintetis beserta status keberhasilan.
      */
     public function generateFakeUser(): array
     {
-        $faker = Faker::create('id_ID');
-
-        /** @var array<string, string> $user */
-        $user = [
-            'name' => $faker->name,
-            'email' => $faker->unique()->safeEmail,
-            'phone' => $faker->phoneNumber,
-            'address' => $faker->address,
+        /** @var list<array{name: string, email: string, phone: string, address: string}> $fakeUsers */
+        $fakeUsers = [
+            [
+                'name' => 'Andi Pratama',
+                'email' => 'andi.pratama@example.test',
+                'phone' => '+6281100000001',
+                'address' => 'Jl. Contoh Nusantara No. 1, Jakarta',
+            ],
+            [
+                'name' => 'Budi Santoso',
+                'email' => 'budi.santoso@example.test',
+                'phone' => '+6281100000002',
+                'address' => 'Jl. Contoh Nusantara No. 2, Bandung',
+            ],
+            [
+                'name' => 'Citra Lestari',
+                'email' => 'citra.lestari@example.test',
+                'phone' => '+6281100000003',
+                'address' => 'Jl. Contoh Nusantara No. 3, Surabaya',
+            ],
+            [
+                'name' => 'Dedi Kurniawan',
+                'email' => 'dedi.kurniawan@example.test',
+                'phone' => '+6281100000004',
+                'address' => 'Jl. Contoh Nusantara No. 4, Yogyakarta',
+            ],
+            [
+                'name' => 'Eka Wulandari',
+                'email' => 'eka.wulandari@example.test',
+                'phone' => '+6281100000005',
+                'address' => 'Jl. Contoh Nusantara No. 5, Semarang',
+            ],
+            [
+                'name' => 'Fajar Nugraha',
+                'email' => 'fajar.nugraha@example.test',
+                'phone' => '+6281100000006',
+                'address' => 'Jl. Contoh Nusantara No. 6, Malang',
+            ],
+            [
+                'name' => 'Gita Permata',
+                'email' => 'gita.permata@example.test',
+                'phone' => '+6281100000007',
+                'address' => 'Jl. Contoh Nusantara No. 7, Medan',
+            ],
+            [
+                'name' => 'Hendra Wijaya',
+                'email' => 'hendra.wijaya@example.test',
+                'phone' => '+6281100000008',
+                'address' => 'Jl. Contoh Nusantara No. 8, Makassar',
+            ],
+            [
+                'name' => 'Intan Sari',
+                'email' => 'intan.sari@example.test',
+                'phone' => '+6281100000009',
+                'address' => 'Jl. Contoh Nusantara No. 9, Denpasar',
+            ],
+            [
+                'name' => 'Joko Saputra',
+                'email' => 'joko.saputra@example.test',
+                'phone' => '+6281100000010',
+                'address' => 'Jl. Contoh Nusantara No. 10, Palembang',
+            ],
         ];
+
+        $user = $fakeUsers[array_rand($fakeUsers)];
 
         return ['status' => 'success', 'user' => $user];
     }
