@@ -2,7 +2,10 @@
 
 namespace App\Services;
 
+use App\Models\Company;
 use App\Models\Product;
+use App\Models\User;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Arr;
 use Meilisearch\Client;
 use Meilisearch\Endpoints\Indexes;
@@ -106,7 +109,10 @@ class BuyerProductSearchService
     {
         $searchProduct = trim((string) ($filters['search_product'] ?? ''));
         $sortProduct = (string) ($filters['sort_product'] ?? 'latest');
-        $maxTotalHits = max(1, (int) config('buyer_product_search.max_total_hits'));
+
+        /** @var int|string $configuredMaxTotalHits */
+        $configuredMaxTotalHits = config('buyer_product_search.max_total_hits');
+        $maxTotalHits = max(1, (int) $configuredMaxTotalHits);
         $offset = ($page - 1) * $perPage;
 
         if ($offset >= $maxTotalHits) {
@@ -155,9 +161,29 @@ class BuyerProductSearchService
      */
     public function document(Product $product): array
     {
+        /** @var User|null $seller */
         $seller = $product->seller;
-        $companyName = trim((string) optional($seller?->company)->name);
-        $storeName = $companyName !== '' ? $companyName : (string) optional($seller)->name;
+
+        /** @var Company|null $company */
+        $company = $seller?->company;
+
+        /** @var string|null $companyNameValue */
+        $companyNameValue = $company?->name;
+
+        /** @var string|null $sellerNameValue */
+        $sellerNameValue = $seller?->name;
+
+        /** @var float|int|string|null $price */
+        $price = $product->price;
+
+        /** @var CarbonInterface|null $createdAt */
+        $createdAt = $product->created_at;
+
+        /** @var CarbonInterface|null $updatedAt */
+        $updatedAt = $product->updated_at;
+
+        $companyName = trim((string) $companyNameValue);
+        $storeName = $companyName !== '' ? $companyName : (string) $sellerNameValue;
 
         return [
             'id' => (string) $product->id,
@@ -168,12 +194,12 @@ class BuyerProductSearchService
             'p_name_sort' => mb_strtolower((string) $product->name),
             'u_name' => $storeName,
             'p_img' => $product->img,
-            'p_price' => (int) $product->price,
+            'p_price' => (int) $price,
             'p_stock' => (int) $product->stock,
-            'created_at' => optional($product->created_at)?->toIso8601String(),
-            'updated_at' => optional($product->updated_at)?->toIso8601String(),
-            'created_at_timestamp' => optional($product->created_at)?->getTimestamp(),
-            'updated_at_timestamp' => optional($product->updated_at)?->getTimestamp(),
+            'created_at' => $createdAt?->toIso8601String(),
+            'updated_at' => $updatedAt?->toIso8601String(),
+            'created_at_timestamp' => $createdAt?->getTimestamp(),
+            'updated_at_timestamp' => $updatedAt?->getTimestamp(),
             'is_purchasable' => true,
         ];
     }
@@ -255,6 +281,9 @@ class BuyerProductSearchService
      */
     private function index(): Indexes
     {
-        return $this->client->index((string) config('buyer_product_search.index'));
+        /** @var bool|float|int|string|null $configuredIndex */
+        $configuredIndex = config('buyer_product_search.index');
+
+        return $this->client->index((string) $configuredIndex);
     }
 }

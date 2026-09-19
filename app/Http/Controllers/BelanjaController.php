@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
+use App\Models\User;
 use App\Services\BuyerProductSearchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -71,7 +72,7 @@ class BelanjaController extends Controller
         // --- step 1 - end - validasi pagination, pencarian, filter katalog, dan sorting
 
         // Identitas token menjadi satu-satunya sumber seller yang dikecualikan dari katalog buyer.
-        $authenticatedUserId = $request->user()->id;
+        $authenticatedUserId = $this->authenticatedUser($request)->id;
 
         // --- step 2 - start - siapkan parameter query katalog buyer
         $page = (int) ($validate['page'] ?? 1);
@@ -109,5 +110,23 @@ class BelanjaController extends Controller
         // --- step 3 - end - jalankan query katalog melalui Meilisearch tanpa fallback PostgreSQL
 
         return response()->json(['status' => 200, ...$result], 200);
+    }
+
+    /**
+     * Mengambil local user yang telah dipasang oleh middleware autentikasi API.
+     *
+     * Endpoint katalog buyer berada di dalam middleware `auth.api`, sehingga request yang mencapai
+     * controller selalu memiliki local User tanpa memerlukan query atau fallback tambahan.
+     *
+     * @param  Request  $request  Request API yang telah melewati middleware autentikasi.
+     *
+     * @return User Local user terautentikasi yang meminta katalog buyer.
+     */
+    private function authenticatedUser(Request $request): User
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        return $user;
     }
 }

@@ -2,8 +2,12 @@
 
 namespace Tests\Unit;
 
+use App\Models\Company;
+use App\Models\Product;
+use App\Models\User;
 use App\Services\BuyerProductSearchService;
 use App\Services\ProductAvailabilityService;
+use Carbon\CarbonImmutable;
 use Meilisearch\Client;
 use Meilisearch\Endpoints\Indexes;
 use Meilisearch\Search\SearchResult;
@@ -15,6 +19,70 @@ use Tests\TestCase;
  */
 class BuyerProductSearchServiceTest extends TestCase
 {
+    /**
+     * Memastikan dokumen katalog memprioritaskan nama company serta menormalisasi nilai produk.
+     *
+     * @return void Tidak mengembalikan nilai; kontrak proyeksi diverifikasi melalui assertion.
+     */
+    public function test_document_prefers_company_name_and_normalizes_product_values(): void
+    {
+        $createdAt = CarbonImmutable::parse('2026-09-18 08:15:30', config('app.timezone'));
+        $updatedAt = CarbonImmutable::parse('2026-09-19 09:45:10', config('app.timezone'));
+        $seller = new User(['name' => 'Seller Fallback']);
+        $seller->setRelation('company', new Company(['name' => 'Verified Store']));
+        $product = (new Product())->forceFill([
+            'id' => '01994f67-3070-70a0-991f-f53a3556954c',
+            'user_id_seller' => '01994f67-3070-70a0-991f-f53a3556954d',
+            'img' => 'product-imgs/catalog.jpg',
+            'name' => 'Catalog Product',
+            'price' => 125000.75,
+            'stock' => 4,
+            'created_at' => $createdAt,
+            'updated_at' => $updatedAt,
+        ]);
+        $product->setRelation('seller', $seller);
+
+        $document = $this->documentService()->document($product);
+
+        $this->assertSame('Verified Store', $document['u_name']);
+        $this->assertSame(125000, $document['p_price']);
+        $this->assertSame($createdAt->toIso8601String(), $document['created_at']);
+        $this->assertSame($updatedAt->toIso8601String(), $document['updated_at']);
+        $this->assertSame($createdAt->getTimestamp(), $document['created_at_timestamp']);
+        $this->assertSame($updatedAt->getTimestamp(), $document['updated_at_timestamp']);
+    }
+
+    /**
+     * Memastikan dokumen katalog memakai nama seller dan mempertahankan timestamp nullable.
+     *
+     * @return void Tidak mengembalikan nilai; fallback nama dan timestamp null diverifikasi.
+     */
+    public function test_document_falls_back_to_seller_name_and_preserves_null_timestamps(): void
+    {
+        $seller = new User(['name' => 'Seller Fallback']);
+        $seller->setRelation('company', null);
+        $product = (new Product())->forceFill([
+            'id' => '01994f67-3070-70a0-991f-f53a3556954e',
+            'user_id_seller' => '01994f67-3070-70a0-991f-f53a3556954f',
+            'img' => null,
+            'name' => 'Fallback Product',
+            'price' => null,
+            'stock' => 1,
+            'created_at' => null,
+            'updated_at' => null,
+        ]);
+        $product->setRelation('seller', $seller);
+
+        $document = $this->documentService()->document($product);
+
+        $this->assertSame('Seller Fallback', $document['u_name']);
+        $this->assertSame(0, $document['p_price']);
+        $this->assertNull($document['created_at']);
+        $this->assertNull($document['updated_at']);
+        $this->assertNull($document['created_at_timestamp']);
+        $this->assertNull($document['updated_at_timestamp']);
+    }
+
     /**
      * Memastikan hit tambahan menandai halaman berikutnya tanpa ikut dikirim dalam response.
      *
@@ -199,6 +267,19 @@ class BuyerProductSearchServiceTest extends TestCase
         $this->assertSame(10000, $settings['pagination']['maxTotalHits']);
         $this->assertContains('id', $settings['sortableAttributes']);
         $this->assertSame('id:asc', $settings['rankingRules'][array_key_last($settings['rankingRules'])]);
+    }
+
+    /**
+     * Membuat service tanpa dependency eksternal untuk memproyeksikan model produk lokal.
+     *
+     * @return BuyerProductSearchService Service yang siap membentuk dokumen katalog buyer.
+     */
+    private function documentService(): BuyerProductSearchService
+    {
+        return new BuyerProductSearchService(
+            Mockery::mock(Client::class),
+            Mockery::mock(ProductAvailabilityService::class),
+        );
     }
 
     /**
