@@ -128,7 +128,7 @@ class PaymentController extends Controller
 
         // --- step 5 - start - buat nama payment sementara
         $generateFakeUser = $this->paymentService->generateFakeUser();
-        $name = $generateFakeUser['user']['name'] ?? '';
+        $name = $generateFakeUser['user']['name'];
         // --- step 5 - end - buat nama payment sementara
 
         return response()->json(['status' => 'success', 'username' => $name]);

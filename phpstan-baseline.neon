@@ -1,11 +1,6 @@
 parameters:
 	ignoreErrors:
 		-
-			message: "#^Cannot access property \\$id on App\\\\Models\\\\User\\|null\\.$#"
-			count: 1
-			path: app/Http/Controllers/BelanjaController.php
-
-		-
 			message: "#^Argument of an invalid type mixed supplied for foreach, only iterables are supported\\.$#"
 			count: 1
 			path: app/Http/Controllers/CheckoutController.php
@@ -304,31 +299,6 @@ parameters:
 			message: "#^Part \\$verifiedLocation\\['formatted_address'\\] \\(mixed\\) of encapsed string cannot be cast to string\\.$#"
 			count: 1
 			path: app/Services/AlamatService.php
-
-		-
-			message: "#^Cannot access property \\$name on mixed\\.$#"
-			count: 2
-			path: app/Services/BuyerProductSearchService.php
-
-		-
-			message: "#^Cannot call method getTimestamp\\(\\) on mixed\\.$#"
-			count: 2
-			path: app/Services/BuyerProductSearchService.php
-
-		-
-			message: "#^Cannot call method toIso8601String\\(\\) on mixed\\.$#"
-			count: 2
-			path: app/Services/BuyerProductSearchService.php
-
-		-
-			message: "#^Cannot cast mixed to int\\.$#"
-			count: 1
-			path: app/Services/BuyerProductSearchService.php
-
-		-
-			message: "#^Cannot cast mixed to string\\.$#"
-			count: 1
-			path: app/Services/BuyerProductSearchService.php
 
 		-
 			message: "#^Access to an undefined property App\\\\Models\\\\Keranjang\\:\\:\\$k_total_price\\.$#"
