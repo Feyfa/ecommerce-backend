@@ -153,6 +153,9 @@ alias path as inline code for a file owned by another repository.
 - [TOK-58 Seller Product Cursor PHPStan Debt QA](qa/tok-58-seller-product-cursor-phpstan.md)
   Tracks nullable cursor values, raw timestamp payloads, and focused baseline reduction.
 
+- [TOK-59 Legacy Invoice Endpoint Retirement QA](qa/tok-59-legacy-invoice-endpoint-retirement.md)
+  Tracks removal of the unused invoice API and Vuex action, scoped PHPStan baseline cleanup, and local verification.
+
 - [Commit Guidelines](development/commit-guidelines.md)
   Explains how to keep commits focused on one purpose and separate unrelated changes.
 

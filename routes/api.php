@@ -6,7 +6,6 @@ use App\Http\Controllers\AuthSessionController;
 use App\Http\Controllers\BelanjaController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\CompanyController;
-use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\KeranjangController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
@@ -105,7 +104,6 @@ Route::middleware('auth.api')->group(function () {
 });
 
 Route::middleware('auth.api')->group(function () {
-    Route::get('/invoice', [InvoiceController::class, 'show']); // sudah tidak dipakai
     Route::get('/transaction', [TransactionController::class, 'getTransaction']);
     Route::post('/transaction/approved', [TransactionController::class, 'approvedTransaction']);
 });
