@@ -19,10 +19,10 @@ Later investigation showed an intermittent network bottleneck between the
 staging VM and GitHub-hosted archives; Faker was the visible stalled package,
 not the underlying cause.
 
-TOK-56 now also includes moving Docker image builds to GitHub Actions and
-deploying immutable private GHCR images from the deploy repository. This
-pipeline work is being prepared across the backend and deploy repositories;
-the historical PHPStan and payment verification below remains unchanged.
+TOK-56 also moved Docker image builds to GitHub Actions and deploys immutable
+private GHCR images from the deploy repository. The pipeline changes were
+released through the backend and deploy repositories; the historical PHPStan
+and payment verification below remains unchanged.
 
 Implementation branch: `task/jd-tok-56`.
 
@@ -100,8 +100,8 @@ errors.
 | TOK-56-BE-08 | ✅ | Verify that the lock move did not upgrade unrelated packages. | `fakerphp/faker` appears zero times under `packages` and once under `packages-dev` at the unchanged version `v1.24.1`. |
 | TOK-56-BE-09 | ✅ | Add automated coverage for the `/api/payment/account/validate` endpoint. | `PaymentAccountValidationTest` passed with 1 test and 5 assertions, asserting a 200 response, a `success` status, and a non-empty allowlisted `username`, which exercises the controller line whose `?? ''` fallback was removed. |
 | TOK-56-BE-10 | ✅ | Confirm the payment tests fail when a synthetic profile is malformed. | A temporary mutation that blanked one profile name was rejected by `PaymentServiceTest` on five consecutive runs. The same mutation escaped the earlier single-draw assertion on three of four runs, which is why the draw is now repeated. The mutation was reverted and the file restored to its 69-insertion, 13-deletion diff. |
-| TOK-56-BE-11 | ⬜ | Run task-branch backend CI. | Pending task-branch CI after the pipeline change is pushed. |
-| TOK-56-BE-12 | ⬜ | Re-run the staging deployment that previously failed. | Pending. Verify that the VM pulls GHCR images and no longer runs Composer or npm builds during deployment. |
+| TOK-56-BE-11 | ✅ | Run task-branch backend CI. | Backend task-branch run [36286913246](https://github.com/Feyfa/ecommerce-backend/actions/runs/36286913246) passed for `b0bc307`; staging and production PR checks also passed. |
+| TOK-56-BE-12 | ✅ | Re-run the staging deployment that previously failed. | [Deploy Staging run 36287680109](https://github.com/Feyfa/ecommerce-deploy/actions/runs/36287680109) built and published GHCR images, then pulled them on the VM. Nine containers ran, and frontend/backend returned HTTP 200. The VM deployment did not run Composer or npm builds. |
 
 ## Known Limitations
 
@@ -129,5 +129,14 @@ each VM records the exact GHCR digests used by Docker Compose. The backend adds
 a dedicated Nginx image so its public files come from the same source commit
 as the PHP image.
 
-Jira TOK-56 remains In Progress. Remote CI, GHCR publication, staging and
-production deployment, and runtime validation have not yet occurred.
+Backend staging PR [#140](https://github.com/Feyfa/ecommerce-backend/pull/140),
+backend production PR [#141](https://github.com/Feyfa/ecommerce-backend/pull/141),
+and deploy PR [#10](https://github.com/Feyfa/ecommerce-deploy/pull/10) were
+merged after their required checks passed. Deploy Staging run
+[36287680109](https://github.com/Feyfa/ecommerce-deploy/actions/runs/36287680109)
+and Deploy Production run
+[36290196340](https://github.com/Feyfa/ecommerce-deploy/actions/runs/36290196340)
+both succeeded. On each VM, nine containers were running and frontend/backend
+returned HTTP 200. The production image manifest records backend source commit
+`d2735028bfc57d244af7f86dce6f3e2ed785c679`; the production VM deploy
+checkout is `e3038ba8475179f84b52b3af58075e802c30b065`.
