@@ -5,6 +5,7 @@ node_modules
 .env
 .env.*
 !.env.example
+public/storage
 storage/logs/*.log
 storage/framework/cache/*
 storage/framework/sessions/*
