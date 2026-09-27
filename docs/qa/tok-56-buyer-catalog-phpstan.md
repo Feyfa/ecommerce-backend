@@ -15,6 +15,14 @@ The second change replaces the Faker-based placeholder identity in
 `fakerphp/faker` from `require` to `require-dev`. This change was added to
 TOK-56 after the staging deployment failed twice while downloading the Faker
 archive during the production `composer install` layer of the backend image.
+Later investigation showed an intermittent network bottleneck between the
+staging VM and GitHub-hosted archives; Faker was the visible stalled package,
+not the underlying cause.
+
+TOK-56 now also includes moving Docker image builds to GitHub Actions and
+deploying immutable private GHCR images from the deploy repository. This
+pipeline work is being prepared across the backend and deploy repositories;
+the historical PHPStan and payment verification below remains unchanged.
 
 Implementation branch: `task/jd-tok-56`.
 
@@ -92,8 +100,8 @@ errors.
 | TOK-56-BE-08 | ✅ | Verify that the lock move did not upgrade unrelated packages. | `fakerphp/faker` appears zero times under `packages` and once under `packages-dev` at the unchanged version `v1.24.1`. |
 | TOK-56-BE-09 | ✅ | Add automated coverage for the `/api/payment/account/validate` endpoint. | `PaymentAccountValidationTest` passed with 1 test and 5 assertions, asserting a 200 response, a `success` status, and a non-empty allowlisted `username`, which exercises the controller line whose `?? ''` fallback was removed. |
 | TOK-56-BE-10 | ✅ | Confirm the payment tests fail when a synthetic profile is malformed. | A temporary mutation that blanked one profile name was rejected by `PaymentServiceTest` on five consecutive runs. The same mutation escaped the earlier single-draw assertion on three of four runs, which is why the draw is now repeated. The mutation was reverted and the file restored to its 69-insertion, 13-deletion diff. |
-| TOK-56-BE-11 | ⬜ | Run task-branch backend CI. | Pending commit and push; remote CI is outside the current implementation scope. |
-| TOK-56-BE-12 | ⬜ | Re-run the staging deployment that previously failed. | Pending. The Faker download failure can only be confirmed resolved by a successful Deploy Staging run. |
+| TOK-56-BE-11 | ⬜ | Run task-branch backend CI. | Pending task-branch CI after the pipeline change is pushed. |
+| TOK-56-BE-12 | ⬜ | Re-run the staging deployment that previously failed. | Pending. Verify that the VM pulls GHCR images and no longer runs Composer or npm builds during deployment. |
 
 ## Known Limitations
 
@@ -114,11 +122,12 @@ errors.
 
 ## Release Status
 
-No migration, environment-variable addition, frontend change, or external API
-contract change is required. The dependency change does affect the backend
-Docker build, which is the intended outcome: the production `--no-dev` install
-no longer downloads `fakerphp/faker`.
+No database migration, frontend source change, or external API contract change
+is required for the pipeline work. The existing VM `frontend.env` supplies
+Vite build values to the GitHub-hosted runner. A new ignored `images.env` on
+each VM records the exact GHCR digests used by Docker Compose. The backend adds
+a dedicated Nginx image so its public files come from the same source commit
+as the PHP image.
 
-Jira TOK-56 remains In Progress. Commit, push, CI, the staging integration
-branch, and the staging redeploy are outside the current local-validation
-scope and are handled manually.
+Jira TOK-56 remains In Progress. Remote CI, GHCR publication, staging and
+production deployment, and runtime validation have not yet occurred.
