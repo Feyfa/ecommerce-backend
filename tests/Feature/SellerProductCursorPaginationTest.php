@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Alamat;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\SellerProductCursorService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
@@ -151,6 +152,77 @@ class SellerProductCursorPaginationTest extends TestCase
                 $this->collectAllProductIds(['per_page' => 1, 'sort_product' => $sortProduct]),
                 "Nilai null untuk {$sortProduct} tidak berada pada urutan stabil.",
             );
+        }
+    }
+
+    /**
+     * Memastikan cursor service tetap menjangkau nama null pada kedua arah urutan tanpa duplikasi.
+     *
+     * Query endpoint mengecualikan nama null melalui filter pencarian, sehingga pengujian kontrak
+     * keyset nullable ini memakai query service secara langsung tanpa mengubah perilaku endpoint.
+     *
+     * @return void Urutan, kelengkapan ID, dan posisi cursor null dinyatakan melalui assertion.
+     */
+    public function test_null_names_remain_last_in_cursor_service_pagination(): void
+    {
+        $expectedIds = $this->insertProducts(4);
+        DB::table('products')->whereIn('id', array_slice($expectedIds, 2))->update(['name' => null]);
+        $cursorService = app(SellerProductCursorService::class);
+
+        foreach (['name_asc', 'name_desc'] as $sortProduct) {
+            $position = null;
+            $actualIds = [];
+
+            do {
+                $query = Product::query()->where('user_id_seller', $this->seller->id);
+                $batch = $cursorService->applyOrder(
+                    $cursorService->applyBoundary($query, $position, $sortProduct),
+                    $sortProduct,
+                )->limit(2)->get();
+                $product = $batch->first();
+                $this->assertNotNull($product);
+                $actualIds[] = $product->id;
+                $hasMore = $batch->count() > 1;
+
+                if ($hasMore) {
+                    $cursor = $cursorService->encode($product, $this->seller->id, '', 'all', $sortProduct);
+                    $position = $cursorService->decode($cursor, $this->seller->id, '', 'all', $sortProduct);
+
+                    if ($product->name === null) {
+                        $this->assertNull($position['value']);
+                    }
+                }
+            } while ($hasMore);
+
+            $this->assertSame($expectedIds, $actualIds, "Nama null untuk {$sortProduct} tidak berada di akhir.");
+        }
+    }
+
+    /**
+     * Memastikan cursor tanggal memakai string timestamp mentah yang berasal dari database.
+     *
+     * Pemeriksaan kedua arah tanggal melindungi bentuk payload saat cast string yang redundan
+     * dihapus dari cabang match pada service.
+     *
+     * @return void Nilai posisi cursor sesuai nilai mentah produk pada kedua arah urutan.
+     */
+    public function test_timestamp_cursor_preserves_raw_database_value(): void
+    {
+        $this->insertProducts(2);
+
+        foreach (['latest', 'oldest'] as $sortProduct) {
+            $first = $this->getJson($this->sellerUrl([
+                'per_page' => 1,
+                'sort_product' => $sortProduct,
+            ]))->assertOk()->assertJsonPath('has_more', true);
+            $cursor = $first->json('next_cursor');
+            $this->assertIsString($cursor);
+
+            $payload = json_decode(Crypt::decryptString($cursor), true, flags: JSON_THROW_ON_ERROR);
+            $rawUpdatedAt = Product::findOrFail($first->json('products.0.id'))->getRawOriginal('updated_at');
+
+            $this->assertIsString($rawUpdatedAt);
+            $this->assertSame($rawUpdatedAt, $payload['position']['value']);
         }
     }
 

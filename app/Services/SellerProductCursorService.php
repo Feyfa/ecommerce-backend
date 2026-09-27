@@ -230,13 +230,14 @@ class SellerProductCursorService
      */
     private function primaryValue(Product $product, string $sortProduct): float|string|null
     {
-        return match ($sortProduct) {
+        /** @var float|string|null $primaryValue */
+        $primaryValue = match ($sortProduct) {
             'price_lowest', 'price_highest' => $product->price === null ? null : (float) $product->price,
             'name_asc', 'name_desc' => $product->getAttribute(self::PRIMARY_VALUE_ATTRIBUTE),
-            default => $product->getRawOriginal('updated_at') === null
-                ? null
-                : (string) $product->getRawOriginal('updated_at'),
+            default => $product->getRawOriginal('updated_at'),
         };
+
+        return $primaryValue;
     }
 
     /**

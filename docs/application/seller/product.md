@@ -92,6 +92,9 @@ Behavior:
   name and bound keyword through a PostgreSQL-compatible
   `LOWER(CAST(... AS TEXT))` query expression. PHP does not lowercase the
   keyword.
+- The search condition excludes products whose name is null, including when
+  the search keyword is empty. The cursor service supports nullable name
+  positions, but the current endpoint does not return those products.
 - Applies stock filters:
   - `all`: no stock restriction.
   - `healthy`: `stock > 5`.
