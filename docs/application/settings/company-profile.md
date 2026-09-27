@@ -131,9 +131,10 @@ Validation rules:
 Side effects:
 
 - Deletes the previous company image from the public disk when it exists, only after the database update and audit succeed.
-- Stores the new image under `company-imgs`.
+- Stores the new image under `company-imgs` with a unique filename, including when the same file extension is uploaded twice in one second.
 - Updates or creates `companies.img` for the authenticated user.
 - Records one owner-scoped `company.image_uploaded` audit event. Context stores only `has_company_image`, never an image path or URL.
+- If storage cannot save the new image, the request fails with a server error before changing the company row or recording an audit event. The previous image remains in place.
 
 Success response:
 
@@ -178,3 +179,5 @@ Error responses:
 - [TOK-23 Company Audit Log QA](../../qa/tok-23-company-audit-log.md) tracks
   backend Profil Toko audit verification; the matching frontend checklist is
   available at `frontend-repo:/docs/qa/tok-23-company-audit-log.md`.
+- [TOK-60 Company Profile PHPStan QA](../../qa/tok-60-company-profile-phpstan.md)
+  tracks type-contract and storage-failure regression checks.

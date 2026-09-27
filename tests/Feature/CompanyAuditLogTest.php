@@ -12,11 +12,15 @@ use App\Models\OutboxMessage;
 use App\Models\User;
 use App\Services\AuditLogService;
 use App\Services\OutboxRecorderService;
+use Carbon\Carbon;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Mockery;
 use Mockery\MockInterface;
 use RuntimeException;
 use Tests\TestCase;
@@ -221,27 +225,139 @@ class CompanyAuditLogTest extends TestCase
      */
     public function company_image_operations_record_safe_distinct_events(): void
     {
-        Storage::fake('public');
+        $disk = Storage::fake('public');
 
-        $this->postJson('/api/company/image', [
-            'file' => UploadedFile::fake()->image('store.png'),
-        ])->assertOk();
+        Carbon::setTestNow('2026-09-27 12:00:00');
+        try {
+            $this->postJson('/api/company/image', [
+                'file' => UploadedFile::fake()->image('store.png'),
+            ])->assertOk()->assertJsonPath('status', 'success');
 
-        $company = Company::query()->where('user_id', $this->user->id)->firstOrFail();
-        $this->assertNotNull($company->img);
-        $this->assertSame(AuditEvent::COMPANY_IMAGE_UPLOADED, AuditLog::query()->sole()->event);
-        $this->assertStringNotContainsString($company->img, json_encode(AuditLog::query()->sole()->context));
+            $company = Company::query()->where('user_id', $this->user->id)->firstOrFail();
+            $this->assertNotNull($company->img);
+            $firstImage = $company->img;
+            $disk->assertExists($firstImage);
+            $this->assertSame(AuditEvent::COMPANY_IMAGE_UPLOADED, AuditLog::query()->sole()->event);
+            $this->assertStringNotContainsString($company->img, json_encode(AuditLog::query()->sole()->context));
 
-        $this->deleteJson('/api/company/image')->assertOk();
+            $this->postJson('/api/company/image', [
+                'file' => UploadedFile::fake()->image('replacement.png'),
+            ])->assertOk()->assertJsonPath('status', 'success');
+        } finally {
+            Carbon::setTestNow();
+        }
+
+        $company->refresh();
+        $this->assertNotSame($firstImage, $company->img);
+        $disk->assertMissing($firstImage);
+        $disk->assertExists($company->img);
+
+        $this->deleteJson('/api/company/image')->assertOk()->assertJsonPath('status', 'success');
+        $disk->assertMissing($company->img);
 
         $this->assertSame(
-            [AuditEvent::COMPANY_IMAGE_UPLOADED->value, AuditEvent::COMPANY_IMAGE_DELETED->value],
+            [AuditEvent::COMPANY_IMAGE_UPLOADED->value, AuditEvent::COMPANY_IMAGE_UPLOADED->value, AuditEvent::COMPANY_IMAGE_DELETED->value],
             AuditLog::query()
                 ->orderBy('created_at')
                 ->get()
                 ->map(fn (AuditLog $audit): string => $audit->event->value)
                 ->all(),
         );
+    }
+
+    /**
+     * Memastikan profil toko dapat dibaca dan seluruh endpoint menolak request tanpa user lokal.
+     *
+     * @test
+     *
+     * @return void Tidak mengembalikan nilai; assertion menjaga response dan pembatasan akses.
+     */
+    public function company_endpoints_require_an_authenticated_local_user(): void
+    {
+        $this->getJson('/api/company')
+            ->assertOk()
+            ->assertJsonPath('status', 'success')
+            ->assertJsonPath('company.name', '');
+
+        Auth::logout();
+
+        $this->getJson('/api/company')->assertUnauthorized();
+        $this->putJson('/api/company', $this->companyPayload())->assertUnauthorized();
+        $this->postJson('/api/company/image', [
+            'file' => UploadedFile::fake()->image('store.png'),
+        ])->assertUnauthorized();
+        $this->deleteJson('/api/company/image')->assertUnauthorized();
+
+        $this->assertDatabaseCount('companies', 0);
+        $this->assertDatabaseCount('audit_logs', 0);
+    }
+
+    /**
+     * Memastikan kegagalan penulisan file tidak mengganti foto toko atau mencatat audit.
+     *
+     * @test
+     *
+     * @return void Tidak mengembalikan nilai; assertion menjaga state lama saat storage gagal.
+     */
+    public function failed_company_image_storage_keeps_the_previous_image(): void
+    {
+        $disk = Storage::fake('public');
+        $previousImage = 'company-imgs/previous.png';
+        $disk->put($previousImage, 'previous image');
+        $company = Company::query()->create([
+            'user_id' => $this->user->id,
+            'img' => $previousImage,
+        ]);
+
+        $failedDisk = Mockery::mock(FilesystemAdapter::class);
+        $failedDisk->shouldReceive('putFileAs')->once()->andReturn(false);
+        Storage::shouldReceive('disk')->once()->with('public')->andReturn($failedDisk);
+
+        $this->postJson('/api/company/image', [
+            'file' => UploadedFile::fake()->image('new.png'),
+        ])->assertServerError();
+
+        $this->assertSame($previousImage, $company->refresh()->img);
+        $this->assertSame([$previousImage], $disk->allFiles('company-imgs'));
+        $this->assertDatabaseCount('audit_logs', 0);
+    }
+
+    /**
+     * Memastikan audit gagal membatalkan penggantian foto dan membersihkan file baru.
+     *
+     * @test
+     *
+     * @return void Tidak mengembalikan nilai; assertion menjaga database dan storage konsisten.
+     */
+    public function failed_company_image_audit_restores_the_previous_image(): void
+    {
+        $disk = Storage::fake('public');
+        Carbon::setTestNow('2026-09-27 12:00:00');
+        try {
+            // Recreate a legacy path that would collide with another PNG in the same second.
+            $previousImage = 'company-imgs/'.$this->user->id.'-'.Carbon::now()->timestamp.'.png';
+            $disk->put($previousImage, 'previous image');
+            $company = Company::query()->create([
+                'user_id' => $this->user->id,
+                'img' => $previousImage,
+            ]);
+
+            $this->partialMock(AuditLogService::class, function (MockInterface $mock): void {
+                $mock->shouldReceive('recordCompanyImageChanged')
+                    ->once()
+                    ->andThrow(new RuntimeException('Audit persistence failed.'));
+            });
+
+            $this->postJson('/api/company/image', [
+                'file' => UploadedFile::fake()->image('new.png'),
+            ])->assertServerError();
+        } finally {
+            Carbon::setTestNow();
+        }
+
+        $this->assertSame($previousImage, $company->refresh()->img);
+        $this->assertSame([$previousImage], $disk->allFiles('company-imgs'));
+        $this->assertDatabaseCount('audit_logs', 0);
     }
 
     /**
