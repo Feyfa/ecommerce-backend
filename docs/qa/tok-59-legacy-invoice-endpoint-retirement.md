@@ -49,7 +49,29 @@ Implementation branches: `task/jd-tok-59` in backend and frontend.
 Repository references, existing tests, and a local build do not prove that
 external clients have stopped calling `GET /api/invoice`. Production access-log
 review is required before release. If an active caller or integration is found,
-the endpoint retirement must be reconsidered before deployment. This page
-records local validation and review. No browser smoke test, push, pull request,
-or deployment was performed at this stage; remote CI and runtime checks remain
-pending.
+the endpoint retirement must be reconsidered before production deployment.
+
+## Staging Release
+
+| Area | Evidence |
+| --- | --- |
+| Backend PR | [TOK-59 staging PR #148](https://github.com/Feyfa/ecommerce-backend/pull/148) merged to `staging`; Backend CI passed on the integration branch. |
+| Frontend PR | [TOK-59 staging PR #126](https://github.com/Feyfa/ecommerce-frontend/pull/126) merged to `staging`; Frontend CI and Release Branch Policy passed. |
+| Runtime deployment | [Deploy Staging run 36320299633](https://github.com/Feyfa/ecommerce-deploy/actions/runs/36320299633) completed successfully from `deploy/main` in 6m21s. |
+| Source revisions | The workflow activated frontend `586321160e5d1ff5c00898372ab82e919875d935` and backend `1b233dceeb8e4bdac50bcf2b451036ac085f0726`. |
+| Runtime checks | The deploy script returned success after HTTP checks on ports 8080 and 8081 and required-service checks; the workflow log listed the services as running. No interactive browser smoke test was run. |
+
+## Production Access-Log Review
+
+The production reverse-proxy access log is configured at
+`/var/log/nginx/access.log` and is sent to container stdout; backend Nginx has
+access logging disabled. A read-only search of the retained reverse-proxy logs
+for `/api/invoice` found zero matches. However, the current proxy container was
+created at `2026-09-27 11:07:10 UTC`, and no older proxy container was retained.
+Although the query requested the preceding 30 days, the available container log
+covers only about two hours. This is not a representative history and
+does not establish that external clients no longer use the endpoint.
+
+Production deployment remains pending a longer, representative access-log
+window, such as archived reverse-proxy or Cloudflare logs. If that history
+shows an active caller, reconsider endpoint retirement before production.
