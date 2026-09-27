@@ -71,41 +71,6 @@ parameters:
 			path: app/Http/Controllers/CompanyController.php
 
 		-
-			message: "#^Access to an undefined property App\\\\Models\\\\TransactionInvoice\\:\\:\\$expiry_time\\.$#"
-			count: 1
-			path: app/Http/Controllers/InvoiceController.php
-
-		-
-			message: "#^Access to an undefined property App\\\\Models\\\\TransactionInvoice\\:\\:\\$gross_amount\\.$#"
-			count: 1
-			path: app/Http/Controllers/InvoiceController.php
-
-		-
-			message: "#^Access to an undefined property App\\\\Models\\\\TransactionInvoice\\:\\:\\$order_id\\.$#"
-			count: 1
-			path: app/Http/Controllers/InvoiceController.php
-
-		-
-			message: "#^Access to an undefined property App\\\\Models\\\\TransactionInvoice\\:\\:\\$transaction_status\\.$#"
-			count: 2
-			path: app/Http/Controllers/InvoiceController.php
-
-		-
-			message: "#^Access to an undefined property App\\\\Models\\\\TransactionInvoice\\:\\:\\$transaction_time\\.$#"
-			count: 1
-			path: app/Http/Controllers/InvoiceController.php
-
-		-
-			message: "#^Access to an undefined property App\\\\Models\\\\TransactionInvoice\\:\\:\\$va_biller_code\\.$#"
-			count: 1
-			path: app/Http/Controllers/InvoiceController.php
-
-		-
-			message: "#^Access to an undefined property App\\\\Models\\\\TransactionInvoice\\:\\:\\$va_number\\.$#"
-			count: 1
-			path: app/Http/Controllers/InvoiceController.php
-
-		-
 			message: "#^Cannot access property \\$id on mixed\\.$#"
 			count: 1
 			path: app/Http/Controllers/KeranjangController.php
