@@ -72,6 +72,9 @@ Although the query requested the preceding 30 days, the available container log
 covers only about two hours. This is not a representative history and
 does not establish that external clients no longer use the endpoint.
 
-Production deployment remains pending a longer, representative access-log
-window, such as archived reverse-proxy or Cloudflare logs. If that history
-shows an active caller, reconsider endpoint retirement before production.
+The project owner approved the production retirement despite this evidence
+limitation because this is a personal project. This approval accepts the
+unresolved possibility of external callers; it does not prove that none exist.
+Any remaining request to `GET /api/invoice` will have no matching route. If
+later access logs or reports identify an active caller, reconsider the endpoint
+retirement.

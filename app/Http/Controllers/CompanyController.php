@@ -10,12 +10,14 @@ use App\Services\AlamatService;
 use App\Services\AuditLogService;
 use App\Services\CompanyService;
 use App\Services\OutboxRecorderService;
-use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
+use RuntimeException;
 
 class CompanyController extends Controller
 {
@@ -45,12 +47,12 @@ class CompanyController extends Controller
     public function show(): JsonResponse
     {
         // --- step 1 - start - validasi user
-        $user_id = optional(auth()->user())->id;
-        $userExists = User::where('id', $user_id)->exists();
+        $user = auth()->user();
 
-        if (! $userExists) {
+        if (! $user instanceof User || ! User::where('id', $user->id)->exists()) {
             return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
         }
+        $user_id = $user->id;
         // --- step 1 - end - validasi user
 
         // --- step 2 - start - ambil profil toko
@@ -76,12 +78,11 @@ class CompanyController extends Controller
     {
         // --- step 1 - start - validasi user
         $user = $request->user();
-        $user_id = optional($user)->id;
-        $userExists = User::where('id', $user_id)->exists();
 
-        if (! $user || ! $userExists) {
+        if (! $user instanceof User || ! User::where('id', $user->id)->exists()) {
             return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
         }
+        $user_id = $user->id;
         // --- step 1 - end - validasi user
 
         // --- step 2 - start - validasi request dan ambil data
@@ -199,17 +200,18 @@ class CompanyController extends Controller
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      *
      * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     *
+     * @throws RuntimeException Ketika file gambar tidak dapat disimpan sebelum profil toko diubah.
      */
     public function uploadImage(Request $request): JsonResponse
     {
         // --- step 1 - start - validasi user
         $user = $request->user();
-        $user_id = optional($user)->id;
-        $userExists = User::where('id', $user_id)->exists();
 
-        if (! $user || ! $userExists) {
+        if (! $user instanceof User || ! User::where('id', $user->id)->exists()) {
             return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
         }
+        $user_id = $user->id;
         // --- step 1 - end - validasi user
 
         // --- step 2 - start - validasi request
@@ -229,12 +231,26 @@ class CompanyController extends Controller
         if ($validator->fails()) {
             return response()->json(['status' => 'error', 'message' => $validator->messages()], 422);
         }
+
+        $file = $request->file('file');
+        if (! $file instanceof UploadedFile) {
+            $validator->errors()->add('file', 'File harus berupa gambar.');
+
+            return response()->json(['status' => 'error', 'message' => $validator->messages()], 422);
+        }
         // --- step 2 - end - validasi request
 
         // --- step 3 - start - unggah file baru sebelum mengganti referensi toko
         $previousImage = Company::where('user_id', $user_id)->value('img');
-        $filename = $user_id.'-'.Carbon::now()->timestamp.'.'.$request->file('file')->getClientOriginalExtension();
-        $path = Storage::disk('public')->putFileAs('company-imgs', $request->file('file'), $filename);
+        // A replacement needs its own path so rollback and old-file cleanup cannot delete the active image.
+        do {
+            $filename = $user_id.'-'.Str::uuid().'.'.$file->getClientOriginalExtension();
+        } while ($previousImage === 'company-imgs/'.$filename);
+
+        $path = Storage::disk('public')->putFileAs('company-imgs', $file, $filename);
+        if ($path === false) {
+            throw new RuntimeException('Company image could not be stored.');
+        }
         // --- step 3 - end - unggah file baru sebelum mengganti referensi toko
 
         // --- step 4 - start - ganti referensi gambar dan catat audit secara atomik
@@ -258,14 +274,16 @@ class CompanyController extends Controller
                 );
             });
         } catch (\Throwable $exception) {
-            Storage::disk('public')->delete($path);
+            if ($path !== $previousImage) {
+                Storage::disk('public')->delete($path);
+            }
 
             throw $exception;
         }
         // --- step 4 - end - ganti referensi gambar dan catat audit secara atomik
 
         // --- step 5 - start - bersihkan file sebelumnya setelah transaksi berhasil
-        if ($previousImage && Storage::disk('public')->exists($previousImage)) {
+        if (is_string($previousImage) && $previousImage !== '' && $previousImage !== $path && Storage::disk('public')->exists($previousImage)) {
             Storage::disk('public')->delete($previousImage);
         }
         // --- step 5 - end - bersihkan file sebelumnya setelah transaksi berhasil
@@ -293,12 +311,11 @@ class CompanyController extends Controller
     {
         // --- step 1 - start - validasi user
         $user = $request->user();
-        $user_id = optional($user)->id;
-        $userExists = User::where('id', $user_id)->exists();
 
-        if (! $user || ! $userExists) {
+        if (! $user instanceof User || ! User::where('id', $user->id)->exists()) {
             return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
         }
+        $user_id = $user->id;
         // --- step 1 - end - validasi user
 
         // --- step 2 - start - ambil profil toko

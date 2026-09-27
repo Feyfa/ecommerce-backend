@@ -47,31 +47,6 @@ parameters:
 
 		-
 			message: "#^Cannot access property \\$id on mixed\\.$#"
-			count: 4
-			path: app/Http/Controllers/CompanyController.php
-
-		-
-			message: "#^Cannot call method getClientOriginalExtension\\(\\) on array\\<int, Illuminate\\\\Http\\\\UploadedFile\\>\\|Illuminate\\\\Http\\\\UploadedFile\\|null\\.$#"
-			count: 1
-			path: app/Http/Controllers/CompanyController.php
-
-		-
-			message: "#^Parameter \\#1 \\$path of method Illuminate\\\\Filesystem\\\\FilesystemAdapter\\:\\:exists\\(\\) expects string, mixed given\\.$#"
-			count: 1
-			path: app/Http/Controllers/CompanyController.php
-
-		-
-			message: "#^Parameter \\#1 \\$paths of method Illuminate\\\\Filesystem\\\\FilesystemAdapter\\:\\:delete\\(\\) expects array\\|string, mixed given\\.$#"
-			count: 1
-			path: app/Http/Controllers/CompanyController.php
-
-		-
-			message: "#^Parameter \\#1 \\$paths of method Illuminate\\\\Filesystem\\\\FilesystemAdapter\\:\\:delete\\(\\) expects array\\|string, string\\|false given\\.$#"
-			count: 1
-			path: app/Http/Controllers/CompanyController.php
-
-		-
-			message: "#^Cannot access property \\$id on mixed\\.$#"
 			count: 1
 			path: app/Http/Controllers/KeranjangController.php
 
@@ -444,11 +419,6 @@ parameters:
 			message: "#^Parameter \\#2 \\$data of function hash expects string, string\\|false given\\.$#"
 			count: 1
 			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\CompanyService\\:\\:getCompany\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/CompanyService.php
 
 		-
 			message: "#^Cannot cast mixed to int\\.$#"

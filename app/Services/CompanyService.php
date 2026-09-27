@@ -24,7 +24,7 @@ class CompanyService
      *
      * @param  string  $user_id  ID user yang menjadi scope data atau mutasi.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{status: 'success', company: array<string, mixed>} Status dan atribut profil toko beserta alamat seller.
      */
     public function getCompany(string $user_id = ''): array
     {
