@@ -147,6 +147,9 @@ alias path as inline code for a file owned by another repository.
   Tracks authenticated-buyer and Meilisearch document type narrowing with focused baseline reduction,
   plus the synthetic payment placeholder that moves Faker to a development-only dependency.
 
+- [TOK-57 Seller Dashboard PHPStan Debt QA](qa/tok-57-seller-dashboard-phpstan.md)
+  Tracks typed dashboard response shapes, joined transaction aliases, and focused baseline reduction.
+
 - [Commit Guidelines](development/commit-guidelines.md)
   Explains how to keep commits focused on one purpose and separate unrelated changes.
 
