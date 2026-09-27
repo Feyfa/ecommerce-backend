@@ -9,6 +9,40 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * Menyusun metrik dan transaksi terbaru seller untuk respons dashboard yang terikat ke pemilik toko.
+ *
+ * @phpstan-type DashboardSummary array{
+ *     total_products: int,
+ *     new_orders: int,
+ *     total_sold: int,
+ *     monthly_revenue: float
+ * }
+ * @phpstan-type DashboardPerformance array{
+ *     period: '30_days',
+ *     labels: list<string>,
+ *     sales: list<int>,
+ *     revenue: list<float>,
+ *     total_sold: int,
+ *     total_revenue: int|float
+ * }
+ * @phpstan-type DashboardTransaction array{
+ *     id: string,
+ *     transaction_number: string|null,
+ *     buyer_name: string,
+ *     product_names: string,
+ *     total_price: float,
+ *     status: string|null,
+ *     invoice_status: string|null,
+ *     transaction_date: string
+ * }
+ * @phpstan-type DashboardProductSnapshot array{
+ *     active_products: int,
+ *     low_stock_products: int,
+ *     empty_stock_products: int,
+ *     new_products: int
+ * }
+ */
 class SellerDashboardService
 {
     /**
@@ -20,7 +54,12 @@ class SellerDashboardService
      *
      * @param  string  $user_id  ID user yang menjadi scope data atau mutasi.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{
+     *     summary: DashboardSummary,
+     *     performance: DashboardPerformance,
+     *     recent_transactions: array<int, DashboardTransaction>,
+     *     product_snapshot: DashboardProductSnapshot
+     * } Empat bagian respons dashboard seller.
      */
     public function getDashboard(string $user_id): array
     {
@@ -53,7 +92,7 @@ class SellerDashboardService
      * @param  Carbon  $startOfMonth  Batas awal bulan untuk perhitungan metrik.
      * @param  Carbon  $endOfMonth  Batas akhir bulan untuk perhitungan metrik.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return DashboardSummary Hitungan produk, pesanan, unit terjual, dan pendapatan bulan berjalan.
      */
     private function getSummary(string $user_id, Carbon $startOfMonth, Carbon $endOfMonth): array
     {
@@ -85,7 +124,7 @@ class SellerDashboardService
      *
      * @param  string  $user_id  ID user yang menjadi scope data atau mutasi.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return DashboardPerformance Deret penjualan 30 hari beserta totalnya.
      */
     private function getPerformance(string $user_id): array
     {
@@ -147,7 +186,7 @@ class SellerDashboardService
      *
      * @param  string  $user_id  ID user yang menjadi scope data atau mutasi.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array<int, DashboardTransaction> Maksimal lima transaksi terbaru milik seller.
      */
     private function getRecentTransactions(string $user_id): array
     {
@@ -168,7 +207,14 @@ class SellerDashboardService
             ->orderBy('transaction_users.created_at', 'DESC')
             ->limit(5)
             ->get()
-            ->map(function ($transaction) {
+            ->map(function (TransactionUser $transaction): array {
+                // These aliases exist only in this joined projection, not on every TransactionUser.
+                /** @var string $buyerName */
+                $buyerName = $transaction->getAttribute('buyer_name');
+
+                /** @var string|null $invoiceStatus */
+                $invoiceStatus = $transaction->getAttribute('invoice_status');
+
                 // --- step 2 - start - ambil nama produk
                 $products = TransactionProduct::query()
                     ->join('products', 'products.id', '=', 'transaction_products.product_id')
@@ -180,17 +226,17 @@ class SellerDashboardService
                 return [
                     'id' => $transaction->id,
                     'transaction_number' => $transaction->transaction_number,
-                    'buyer_name' => $transaction->buyer_name,
+                    'buyer_name' => $buyerName,
                     'product_names' => $products->join(', '),
                     'total_price' => (float) $transaction->product_price,
                     'status' => $transaction->status,
-                    'invoice_status' => $transaction->invoice_status,
+                    'invoice_status' => $invoiceStatus,
                     'transaction_date' => Carbon::parse($transaction->created_at)
                         ->setTimezone('Asia/Jakarta')
                         ->translatedFormat('d F Y H:i'),
                 ];
             })
-            ->toArray();
+            ->all();
         // --- step 1 - end - ambil transaksi terbaru
 
         return $recentTransactions;
@@ -205,7 +251,7 @@ class SellerDashboardService
      *
      * @param  string  $user_id  ID user yang menjadi scope data atau mutasi.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return DashboardProductSnapshot Hitungan produk menurut stok dan usia produk.
      */
     private function getProductSnapshot(string $user_id): array
     {

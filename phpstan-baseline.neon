@@ -741,46 +741,6 @@ parameters:
 			path: app/Services/SaldoService.php
 
 		-
-			message: "#^Access to an undefined property App\\\\Models\\\\TransactionUser\\:\\:\\$buyer_name\\.$#"
-			count: 1
-			path: app/Services/SellerDashboardService.php
-
-		-
-			message: "#^Access to an undefined property App\\\\Models\\\\TransactionUser\\:\\:\\$invoice_status\\.$#"
-			count: 1
-			path: app/Services/SellerDashboardService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\SellerDashboardService\\:\\:getDashboard\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/SellerDashboardService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\SellerDashboardService\\:\\:getPerformance\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/SellerDashboardService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\SellerDashboardService\\:\\:getProductSnapshot\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/SellerDashboardService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\SellerDashboardService\\:\\:getRecentTransactions\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/SellerDashboardService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\SellerDashboardService\\:\\:getSummary\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/SellerDashboardService.php
-
-		-
-			message: "#^Return type of call to method Illuminate\\\\Database\\\\Eloquent\\\\Collection\\<int,App\\\\Models\\\\TransactionUser\\>\\:\\:map\\(\\) contains unresolvable type\\.$#"
-			count: 1
-			path: app/Services/SellerDashboardService.php
-
-		-
 			message: "#^Cannot cast mixed to string\\.$#"
 			count: 1
 			path: app/Services/SellerProductCursorService.php
