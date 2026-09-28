@@ -196,21 +196,6 @@ parameters:
 			path: app/Http/Controllers/TransactionController.php
 
 		-
-			message: "#^Cannot cast mixed to float\\.$#"
-			count: 2
-			path: app/Services/AlamatService.php
-
-		-
-			message: "#^Cannot cast mixed to string\\.$#"
-			count: 1
-			path: app/Services/AlamatService.php
-
-		-
-			message: "#^Part \\$verifiedLocation\\['formatted_address'\\] \\(mixed\\) of encapsed string cannot be cast to string\\.$#"
-			count: 1
-			path: app/Services/AlamatService.php
-
-		-
 			message: "#^Access to an undefined property App\\\\Models\\\\Keranjang\\:\\:\\$k_total_price\\.$#"
 			count: 1
 			path: app/Services/CheckoutService.php
@@ -389,16 +374,6 @@ parameters:
 			message: "#^Parameter \\#2 \\$data of function hash expects string, string\\|false given\\.$#"
 			count: 1
 			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Cannot cast mixed to int\\.$#"
-			count: 1
-			path: app/Services/GeoapifyService.php
-
-		-
-			message: "#^Cannot cast mixed to string\\.$#"
-			count: 2
-			path: app/Services/GeoapifyService.php
 
 		-
 			message: "#^Access to an undefined property App\\\\Models\\\\Keranjang\\:\\:\\$is_purchasable\\.$#"

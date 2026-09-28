@@ -156,6 +156,15 @@ alias path as inline code for a file owned by another repository.
 - [TOK-59 Legacy Invoice Endpoint Retirement QA](qa/tok-59-legacy-invoice-endpoint-retirement.md)
   Tracks removal of the unused invoice API and Vuex action, scoped PHPStan baseline cleanup, and local verification.
 
+- [TOK-60 Company Profile PHPStan Debt QA](qa/tok-60-company-profile-phpstan.md)
+  Tracks company profile type contracts, image storage failure handling, and focused baseline reduction.
+
+- [TOK-61 User Profile PHPStan and Image Upload Security QA](qa/tok-61-user-profile-phpstan.md)
+  Tracks user profile type contracts and JPEG, PNG, and GIF upload security across profile, company, and product images.
+
+- [TOK-62 Location Verification PHPStan Debt QA](qa/tok-62-location-phpstan.md)
+  Tracks Geoapify configuration type checks and the shared buyer/seller location contract.
+
 - [Commit Guidelines](development/commit-guidelines.md)
   Explains how to keep commits focused on one purpose and separate unrelated changes.
 

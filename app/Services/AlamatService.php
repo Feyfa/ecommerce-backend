@@ -61,19 +61,35 @@ class AlamatService
      *
      * Koordinat request diverifikasi ulang melalui Geoapify dan metadata client diganti dengan hasil
      * server. Attribute yang dikembalikan siap disimpan tanpa mempercayai formatted address atau place
-     * ID dari browser.
+     * ID dari browser. Caller wajib menerapkan locationRules() sebelum memanggil method ini sehingga
+     * koordinat berupa angka dan detail alamat berupa string.
      *
-     * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
+     * @param  Request  $request  Request terautentikasi dengan field lokasi yang sudah lolos validasi.
      *
-     * @return array<string, mixed> Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{
+     *     latitude: float,
+     *     longitude: float,
+     *     geoapify_place_id: string|null,
+     *     formatted_address: string,
+     *     alamat: string,
+     *     address_detail: string,
+     *     location_source: 'map'
+     * } Attribute lokasi terverifikasi yang siap disimpan.
      */
     public function locationAttributes(Request $request): array
     {
+        /** @var int|float|numeric-string $latitude */
+        $latitude = $request->latitude;
+        /** @var int|float|numeric-string $longitude */
+        $longitude = $request->longitude;
+        /** @var string $addressDetail */
+        $addressDetail = $request->address_detail;
+
         $verifiedLocation = $this->geoapifyService->verifyIndonesiaLocation(
-            (float) $request->latitude,
-            (float) $request->longitude,
+            (float) $latitude,
+            (float) $longitude,
         );
-        $addressDetail = trim((string) $request->address_detail);
+        $addressDetail = trim($addressDetail);
 
         return array_merge($verifiedLocation, [
             'alamat' => "{$addressDetail}, {$verifiedLocation['formatted_address']}",

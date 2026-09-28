@@ -20,13 +20,32 @@ class GeoapifyService
      * @param  float  $latitude  Koordinat lintang yang akan diverifikasi oleh provider.
      * @param  float  $longitude  Koordinat bujur yang akan diverifikasi oleh provider.
      *
-     * @return array<string, mixed> Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{
+     *     latitude: float,
+     *     longitude: float,
+     *     geoapify_place_id: string|null,
+     *     formatted_address: string
+     * } Koordinat dan alamat terverifikasi yang siap disimpan.
      */
     public function verifyIndonesiaLocation(float $latitude, float $longitude): array
     {
         // --- step 1 - start - validasi konfigurasi server
-        $apiKey = trim((string) config('services.geoapify.key'));
+        $configuredKey = config('services.geoapify.key');
+        if ($configuredKey !== null && ! is_scalar($configuredKey)) {
+            $this->throwUnavailable();
+        }
+
+        $apiKey = trim((string) $configuredKey);
         if ($apiKey == '') {
+            $this->throwUnavailable();
+        }
+
+        // Configuration may contain arbitrary values; only scalar or null values retain the
+        // existing cast behavior before an HTTP request is sent to the provider.
+        $configuredTimeout = config('services.geoapify.timeout', 8);
+        $configuredUrl = config('services.geoapify.url');
+        if (($configuredTimeout !== null && ! is_scalar($configuredTimeout))
+            || ($configuredUrl !== null && ! is_scalar($configuredUrl))) {
             $this->throwUnavailable();
         }
         // --- step 1 - end - validasi konfigurasi server
@@ -34,8 +53,8 @@ class GeoapifyService
         // --- step 2 - start - verifikasi koordinat melalui provider tepercaya
         try {
             $response = Http::acceptJson()
-                ->timeout((int) config('services.geoapify.timeout', 8))
-                ->get(rtrim((string) config('services.geoapify.url'), '/').'/reverse', [
+                ->timeout((int) $configuredTimeout)
+                ->get(rtrim((string) $configuredUrl, '/').'/reverse', [
                     'lat' => $latitude,
                     'lon' => $longitude,
                     'lang' => 'id',
