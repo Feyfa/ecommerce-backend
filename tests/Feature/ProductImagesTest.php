@@ -137,6 +137,34 @@ class ProductImagesTest extends TestCase
     }
 
     /**
+     * Menolak SVG pada pembuatan produk sebelum file, produk, atau audit disimpan.
+     *
+     * @return void Tidak mengembalikan nilai; assertion menjaga state saat format tidak didukung.
+     *
+     * @test
+     */
+    public function create_rejects_svg_images_without_side_effects(): void
+    {
+        $payload = [
+            'user_id_seller' => $this->seller->id,
+            'name' => 'Produk Test',
+            'price' => 10000,
+            'stock' => 2,
+            'image_order' => ['new:0'],
+            'images' => [UploadedFile::fake()->createWithContent('image.svg', '<svg xmlns="http://www.w3.org/2000/svg"></svg>')],
+        ];
+
+        $this->post('/api/product', $payload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['images.0'], 'message');
+
+        $this->assertDatabaseCount('products', 0);
+        $this->assertDatabaseCount('product_images', 0);
+        $this->assertDatabaseCount('audit_logs', 0);
+        $this->assertSame([], Storage::disk('public')->allFiles('product-imgs'));
+    }
+
+    /**
      * Memverifikasi aturan pengelolaan satu hingga lima gambar produk pada skenario create rejects
      * malformed image manifests without server errors.
      *
@@ -292,6 +320,35 @@ class ProductImagesTest extends TestCase
         $this->post("/api/product/{$product->id}", $basePayload + [
             'image_order' => [$otherProduct->images->first()->id],
         ])->assertUnprocessable()->assertJsonValidationErrors(['images'], 'message');
+    }
+
+    /**
+     * Menolak SVG saat memperbarui produk dan mempertahankan gambar serta audit lama.
+     *
+     * @return void Tidak mengembalikan nilai; assertion menjaga update tanpa efek samping.
+     *
+     * @test
+     */
+    public function update_rejects_svg_images_without_side_effects(): void
+    {
+        $product = $this->productWithImage('product-imgs/owner.jpg');
+        $existingImage = $product->images()->sole();
+        Storage::disk('public')->put($existingImage->path, 'original');
+
+        $this->post("/api/product/{$product->id}", [
+            '_method' => 'PUT',
+            'name' => 'Produk Baru',
+            'price' => 15000,
+            'stock' => 2,
+            'images' => [UploadedFile::fake()->createWithContent('image.svg', '<svg xmlns="http://www.w3.org/2000/svg"></svg>')],
+            'image_order' => ['new:0', $existingImage->id],
+        ])->assertUnprocessable()->assertJsonValidationErrors(['images.0'], 'message');
+
+        $this->assertSame('Produk Test', $product->refresh()->name);
+        $this->assertSame($existingImage->path, $product->img);
+        $this->assertDatabaseCount('product_images', 1);
+        $this->assertDatabaseCount('audit_logs', 0);
+        $this->assertSame([$existingImage->path], Storage::disk('public')->allFiles('product-imgs'));
     }
 
     /**
