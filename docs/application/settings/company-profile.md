@@ -125,13 +125,14 @@ Validation rules:
 
 - `file` is required.
 - `file` must be an image.
-- Allowed image MIME extensions: `jpeg`, `png`, `jpg`, `gif`, `svg`.
+- Allowed image formats: JPEG, PNG, and GIF. SVG is rejected.
 - Max file size: `1024` KB.
 
 Side effects:
 
 - Deletes the previous company image from the public disk when it exists, only after the database update and audit succeed.
-- Stores the new image under `company-imgs` with a unique filename, including when the same file extension is uploaded twice in one second.
+- Laravel `store()` creates a unique filename under `company-imgs` on the public disk, including when the same extension is uploaded twice in one second.
+- The generated extension follows the detected image content rather than the submitted filename.
 - Updates or creates `companies.img` for the authenticated user.
 - Records one owner-scoped `company.image_uploaded` audit event. Context stores only `has_company_image`, never an image path or URL.
 - If storage cannot save the new image, the request fails with a server error before changing the company row or recording an audit event. The previous image remains in place.
@@ -141,7 +142,7 @@ Success response:
 ```json
 {
   "status": "success",
-  "message": "Upload Image Successfully",
+  "message": "Foto toko berhasil diunggah.",
   "company": {}
 }
 ```
@@ -161,7 +162,7 @@ Success response:
 ```json
 {
   "status": "success",
-  "message": "Delete Image Success",
+  "message": "Foto toko berhasil dihapus.",
   "company": {}
 }
 ```
@@ -173,6 +174,8 @@ Error responses:
 
 ## QA Coverage
 
+- [TOK-61 User Profile PHPStan and Image Upload Security QA](../../qa/tok-61-user-profile-phpstan.md)
+  records the shared image-format and storage regression checks.
 - [TOK-8 Pinpoint Address QA](../../qa/tok-8-pinpoint-address.md) tracks backend
   store-location verification; the matching frontend checklist is available at
   `frontend-repo:/docs/qa/tok-8-pinpoint-address.md`.

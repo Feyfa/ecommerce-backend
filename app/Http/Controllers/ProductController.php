@@ -505,9 +505,9 @@ class ProductController extends Controller
     /**
      * Membuat validator product dan memastikan manifest gambar konsisten dengan file upload.
      *
-     * Aturan create dan update dibedakan berdasarkan kebutuhan gambar serta field produk. Callback
-     * tambahan memvalidasi manifest urutan, kepemilikan gambar lama, dan korespondensi setiap upload
-     * sebelum controller menyentuh storage atau database.
+     * Aturan create dan update dibedakan berdasarkan kebutuhan gambar serta field produk. Gambar baru
+     * dibatasi pada JPEG, PNG, dan GIF. Callback tambahan memvalidasi manifest urutan, kepemilikan
+     * gambar lama, dan korespondensi setiap upload sebelum storage atau database disentuh.
      *
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      * @param  bool  $creating  Nilai creating yang diperlukan untuk menjalankan proses ini.
@@ -523,7 +523,7 @@ class ProductController extends Controller
             'price' => ['required', 'integer', 'min:1'],
             'stock' => ['required', 'integer', $creating ? 'min:1' : 'min:0'],
             'images' => [$creating ? 'required' : 'nullable', 'array', 'max:5'],
-            'images.*' => ['image', 'file', 'max:1024'],
+            'images.*' => ['image', 'file', 'mimes:jpeg,png,jpg,gif', 'max:1024'],
             'image_order' => ['required', 'array', 'min:1', 'max:5'],
             'image_order.*' => ['required', 'string', 'distinct'],
         ];

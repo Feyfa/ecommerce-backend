@@ -16,7 +16,6 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
 use RuntimeException;
 
 class CompanyController extends Controller
@@ -193,9 +192,9 @@ class CompanyController extends Controller
     /**
      * Mengunggah gambar profil toko seller.
      *
-     * Gambar toko divalidasi dan disimpan untuk perusahaan milik user terautentikasi. Referensi lama
-     * dibersihkan setelah transaksi database dan audit berhasil agar kegagalan upload tidak
-     * meninggalkan profil tanpa gambar yang valid.
+     * Hanya JPEG, PNG, dan GIF yang disimpan untuk perusahaan milik user terautentikasi. Laravel
+     * membuat path unik dan menentukan ekstensi dari isi file yang telah divalidasi pada disk publik.
+     * Referensi lama dibersihkan setelah transaksi database dan audit berhasil.
      *
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      *
@@ -218,12 +217,12 @@ class CompanyController extends Controller
         $validator = Validator::make(
             $request->all(),
             [
-                'file' => ['required', 'image', 'mimes:jpeg,png,jpg,gif,svg', 'max:1024'],
+                'file' => ['required', 'image', 'mimes:jpeg,png,jpg,gif', 'max:1024'],
             ],
             [
                 'file.required' => 'Gambar wajib dipilih.',
                 'file.image' => 'File harus berupa gambar.',
-                'file.mimes' => 'File harus berformat jpeg, png, jpg, gif, atau svg.',
+                'file.mimes' => 'File harus berformat jpeg, png, jpg, atau gif.',
                 'file.max' => 'Ukuran gambar tidak boleh lebih dari 1024 KB.',
             ]
         );
@@ -242,12 +241,8 @@ class CompanyController extends Controller
 
         // --- step 3 - start - unggah file baru sebelum mengganti referensi toko
         $previousImage = Company::where('user_id', $user_id)->value('img');
-        // A replacement needs its own path so rollback and old-file cleanup cannot delete the active image.
-        do {
-            $filename = $user_id.'-'.Str::uuid().'.'.$file->getClientOriginalExtension();
-        } while ($previousImage === 'company-imgs/'.$filename);
-
-        $path = Storage::disk('public')->putFileAs('company-imgs', $file, $filename);
+        // A new uploaded file gets its own random path, keeping cleanup away from the active image.
+        $path = $file->store('company-imgs', 'public');
         if ($path === false) {
             throw new RuntimeException('Company image could not be stored.');
         }

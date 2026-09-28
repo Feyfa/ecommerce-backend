@@ -196,36 +196,6 @@ parameters:
 			path: app/Http/Controllers/TransactionController.php
 
 		-
-			message: "#^Cannot access property \\$id on App\\\\Models\\\\User\\|null\\.$#"
-			count: 1
-			path: app/Http/Controllers/UserController.php
-
-		-
-			message: "#^Cannot call method getClientOriginalExtension\\(\\) on array\\<int, Illuminate\\\\Http\\\\UploadedFile\\>\\|Illuminate\\\\Http\\\\UploadedFile\\|null\\.$#"
-			count: 1
-			path: app/Http/Controllers/UserController.php
-
-		-
-			message: "#^Parameter \\#1 \\$paths of method Illuminate\\\\Filesystem\\\\FilesystemAdapter\\:\\:delete\\(\\) expects array\\|string, string\\|false given\\.$#"
-			count: 1
-			path: app/Http/Controllers/UserController.php
-
-		-
-			message: "#^Property App\\\\Models\\\\User\\:\\:\\$img \\(string\\|null\\) does not accept string\\|false\\.$#"
-			count: 1
-			path: app/Http/Controllers/UserController.php
-
-		-
-			message: "#^Property App\\\\Models\\\\User\\:\\:\\$jenis_kelamin \\(string\\|null\\) does not accept mixed\\.$#"
-			count: 1
-			path: app/Http/Controllers/UserController.php
-
-		-
-			message: "#^Property App\\\\Models\\\\User\\:\\:\\$tanggal_lahir \\(string\\|null\\) does not accept mixed\\.$#"
-			count: 1
-			path: app/Http/Controllers/UserController.php
-
-		-
 			message: "#^Cannot cast mixed to float\\.$#"
 			count: 2
 			path: app/Services/AlamatService.php
