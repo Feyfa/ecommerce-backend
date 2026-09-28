@@ -231,6 +231,38 @@ class AddressLocationTest extends TestCase
     }
 
     /**
+     * Menolak konfigurasi Geoapify berbentuk array atau objek sebelum memanggil provider atau menyimpan alamat.
+     *
+     * Setiap opsi konfigurasi diuji sendiri agar key, URL, dan timeout memiliki respons 503 yang sama.
+     *
+     * @return void Tidak mengembalikan nilai; respons dan ketiadaan perubahan data diperiksa lewat assertion.
+     *
+     * @test
+     */
+    public function invalid_geoapify_configuration_rejects_address_without_a_write(): void
+    {
+        foreach ([['invalid'], (object) ['invalid' => true]] as $invalidValue) {
+            foreach (['services.geoapify.key', 'services.geoapify.url', 'services.geoapify.timeout'] as $key) {
+                $original = config($key);
+                config([$key => $invalidValue]);
+
+                try {
+                    $this->postJson('/api/alamat/buyer', array_merge($this->buyerFields(), [
+                        'enable' => true,
+                    ], $this->mapFields()))
+                        ->assertStatus(503)
+                        ->assertJsonPath('code', 'LOCATION_VERIFICATION_UNAVAILABLE');
+
+                    $this->assertDatabaseCount('alamats', 0);
+                    Http::assertNothingSent();
+                } finally {
+                    config([$key => $original]);
+                }
+            }
+        }
+    }
+
+    /**
      * Memverifikasi aturan verifikasi pinpoint alamat buyer dan seller pada skenario checkout rejects
      * an active legacy manual buyer address.
      *
