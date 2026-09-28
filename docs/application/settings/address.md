@@ -84,6 +84,8 @@ Validation rules:
 - Client `formatted_address` and `geoapify_place_id` values are not trusted.
 - Provider/configuration failures return `503` with
   `LOCATION_VERIFICATION_UNAVAILABLE`; the write is not applied.
+- Array or object values for the Geoapify key, URL, or timeout configuration
+  return the same `503` before a provider request or address write.
 
 Side effects:
 
@@ -202,3 +204,5 @@ not audited, and seller store locations remain outside this scope. See
   `frontend-repo:/docs/qa/tok-8-pinpoint-address.md`.
 - [TOK-21 Address Audit Log QA](../../qa/tok-21-address-audit-log.md) tracks the
   audit behavior of these mutations.
+- [TOK-62 Location Verification PHPStan Debt QA](../../qa/tok-62-location-phpstan.md)
+  tracks the configuration type checks and shared buyer/seller location contract.

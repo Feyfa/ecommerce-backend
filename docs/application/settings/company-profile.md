@@ -70,6 +70,8 @@ Validation rules:
   persists the provider address instead of client address metadata.
 - Provider/configuration failures return `503` with
   `LOCATION_VERIFICATION_UNAVAILABLE` without partially updating the profile.
+- Array or object values for the Geoapify key, URL, or timeout configuration
+  return the same `503` before a provider request or company update.
 - `email` is required, must be a valid email, max 255 characters, and must not exist in another `users` row or another `companies` row.
 - `phone` is required, must be a string, max 20 characters, and must not exist in another `users` row or another `companies` row.
 
@@ -184,3 +186,5 @@ Error responses:
   available at `frontend-repo:/docs/qa/tok-23-company-audit-log.md`.
 - [TOK-60 Company Profile PHPStan QA](../../qa/tok-60-company-profile-phpstan.md)
   tracks type-contract and storage-failure regression checks.
+- [TOK-62 Location Verification PHPStan Debt QA](../../qa/tok-62-location-phpstan.md)
+  tracks the configuration type checks shared with buyer addresses.
