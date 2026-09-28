@@ -266,6 +266,39 @@ class CompanyAuditLogTest extends TestCase
     }
 
     /**
+     * Menolak SVG dan memakai ekstensi isi JPEG ketika nama unggahan toko berakhiran HTML.
+     *
+     * @return void Tidak mengembalikan nilai; assertion menjaga file, database, dan audit toko.
+     *
+     * @test
+     */
+    public function company_image_upload_uses_detected_extension_and_rejects_svg(): void
+    {
+        $disk = Storage::fake('public');
+        $svg = UploadedFile::fake()->createWithContent('image.svg', '<svg xmlns="http://www.w3.org/2000/svg"></svg>');
+        $svgNamedHtml = new UploadedFile($svg->getPathname(), 'image.html', 'image/svg+xml', null, true);
+
+        $this->postJson('/api/company/image', [
+            'file' => $svgNamedHtml,
+        ])->assertUnprocessable()->assertJsonValidationErrors(['file'], 'message');
+
+        $this->assertDatabaseCount('companies', 0);
+        $this->assertSame([], $disk->allFiles('company-imgs'));
+        $this->assertDatabaseCount('audit_logs', 0);
+
+        $jpeg = UploadedFile::fake()->image('store.jpg');
+        $jpegNamedHtml = new UploadedFile($jpeg->getPathname(), 'store.html', 'image/jpeg', null, true);
+        $this->postJson('/api/company/image', [
+            'file' => $jpegNamedHtml,
+        ])->assertOk();
+
+        $company = Company::query()->where('user_id', $this->user->id)->sole();
+        $this->assertStringEndsWith('.jpg', $company->img);
+        $disk->assertExists($company->img);
+        $this->assertDatabaseCount('audit_logs', 1);
+    }
+
+    /**
      * Memastikan profil toko dapat dibaca dan seluruh endpoint menolak request tanpa user lokal.
      *
      * @test

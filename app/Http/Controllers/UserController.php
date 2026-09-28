@@ -5,13 +5,14 @@ namespace App\Http\Controllers;
 use App\Enums\AuditEvent;
 use App\Models\User;
 use App\Services\AuditLogService;
-use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use RuntimeException;
 
 class UserController extends Controller
 {
@@ -92,12 +93,15 @@ class UserController extends Controller
     /**
      * Mengunggah dan menyimpan gambar profil pengguna.
      *
-     * File divalidasi sebagai gambar yang didukung sebelum disimpan. Gambar lama dibersihkan setelah
-     * path baru berhasil diperoleh sehingga profil tidak menunjuk file yang gagal dibuat.
+     * Hanya JPEG, PNG, dan GIF yang diterima; Laravel membuat path unik dan menentukan ekstensi
+     * dari isi file yang telah divalidasi pada disk publik. Gambar lama dibersihkan setelah
+     * transaksi berhasil agar rollback dan pembersihan tidak menghapus foto aktif.
      *
      * @param  Request  $request  File gambar profil.
      *
      * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     *
+     * @throws RuntimeException Ketika file gambar tidak dapat disimpan sebelum profil diubah.
      */
     public function uploadImage(Request $request): JsonResponse
     {
@@ -106,12 +110,12 @@ class UserController extends Controller
             $request->all(),
             [
                 'id' => ['required', 'uuid'],
-                'file' => ['required', 'image', 'mimes:jpeg,png,jpg,gif,svg', 'max:1024'],
+                'file' => ['required', 'image', 'mimes:jpeg,png,jpg,gif', 'max:1024'],
             ],
             [
                 'file.required' => 'Gambar wajib dipilih.',
                 'file.image' => 'File harus berupa gambar.',
-                'file.mimes' => 'File harus berformat jpeg, png, jpg, gif, atau svg.',
+                'file.mimes' => 'File harus berformat jpeg, png, jpg, atau gif.',
                 'file.max' => 'Ukuran gambar tidak boleh lebih dari 1024 KB.',
             ]
         );
@@ -126,7 +130,7 @@ class UserController extends Controller
         // --- step 2 - start - validasi user terautentikasi
         $user = $request->user();
 
-        if (! $user) {
+        if (! $user instanceof User) {
             return response()->json(['status' => 404, 'message' => 'User Not Found'], 404);
         }
 
@@ -136,9 +140,19 @@ class UserController extends Controller
         // --- step 2 - end - validasi user terautentikasi
 
         // --- step 3 - start - unggah file baru sebelum mengganti referensi profil
+        $file = $request->file('file');
+        if (! $file instanceof UploadedFile) {
+            $validator->errors()->add('file', 'File harus berupa gambar.');
+
+            return response()->json(['status' => 422, 'message' => $validator->messages()], 422);
+        }
+
         $previousImage = $user->img;
-        $filename = $request->id.'-'.Carbon::now()->timestamp.'.'.$request->file('file')->getClientOriginalExtension();
-        $path = Storage::disk('public')->putFileAs('user-imgs', $request->file('file'), $filename);
+        // A new uploaded file gets its own random path, keeping cleanup away from the active image.
+        $path = $file->store('user-imgs', 'public');
+        if ($path === false) {
+            throw new RuntimeException('Profile image could not be stored.');
+        }
         // --- step 3 - end - unggah file baru sebelum mengganti referensi profil
 
         // --- step 4 - start - ganti referensi gambar dan catat audit secara atomik
@@ -154,14 +168,16 @@ class UserController extends Controller
                 );
             });
         } catch (\Throwable $exception) {
-            Storage::disk('public')->delete($path);
+            if ($path !== $previousImage) {
+                Storage::disk('public')->delete($path);
+            }
 
             throw $exception;
         }
         // --- step 4 - end - ganti referensi gambar dan catat audit secara atomik
 
         // --- step 5 - start - bersihkan file sebelumnya setelah transaksi berhasil
-        if ($previousImage && Storage::disk('public')->exists($previousImage)) {
+        if ($previousImage && $previousImage !== $path && Storage::disk('public')->exists($previousImage)) {
             Storage::disk('public')->delete($previousImage);
         }
         // --- step 5 - end - bersihkan file sebelumnya setelah transaksi berhasil
@@ -176,9 +192,13 @@ class UserController extends Controller
      */
     public function show(): JsonResponse
     {
-        $id = auth()->user()->id;
+        $authUser = auth()->user();
 
-        $user = User::where('id', $id)
+        if (! $authUser instanceof User) {
+            return response()->json(['status' => 404, 'message' => 'User Not Found'], 404);
+        }
+
+        $user = User::where('id', $authUser->id)
             ->first();
 
         return ($user) ?
@@ -190,7 +210,8 @@ class UserController extends Controller
      * Memperbarui profil pengguna yang sesuai dengan identitas terautentikasi.
      *
      * Identitas pada route dan session harus merujuk user yang sama sebelum data profil divalidasi.
-     * Hanya field yang diizinkan yang diperbarui dan response mengembalikan representasi user terbaru.
+     * Field profil opsional divalidasi sebagai string atau tanggal sebelum disimpan, dan nilai kosong
+     * mengosongkan field terkait. Response mengembalikan representasi user terbaru.
      *
      * @param  Request  $request  Data profil terbaru.
      * @param  string  $id  ID pengguna.
@@ -208,7 +229,7 @@ class UserController extends Controller
             return response()->json(['status' => 422, 'result' => 'error', 'message' => $routeIdValidator->messages()], 422);
         }
 
-        $validatedRouteId = $routeIdValidator->validate()['id'];
+        $validatedRouteId = $routeIdValidator->validated()['id'];
         // --- step 1 - end - validasi id route
 
         // --- step 2 - start - validasi user terautentikasi
@@ -224,12 +245,20 @@ class UserController extends Controller
         // --- step 2 - end - validasi user terautentikasi
 
         // --- step 3 - start - validasi request dan ambil data
+        $gender = $request->input('jenis_kelamin');
+        $birthDate = $request->input('tanggal_lahir');
+
+        // Empty optional fields clear their stored values, even when request middleware is bypassed.
         $validator = Validator::make(
             [
                 'phone' => $request->phone,
+                'jenis_kelamin' => $gender === '' ? null : $gender,
+                'tanggal_lahir' => $birthDate === '' ? null : $birthDate,
             ],
             [
                 'phone' => ['required', 'string', 'max:15', Rule::unique('users')->ignore($validatedRouteId)],
+                'jenis_kelamin' => ['nullable', 'string', 'max:20'],
+                'tanggal_lahir' => ['nullable', 'date_format:Y-m-d'],
             ]
         );
 
@@ -237,15 +266,16 @@ class UserController extends Controller
             return response()->json(['status' => 422, 'result' => 'error', 'message' => $validator->messages()], 422);
         }
 
-        $validate = $validator->validate();
+        /** @var array{phone: string, jenis_kelamin: string|null, tanggal_lahir: string|null} $validate */
+        $validate = $validator->validated();
         // --- step 3 - end - validasi request dan ambil data
 
         // --- step 4 - start - perbarui Pengaturan Pengguna bersama audit secara atomik
         $beforeValues = $this->auditLogService->profileSnapshot($user);
 
         DB::transaction(function () use ($user, $request, $validate, $beforeValues): void {
-            $user->jenis_kelamin = $request->jenis_kelamin;
-            $user->tanggal_lahir = $request->tanggal_lahir;
+            $user->jenis_kelamin = $validate['jenis_kelamin'];
+            $user->tanggal_lahir = $validate['tanggal_lahir'];
             $user->phone = $validate['phone'];
             $user->save();
 

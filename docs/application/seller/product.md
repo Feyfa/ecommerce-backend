@@ -140,7 +140,7 @@ This endpoint is used before opening the edit form with existing product data.
 Required form data:
 
 - `user_id_seller`: UUID.
-- `images[]`: required image files, between 1 and 5 files, max 1024 KB each.
+- `images[]`: required JPEG, PNG, or GIF files, between 1 and 5 files, max 1024 KB each. SVG is rejected.
 - `image_order[]`: required ordered tokens. New uploads use `new:{index}`, matching the zero-based index in `images[]`.
 - `name`: required, minimum 3 characters.
 - `price`: required integer, minimum 1.
@@ -167,7 +167,7 @@ Required form data:
 
 Optional form data:
 
-- `images[]`: optional new image files, max 1024 KB each. New files are referenced from `image_order[]` with `new:{index}`.
+- `images[]`: optional new JPEG, PNG, or GIF files, max 1024 KB each. SVG is rejected. New files are referenced from `image_order[]` with `new:{index}`.
 
 Behavior:
 
@@ -279,7 +279,7 @@ Validation failures return `422` with `message` containing validator messages.
 - Product APIs are authenticated with Clerk-backed API auth.
 - Seller product operations enforce the authenticated seller identity.
 - The product list endpoint is seller-scoped by `user_id_seller`.
-- Products require 1 to 5 images, limited to 1024 KB per image.
+- Products require 1 to 5 JPEG, PNG, or GIF images, limited to 1024 KB per image.
 - Image position 1 is the primary product cover.
 - Update can set stock to `0`; create cannot.
 - Creating a product requires an active verified Pinpoint seller location; existing seller products remain manageable when that location later becomes invalid.
@@ -294,6 +294,8 @@ Validation failures return `422` with `message` containing validator messages.
 
 ## QA Coverage
 
+- [TOK-61 User Profile PHPStan and Image Upload Security QA](../../qa/tok-61-user-profile-phpstan.md)
+  records the product SVG rejection checks shared with profile image uploads.
 - [TOK-6 Product Images QA](../../qa/tok-6-product-images.md) tracks backend
   image validation, ordering, migration, storage, and ownership verification;
   the matching frontend checklist is available at
