@@ -37,6 +37,8 @@ class OutboxPublisherService
      * @param  int  $maxBatches  Jumlah maksimum batch dalam satu invocation terjadwal.
      *
      * @return array{claimed: int, published: int, retried: int, failed: int} Ringkasan hasil publikasi.
+     *
+     * @throws RuntimeException Ketika konfigurasi numerik outbox tidak dapat dikonversi dengan aman.
      */
     public function publishDue(int $batchSize, int $maxBatches): array
     {
@@ -53,9 +55,14 @@ class OutboxPublisherService
             return $summary;
         }
 
+        $lockTimeout = max(1, $this->integerConfig('outbox.lock_timeout_seconds'));
+        $maxAttempts = max(1, $this->integerConfig('outbox.max_attempts'));
+        $retryBase = max(1, $this->integerConfig('outbox.retry_base_seconds'));
+        $retryMaximum = max($retryBase, $this->integerConfig('outbox.retry_max_seconds'));
+
         // --- step 1 - start - proses batch due secara bounded
         for ($batch = 0; $batch < $maxBatches; $batch++) {
-            $messages = $this->claimBatch($batchSize);
+            $messages = $this->claimBatch($batchSize, $lockTimeout);
 
             if ($messages->isEmpty()) {
                 break;
@@ -64,7 +71,7 @@ class OutboxPublisherService
             $summary['claimed'] += $messages->count();
 
             foreach ($messages as $message) {
-                $result = $this->publishClaimed($message);
+                $result = $this->publishClaimed($message, $maxAttempts, $retryBase, $retryMaximum);
                 $summary[$result]++;
             }
 
@@ -145,7 +152,13 @@ class OutboxPublisherService
                 'published_at' => null,
             ])->save();
 
-            return $message->fresh();
+            $reloaded = $message->fresh();
+
+            if ($reloaded === null) {
+                throw (new ModelNotFoundException)->setModel(OutboxMessage::class, $messageId);
+            }
+
+            return $reloaded;
         });
     }
 
@@ -153,6 +166,8 @@ class OutboxPublisherService
      * Merangkum jumlah pesan per status dan umur pending tertua untuk pemeriksaan operasional.
      *
      * @return array{available: bool, counts: array<string, int>, oldest_pending_at: string|null} Status outbox.
+     *
+     * @throws RuntimeException Ketika hasil agregat timestamp database bukan scalar atau null.
      */
     public function status(): array
     {
@@ -168,11 +183,18 @@ class OutboxPublisherService
             ->selectRaw('status, COUNT(*) as aggregate')
             ->groupBy('status')
             ->pluck('aggregate', 'status')
-            ->map(static fn ($count): int => (int) $count)
+            ->map(static function (mixed $count): int {
+                /** @var int|numeric-string $count */
+                return (int) $count;
+            })
             ->all();
         $oldestPending = OutboxMessage::query()
             ->where('status', OutboxStatus::PENDING->value)
             ->min('created_at');
+
+        if ($oldestPending !== null && ! is_scalar($oldestPending)) {
+            throw new RuntimeException('Invalid oldest pending outbox timestamp.');
+        }
 
         return [
             'available' => true,
@@ -195,14 +217,14 @@ class OutboxPublisherService
      * Mengklaim pesan due dan stale secara atomik dengan locking yang sesuai database runtime.
      *
      * @param  int  $batchSize  Jumlah maksimum pesan yang diklaim.
+     * @param  int  $lockTimeout  Umur claim dalam detik sebelum dapat diambil kembali.
      *
      * @return Collection<int, OutboxMessage> Pesan beserta locked_at token untuk publikasi di luar transaksi.
      */
-    private function claimBatch(int $batchSize): Collection
+    private function claimBatch(int $batchSize, int $lockTimeout): Collection
     {
-        return DB::transaction(function () use ($batchSize): Collection {
+        return DB::transaction(function () use ($batchSize, $lockTimeout): Collection {
             $now = CarbonImmutable::now();
-            $lockTimeout = max(1, (int) config('outbox.lock_timeout_seconds'));
             $staleBefore = $now->subSeconds($lockTimeout);
             $query = OutboxMessage::query()
                 ->where(function (Builder $query) use ($now, $staleBefore): void {
@@ -254,10 +276,13 @@ class OutboxPublisherService
      * Mempublikasikan satu claim dan menerapkan outcome hanya jika locked_at token masih dimiliki.
      *
      * @param  OutboxMessage  $message  Pesan processing yang diklaim invocation saat ini.
+     * @param  int  $maxAttempts  Batas percobaan sebelum kegagalan menjadi terminal.
+     * @param  int  $retryBase  Delay awal retry dalam detik.
+     * @param  int  $retryMaximum  Batas delay retry dalam detik.
      *
      * @return 'published'|'retried'|'failed' Nama counter ringkasan untuk outcome pesan.
      */
-    private function publishClaimed(OutboxMessage $message): string
+    private function publishClaimed(OutboxMessage $message, int $maxAttempts, int $retryBase, int $retryMaximum): string
     {
         try {
             $this->dispatchMessage($message);
@@ -274,15 +299,13 @@ class OutboxPublisherService
 
             return 'failed';
         } catch (Throwable $exception) {
-            $maxAttempts = max(1, (int) config('outbox.max_attempts'));
-
             if ($message->attempts >= $maxAttempts) {
                 $this->markFailed($message, $exception, false);
 
                 return 'failed';
             }
 
-            $delay = $this->retryDelaySeconds($message->attempts);
+            $delay = $this->retryDelaySeconds($message->attempts, $retryBase, $retryMaximum);
             $this->updateClaim($message, [
                 'status' => OutboxStatus::PENDING->value,
                 'available_at' => now()->addSeconds($delay),
@@ -305,7 +328,7 @@ class OutboxPublisherService
     }
 
     /**
-     * Memvalidasi kontrak event dan meneruskannya kepada dispatcher job buyer catalog.
+     * Memvalidasi schema dan source string sebelum meneruskan event ke dispatcher buyer catalog.
      *
      * @param  OutboxMessage  $message  Pesan yang event dan aggregate-nya akan diterjemahkan.
      *
@@ -313,9 +336,11 @@ class OutboxPublisherService
      */
     private function dispatchMessage(OutboxMessage $message): void
     {
-        $payload = is_array($message->payload) ? $message->payload : [];
+        $rawPayload = $message->getAttribute('payload');
+        $payload = is_array($rawPayload) ? $rawPayload : [];
+        $source = $payload['source'] ?? null;
 
-        if (($payload['schema_version'] ?? null) !== 1 || trim((string) ($payload['source'] ?? '')) === '') {
+        if (($payload['schema_version'] ?? null) !== 1 || ! is_string($source) || trim($source) === '') {
             throw new InvalidArgumentException('Outbox payload must contain schema_version 1 and a non-empty source.');
         }
 
@@ -414,7 +439,7 @@ class OutboxPublisherService
         if ($updated !== 1) {
             Log::warning('Outbox claim outcome was ignored because the lock token changed.', [
                 'outbox_id' => $message->id,
-                'locked_at' => optional($message->locked_at)->toIso8601String(),
+                'locked_at' => $message->locked_at?->toIso8601String(),
             ]);
         }
 
@@ -425,16 +450,38 @@ class OutboxPublisherService
      * Menghitung exponential backoff berdasarkan attempt dengan batas maksimum operasional.
      *
      * @param  int  $attempts  Jumlah attempt termasuk percobaan yang baru gagal.
+     * @param  int  $retryBase  Delay awal retry dalam detik.
+     * @param  int  $retryMaximum  Batas delay retry dalam detik.
      *
      * @return int Delay retry dalam detik.
      */
-    private function retryDelaySeconds(int $attempts): int
+    private function retryDelaySeconds(int $attempts, int $retryBase, int $retryMaximum): int
     {
-        $base = max(1, (int) config('outbox.retry_base_seconds'));
-        $maximum = max($base, (int) config('outbox.retry_max_seconds'));
         $exponent = min(max(0, $attempts - 1), 30);
 
-        return min($maximum, $base * (2 ** $exponent));
+        return min($retryMaximum, $retryBase * (2 ** $exponent));
+    }
+
+    /**
+     * Membaca batas numerik outbox sambil menolak konfigurasi yang tidak dapat dicast dengan aman.
+     *
+     * Konfigurasi diperiksa sebelum claim agar nilai array atau objek tidak meninggalkan pesan processing.
+     *
+     * @param  string  $key  Nama konfigurasi outbox yang akan dibaca.
+     *
+     * @return int Nilai scalar atau null yang dikonversi seperti cast konfigurasi sebelumnya.
+     *
+     * @throws RuntimeException Ketika nilai konfigurasi berupa array atau objek.
+     */
+    private function integerConfig(string $key): int
+    {
+        $value = config($key);
+
+        if (! is_scalar($value) && $value !== null) {
+            throw new RuntimeException("Invalid outbox configuration: {$key}.");
+        }
+
+        return (int) $value;
     }
 
     /**

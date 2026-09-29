@@ -506,31 +506,6 @@ parameters:
 			path: app/Services/KeranjangService.php
 
 		-
-			message: "#^Anonymous function should return App\\\\Models\\\\OutboxMessage but returns App\\\\Models\\\\OutboxMessage\\|null\\.$#"
-			count: 1
-			path: app/Services/OutboxPublisherService.php
-
-		-
-			message: "#^Cannot call method toIso8601String\\(\\) on mixed\\.$#"
-			count: 1
-			path: app/Services/OutboxPublisherService.php
-
-		-
-			message: "#^Cannot cast mixed to int\\.$#"
-			count: 5
-			path: app/Services/OutboxPublisherService.php
-
-		-
-			message: "#^Cannot cast mixed to string\\.$#"
-			count: 1
-			path: app/Services/OutboxPublisherService.php
-
-		-
-			message: "#^Else branch is unreachable because ternary operator condition is always true\\.$#"
-			count: 1
-			path: app/Services/OutboxPublisherService.php
-
-		-
 			message: "#^Method App\\\\Services\\\\PaymentService\\:\\:getCheckoutPayment\\(\\) return type has no value type specified in iterable type array\\.$#"
 			count: 1
 			path: app/Services/PaymentService.php
