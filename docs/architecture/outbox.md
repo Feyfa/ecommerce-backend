@@ -48,6 +48,8 @@ Supported sources are `product.created`, `product.updated`, `product.deleted`,
 `checkout.stock_changed`, `company.updated`, and `clerk.name_changed`. New
 event types can add payload fields without adding table columns, but their
 schema, validation, and publisher mapping must be implemented together.
+The publisher requires `source` to be a non-empty string; other JSON types
+are invalid payloads and fail permanently before transport dispatch.
 
 ## Transaction boundary
 
@@ -90,6 +92,12 @@ Transport failures return the message to `pending`, increment `attempts`, and
 set a new `available_at`. Exponential backoff begins at 60 seconds and is
 capped at six hours. The twentieth failed publish becomes `failed` and emits a
 `critical` log.
+
+The publisher checks its four numeric retry and claim settings before claiming
+any messages. Scalar and `null` values keep their existing integer conversion;
+an array or object configuration stops the invocation without changing an
+outbox row or dispatching a job. Correct the configuration before rerunning the
+publisher.
 
 Unsupported event types and invalid payloads are permanent failures. They move
 directly to `failed` because retrying unchanged data cannot make them valid.

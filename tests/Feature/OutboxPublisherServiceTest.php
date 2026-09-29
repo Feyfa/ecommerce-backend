@@ -10,6 +10,7 @@ use App\Jobs\SyncSellerBuyerCatalogSearchJob;
 use App\Models\OutboxMessage;
 use App\Services\BuyerCatalogSyncDispatcherService;
 use App\Services\OutboxPublisherService;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
@@ -223,6 +224,107 @@ class OutboxPublisherServiceTest extends TestCase
     }
 
     /**
+     * Memastikan payload JSON scalar tetap gagal permanen tanpa meneruskan event ke Redis.
+     *
+     * @return void Tidak mengembalikan nilai; outcome failed dan absence dispatch diverifikasi.
+     */
+    public function test_scalar_payload_is_failed_without_transport_dispatch(): void
+    {
+        $message = $this->message(
+            OutboxEventType::BUYER_CATALOG_PRODUCT_SYNC->value,
+            OutboxAggregateType::PRODUCT->value,
+            'product-scalar-payload',
+            ['payload' => 'invalid'],
+        );
+        $dispatcher = Mockery::mock(BuyerCatalogSyncDispatcherService::class);
+        $dispatcher->shouldNotReceive('dispatchProduct');
+        $dispatcher->shouldNotReceive('dispatchSeller');
+
+        $summary = (new OutboxPublisherService($dispatcher))->publishDue(100, 10);
+
+        $message->refresh();
+        $this->assertSame(1, $summary['failed']);
+        $this->assertSame(OutboxStatus::FAILED, $message->status);
+        $this->assertStringContainsString('schema_version 1', (string) $message->last_error);
+    }
+
+    /**
+     * Memastikan source payload yang bukan string gagal permanen sebelum job dikirim.
+     *
+     * @return void Tidak mengembalikan nilai; status kedua pesan dan absence dispatch diverifikasi.
+     */
+    public function test_non_string_payload_source_is_failed_without_transport_dispatch(): void
+    {
+        $messages = [];
+
+        foreach ([['unexpected'], 123] as $index => $source) {
+            $messages[] = $this->message(
+                OutboxEventType::BUYER_CATALOG_PRODUCT_SYNC->value,
+                OutboxAggregateType::PRODUCT->value,
+                "product-invalid-source-{$index}",
+                ['payload' => ['schema_version' => 1, 'source' => $source]],
+            );
+        }
+
+        $dispatcher = Mockery::mock(BuyerCatalogSyncDispatcherService::class);
+        $dispatcher->shouldNotReceive('dispatchProduct');
+        $dispatcher->shouldNotReceive('dispatchSeller');
+
+        $summary = (new OutboxPublisherService($dispatcher))->publishDue(100, 10);
+
+        $this->assertSame(2, $summary['failed']);
+
+        foreach ($messages as $message) {
+            $message->refresh();
+            $this->assertSame(OutboxStatus::FAILED, $message->status);
+            $this->assertStringContainsString('non-empty source', (string) $message->last_error);
+        }
+    }
+
+    /**
+     * Memastikan konfigurasi non-scalar ditolak sebelum claim mengubah status atau mengirim job.
+     *
+     * @return void Tidak mengembalikan nilai; keempat opsi numerik dan state pesan diverifikasi.
+     */
+    public function test_invalid_numeric_configuration_does_not_claim_or_dispatch_message(): void
+    {
+        $message = $this->message(
+            OutboxEventType::BUYER_CATALOG_PRODUCT_SYNC->value,
+            OutboxAggregateType::PRODUCT->value,
+            'product-invalid-config',
+        );
+        $dispatcher = Mockery::mock(BuyerCatalogSyncDispatcherService::class);
+        $dispatcher->shouldNotReceive('dispatchProduct');
+        $dispatcher->shouldNotReceive('dispatchSeller');
+        $publisher = new OutboxPublisherService($dispatcher);
+        $invalidValues = [
+            'outbox.lock_timeout_seconds' => [],
+            'outbox.max_attempts' => (object) ['value' => 20],
+            'outbox.retry_base_seconds' => [],
+            'outbox.retry_max_seconds' => (object) ['value' => 21600],
+        ];
+
+        foreach ($invalidValues as $key => $invalidValue) {
+            $original = config($key);
+            config()->set($key, $invalidValue);
+
+            try {
+                $publisher->publishDue(100, 10);
+                $this->fail("Expected invalid configuration {$key} to be rejected.");
+            } catch (RuntimeException $exception) {
+                $this->assertSame("Invalid outbox configuration: {$key}.", $exception->getMessage());
+            } finally {
+                config()->set($key, $original);
+            }
+
+            $message->refresh();
+            $this->assertSame(OutboxStatus::PENDING, $message->status);
+            $this->assertSame(0, $message->attempts);
+            $this->assertNull($message->locked_at);
+        }
+    }
+
+    /**
      * Memastikan stale claim dapat mengirim duplikat aman ketika job sebelumnya mungkin sudah diterima Redis.
      *
      * @return void Tidak mengembalikan nilai; duplicate delivery dan final published state diverifikasi.
@@ -297,6 +399,60 @@ class OutboxPublisherServiceTest extends TestCase
         $this->assertNotNull($failed->available_at);
         $this->assertModelMissing($oldPublished);
         $this->assertModelExists($recentPublished);
+    }
+
+    /**
+     * Memastikan hilangnya row saat reload membatalkan retry manual di dalam transaksi.
+     *
+     * @return void Tidak mengembalikan nilai; exception dan status row setelah rollback diverifikasi.
+     */
+    public function test_retry_rolls_back_when_reloaded_message_is_missing(): void
+    {
+        $message = $this->message(
+            OutboxEventType::BUYER_CATALOG_PRODUCT_SYNC->value,
+            OutboxAggregateType::PRODUCT->value,
+            'product-missing-on-reload',
+            ['status' => OutboxStatus::FAILED],
+        );
+
+        OutboxMessage::saved(static function (OutboxMessage $saved) use ($message): void {
+            if ($saved->id === $message->id && $saved->status === OutboxStatus::PENDING) {
+                OutboxMessage::query()->whereKey($saved->id)->delete();
+            }
+        });
+
+        try {
+            $this->app->make(OutboxPublisherService::class)->retryFailed($message->id);
+            $this->fail('Expected the missing reloaded message to fail.');
+        } catch (ModelNotFoundException $exception) {
+            $this->assertSame(OutboxMessage::class, $exception->getModel());
+        }
+
+        $message->refresh();
+        $this->assertSame(OutboxStatus::FAILED, $message->status);
+    }
+
+    /**
+     * Memastikan status memakai jumlah per status dan timestamp pending tertua dari database.
+     *
+     * @return void Tidak mengembalikan nilai; bentuk ringkasan dan tanggal mentah diverifikasi.
+     */
+    public function test_status_returns_oldest_pending_timestamp_as_string(): void
+    {
+        $message = $this->message(
+            OutboxEventType::BUYER_CATALOG_PRODUCT_SYNC->value,
+            OutboxAggregateType::PRODUCT->value,
+            'product-status-pending',
+        );
+
+        $status = $this->app->make(OutboxPublisherService::class)->status();
+        $expectedOldestPending = OutboxMessage::query()
+            ->whereKey($message->getKey())
+            ->min('created_at');
+
+        $this->assertTrue($status['available']);
+        $this->assertSame(1, $status['counts'][OutboxStatus::PENDING->value]);
+        $this->assertSame($expectedOldestPending, $status['oldest_pending_at']);
     }
 
     /**
