@@ -446,10 +446,13 @@ class OutboxPublisherServiceTest extends TestCase
         );
 
         $status = $this->app->make(OutboxPublisherService::class)->status();
+        $expectedOldestPending = OutboxMessage::query()
+            ->whereKey($message->getKey())
+            ->min('created_at');
 
         $this->assertTrue($status['available']);
         $this->assertSame(1, $status['counts'][OutboxStatus::PENDING->value]);
-        $this->assertSame($message->getRawOriginal('created_at'), $status['oldest_pending_at']);
+        $this->assertSame($expectedOldestPending, $status['oldest_pending_at']);
     }
 
     /**
