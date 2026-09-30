@@ -10,11 +10,34 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use stdClass;
 
+/**
+ * Menyusun daftar transaksi buyer/seller dan menerapkan pencatatan saldo transaksi seller.
+ *
+ * @phpstan-type TransactionFilters array{
+ *     status?: string|null,
+ *     search?: string|null,
+ *     sort?: string|null,
+ *     page?: int|float|string|null,
+ *     per_page?: int|float|string|null,
+ *     date_from?: string|null,
+ *     date_to?: string|null
+ * }
+ * @phpstan-type TransactionResult array{
+ *     status: 'error',
+ *     message: string
+ * }|array{
+ *     status: 'success',
+ *     transactions: Collection<int, TransactionUser|stdClass>,
+ *     counts: array{all: int, paid: int, pending_payment: int, waiting_seller: int, done: int},
+ *     pagination: array{current_page: int, last_page: int, per_page: int, total: int, from: int|null, to: int|null}
+ * }
+ */
 class TransactionService
 {
     /**
-     * user_type disini itu maksudnya ingin mengambil history transaksi namun user tersebut sedang login di user type apa
+     * Mengambil daftar transaksi dari perspektif buyer atau seller beserta counts dan pagination.
      *
      * Query transaksi dibangun dari perspektif role user, lalu filter pencarian, tanggal, dan status
      * diterapkan secara terpisah. Relasi yang dibutuhkan dimuat untuk menghasilkan data tampilan tanpa
@@ -22,9 +45,9 @@ class TransactionService
      *
      * @param  string  $user_id  ID user yang menjadi scope data atau mutasi.
      * @param  string  $user_type  Perspektif buyer atau seller yang menentukan scope transaksi.
-     * @param  array  $filters  Kumpulan filter transaksi yang telah divalidasi.
+     * @param  TransactionFilters  $filters  Filter daftar transaksi; key yang tidak diberikan memakai default existing.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return TransactionResult Hasil daftar transaksi atau pesan kegagalan validasi ID dan perspektif user.
      */
     public function getTransaction(string $user_id, string $user_type, array $filters = []): array
     {
@@ -86,6 +109,8 @@ class TransactionService
                 ->paginate($perPage, ['*'], 'page', $page);
 
             $transactions->setCollection($this->prepareTransactionRows($transactions->getCollection()));
+            // The paginator holds the indexed query rows; its framework stub loses the key type.
+            /** @var Collection<int, TransactionUser|stdClass> $transactionItems */
             $transactionItems = $transactions->getCollection();
             $pagination = [
                 'current_page' => $transactions->currentPage(),
@@ -182,7 +207,7 @@ class TransactionService
      * @param  string  $userId  ID buyer pemilik invoice pending yang akan dimuat.
      * @param  string  $sortOrder  Arah urutan tanggal transaksi, asc atau desc.
      *
-     * @return Collection Kumpulan invoice pending yang setiap itemnya memiliki paket transaksi per toko.
+     * @return Collection<int, TransactionUser|stdClass> Model transaksi satu toko atau objek invoice gabungan dengan seluruh paket tokonya.
      */
     private function getPendingBuyerInvoices(Builder $filteredTransactions, string $userId, string $sortOrder): Collection
     {
@@ -210,9 +235,15 @@ class TransactionService
         // --- step 2 - end - muat seluruh paket dari invoice yang cocok
 
         // --- step 3 - start - bentuk satu item tampilan untuk setiap invoice
-        return $this->prepareTransactionRows($packages)
+        // Declare the shared model/object contract: PHPStan 1 treats Collection values as invariant.
+        /** @var Collection<int, TransactionUser|stdClass> $invoices */
+        $invoices = $this->prepareTransactionRows($packages)
             ->groupBy('invoice_id')
-            ->map(function (Collection $invoicePackages) {
+            ->map(function (Collection $invoicePackages): TransactionUser|stdClass {
+                /** @var Collection<int, TransactionUser> $invoicePackages */
+
+                // groupBy() creates each group from existing rows, so this group is non-empty.
+                /** @var TransactionUser $invoice */
                 $invoice = $invoicePackages->first();
 
                 // Satu toko sudah memiliki satu transaksi dan satu VA, sehingga response lama tetap
@@ -222,19 +253,21 @@ class TransactionService
                 }
 
                 return (object) [
-                    'id' => $invoice->invoice_id,
-                    'invoice_status' => $invoice->invoice_status,
-                    'invoice_id' => $invoice->invoice_id,
-                    'payment_name' => $invoice->payment_name,
-                    'payment_account' => $invoice->payment_account,
-                    'transaction_date' => $invoice->transaction_date,
-                    'alamat_buyer' => $invoice->alamat_buyer,
-                    'total_price' => $invoice->total_price,
-                    'expired_at' => $invoice->expired_at,
+                    'id' => $invoice->getAttribute('invoice_id'),
+                    'invoice_status' => $invoice->getAttribute('invoice_status'),
+                    'invoice_id' => $invoice->getAttribute('invoice_id'),
+                    'payment_name' => $invoice->getAttribute('payment_name'),
+                    'payment_account' => $invoice->getAttribute('payment_account'),
+                    'transaction_date' => $invoice->getAttribute('transaction_date'),
+                    'alamat_buyer' => $invoice->getAttribute('alamat_buyer'),
+                    'total_price' => $invoice->getAttribute('total_price'),
+                    'expired_at' => $invoice->getAttribute('expired_at'),
                     'packages' => $invoicePackages->values(),
                 ];
             })
             ->values();
+
+        return $invoices;
         // --- step 3 - end - bentuk satu item tampilan untuk setiap invoice
     }
 
@@ -244,9 +277,9 @@ class TransactionService
      * Produk dimuat dalam satu query berdasarkan seluruh ID transaksi yang sedang ditampilkan agar
      * invoice pending dengan beberapa toko tidak membuat query tambahan untuk setiap paket.
      *
-     * @param  Collection  $transactions  Kumpulan transaksi seller yang akan disiapkan untuk response.
+     * @param  Collection<int, TransactionUser>  $transactions  Model transaksi hasil query daftar atau paket invoice pending.
      *
-     * @return Collection Transaksi dengan tanggal lokal dan daftar produk terkait.
+     * @return Collection<int, TransactionUser> Model transaksi yang sama dengan tanggal lokal dan daftar produk terkait.
      */
     private function prepareTransactionRows(Collection $transactions): Collection
     {
@@ -270,14 +303,26 @@ class TransactionService
         // --- step 1 - end - muat produk untuk seluruh transaksi yang sedang ditampilkan
 
         // --- step 2 - start - format data transaksi untuk tampilan buyer atau seller
-        return $transactions->map(function ($item) use ($productsByTransaction) {
-            $item->transaction_date = Carbon::parse($item->transaction_date)
-                ->setTimezone('Asia/Jakarta')
-                ->translatedFormat('d F Y H:i');
-            $item->expired_at = Carbon::parse($item->expired_at)
-                ->setTimezone('Asia/Jakarta')
-                ->translatedFormat('d F Y H:i');
-            $item->products = $productsByTransaction->get($item->id, collect())->values();
+        return $transactions->map(function (TransactionUser $item) use ($productsByTransaction): TransactionUser {
+            // These timestamps belong to the joined projection; keep nullable Carbon parsing unchanged.
+            /** @var string|null $transactionDate */
+            $transactionDate = $item->getAttribute('transaction_date');
+            /** @var string|null $expiredAt */
+            $expiredAt = $item->getAttribute('expired_at');
+
+            $item->setAttribute(
+                'transaction_date',
+                Carbon::parse($transactionDate)
+                    ->setTimezone('Asia/Jakarta')
+                    ->translatedFormat('d F Y H:i')
+            );
+            $item->setAttribute(
+                'expired_at',
+                Carbon::parse($expiredAt)
+                    ->setTimezone('Asia/Jakarta')
+                    ->translatedFormat('d F Y H:i')
+            );
+            $item->setAttribute('products', $productsByTransaction->get($item->id, collect())->values());
 
             return $item;
         });
