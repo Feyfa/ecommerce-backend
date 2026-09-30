@@ -55,7 +55,7 @@ Larastan without any baseline returned `[OK] No errors`. The full application
 The temporary diagnostic configuration was outside the repository and is not
 part of the implementation.
 
-## Local Verification
+## Verification Status
 
 | ID | Status | Verification | Evidence |
 | --- | --- | --- | --- |
@@ -68,9 +68,44 @@ part of the implementation.
 | TOK-64-BE-07 | ✅ | Check PHP formatting and the configured backend suite. | PHP 8.3 `composer format:check` passed for 179 files; `artisan test` passed: 275 tests, 3,657 assertions. |
 | TOK-64-BE-08 | ✅ | Check syntax and the working diff. | PHP 8.3 syntax checks passed for both application files and both transaction test files; `git diff --check` passed. |
 | TOK-64-BE-09 | ✅ | Review the final change and verify transaction behavior on PostgreSQL. | On September 30, 2026, final review found no defect in the scoped diff. Both transaction suites passed on an isolated PostgreSQL 16.13 database: 14 tests, 259 assertions. The temporary server was stopped after verification. |
-| TOK-64-BE-10 | ⬜ | Run task-branch and staging-integration CI. | Pending push and the required Backend CI/Release Branch Policy results. Local PostgreSQL evidence covers the transaction suites, not the full remote CI pipeline. |
-| TOK-64-BE-11 | ⬜ | Validate the deployed staging transaction feature before production promotion. | Pending successful staging deployment and health checks, followed by authenticated buyer/seller transaction reads, filtering, details, single/multi-store pending invoices, account isolation, and malformed-filter responses. |
+| TOK-64-BE-10 | ✅ | Run task-branch and staging-integration CI. | Backend CI passed for the task branch, staging integration branch, and staging PR. Release Branch Policy passed before PR #159 was merged; run links are recorded below. |
+| TOK-64-BE-11 | ⬜ | Validate the deployed staging transaction feature before production promotion. | Deployment and health checks passed. Authenticated buyer/seller reads, filtering, details, single/multi-store pending invoices, account isolation, and malformed-filter responses remain pending. An unauthenticated 401 probe does not verify these cases. |
 | TOK-64-BE-12 | ⬜ | Verify the approved production release. | Pending production approval, deployment, health checks, a bounded read-only transaction smoke test, and required repository synchronization. |
+| TOK-64-BE-13 | ✅ | Verify the initial staging deployment and repository synchronization. | Deploy Staging run 36747363496 succeeded, activating immutable images after both HTTP checks and all nine service checks passed. Frontend/backend staging and main plus deploy main were refreshed; all three local repositories finished clean on main. |
+
+## Initial Staging Release Evidence
+
+The implementation was pushed as commit `36f7aa21945265b16e060aca8c42669c8ea0a29c`.
+The following remote checks completed successfully:
+
+- [Task-branch Backend CI](https://github.com/Feyfa/ecommerce-backend/actions/runs/36746044369).
+- [Staging-integration push Backend CI](https://github.com/Feyfa/ecommerce-backend/actions/runs/36746621635).
+- [Staging PR Backend CI](https://github.com/Feyfa/ecommerce-backend/actions/runs/36746866061).
+- [Staging PR Release Branch Policy](https://github.com/Feyfa/ecommerce-backend/actions/runs/36746866036).
+
+[Backend PR #159](https://github.com/Feyfa/ecommerce-backend/pull/159) merged
+`task/jd-tok-64-staging` into `staging` as
+`d419a00d6deabb72484f7b5ef921a8a2a60d2a78`.
+[Deploy Staging run 36747363496](https://github.com/Feyfa/ecommerce-deploy/actions/runs/36747363496)
+then completed successfully using these source revisions:
+
+| Repository | Source revision |
+| --- | --- |
+| Backend staging | `d419a00d6deabb72484f7b5ef921a8a2a60d2a78` |
+| Frontend staging | `d2eb8dfe16114f1271eea9cf8dec211db51e4312` |
+| Deploy main | `e3038ba8475179f84b52b3af58075e802c30b065` |
+
+The workflow built and activated immutable frontend, backend PHP, and backend
+Nginx images. The staging VM's HTTP checks on ports 8080 and 8081 passed, and
+all nine services were running: reverse-proxy, frontend, backend-nginx,
+backend-php, backend-worker, backend-scheduler, postgres, redis, and meilisearch.
+No separate migration or seeder workflow was dispatched for this release.
+
+A public read-only probe of
+`GET /api/transaction?user_type=buyer` without authentication returned
+`401 application/json`. This confirms route reachability and an authentication
+response; it does not exercise the authenticated transaction controller or
+prove buyer/seller data, filtering, or 422 validation behavior on staging.
 
 ## Verification Boundary and Release Status
 
@@ -84,16 +119,19 @@ cluster with a dedicated `tok64_review_testing` database. Explicit environment
 overrides selected that database and retained the isolated queue, cache, Redis,
 and Meilisearch testing settings. The test schema was verified on PostgreSQL,
 and the temporary server was stopped afterward. Development, staging, and
-production databases were not used. The broader PostgreSQL suite and separate
-Integration tests remain unverified locally and are not claimed as passed.
+production databases were not used. The broader PostgreSQL suite was not run
+locally; the configured Unit/Feature suite subsequently passed in remote
+Backend CI using PostgreSQL. Separate Integration suites were not run.
 
 No additional manual local smoke test is required before staging preparation.
-The next gates are final commit review, task-branch CI on PostgreSQL, staging
-integration CI, and deployment to staging. Smoke testing the deployed revision
-with real authentication is required before production promotion. Use existing
+Task-branch CI, staging integration CI, PR checks, and the initial staging
+deployment have completed. Smoke testing the deployed revision with real
+authentication is required before production promotion. Use existing
 transaction fixtures and GET requests; approval, payments, and withdrawals are
 outside this smoke scope. Browser automation requires explicit user permission.
 
-Browser testing, remote CI, pull requests, staging, and production deployment
-have not run. Implementation remains local to the task branch and has not been
-pushed. Jira has not been moved to Done.
+Browser testing and authenticated transaction smoke testing have not run.
+Production has not been promoted or deployed. Jira records the verified staging
+release and was moved to Done for that scope; this does not establish production
+readiness or mark the remaining smoke cases as verified. The public request
+probe and deployment health checks are the only live HTTP verification claimed.
