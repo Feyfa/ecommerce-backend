@@ -165,6 +165,9 @@ alias path as inline code for a file owned by another repository.
 - [TOK-62 Location Verification PHPStan Debt QA](qa/tok-62-location-phpstan.md)
   Tracks Geoapify configuration type checks and the shared buyer/seller location contract.
 
+- [TOK-64 Transaction PHPStan and Filter Validation QA](qa/tok-64-transaction-phpstan.md)
+  Tracks transaction projection type contracts, read-filter validation, focused baseline cleanup, and local regression evidence.
+
 - [Commit Guidelines](development/commit-guidelines.md)
   Explains how to keep commits focused on one purpose and separate unrelated changes.
 
