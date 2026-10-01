@@ -76,7 +76,8 @@ Most cart read/write responses include the latest cart state:
 {
   "k_id": "cart uuid",
   "k_user_id_seller": "seller uuid",
-  "k_checked": true,
+  "k_checked": 1,
+  "k_checkout": 1,
   "k_total": 1,
   "k_total_price": 75000,
   "u_seller_name": "store name, or seller account name as fallback",
@@ -91,6 +92,10 @@ Most cart read/write responses include the latest cart state:
   "stock_issue": null
 }
 ```
+
+`k_checked` and `k_checkout` are normalized to numeric `0` or `1` in the
+response, regardless of the database driver's boolean representation. The
+derived `is_purchasable` and `is_selectable` fields remain booleans.
 
 `unavailable_reason` can be `PRODUCT_DELETED`, `OUT_OF_STOCK`, or `SELLER_LOCATION_UNVERIFIED`, in that priority order. When a positive stock value is lower than the saved quantity, `stock_issue.code` is `QUANTITY_EXCEEDS_STOCK`, `is_purchasable` stays true so quantity can be edited, and `is_selectable` becomes false. `totalPrice` is calculated from checked and selectable cart items only.
 

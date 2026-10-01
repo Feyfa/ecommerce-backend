@@ -6,6 +6,40 @@ use App\Models\Alamat;
 use App\Models\Keranjang;
 use App\Models\Product;
 
+/**
+ * Menyusun state keranjang buyer dan merekonsiliasi pilihan terhadap availability terbaru.
+ *
+ * @phpstan-type StockIssue array{
+ *     code: string,
+ *     cart_id: string,
+ *     product_id: string,
+ *     product_name: string|null,
+ *     seller_id: string,
+ *     seller_name: string,
+ *     cart_quantity: int,
+ *     available_stock: int
+ * }
+ * @phpstan-type CartItem array{
+ *     k_id: string,
+ *     k_user_id_seller: string,
+ *     k_checked: int,
+ *     k_checkout: int,
+ *     k_total: int|numeric-string,
+ *     k_total_price: int|float|numeric-string,
+ *     u_seller_name: string,
+ *     p_id: string,
+ *     p_exists_id: string|null,
+ *     p_name: string|null,
+ *     p_price: int|float|numeric-string|null,
+ *     p_stock: int|numeric-string|null,
+ *     p_img: string|null,
+ *     p_deleted_at: string|null,
+ *     is_purchasable: bool,
+ *     unavailable_reason: string|null,
+ *     stock_issue: StockIssue|null,
+ *     is_selectable: bool
+ * }
+ */
 class KeranjangService
 {
     /**
@@ -26,7 +60,16 @@ class KeranjangService
      *
      * @param  string  $user_id_buyer  ID buyer pemilik cart, alamat, atau transaksi.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{
+     *     totalPrice: int|float,
+     *     keranjangs: array<string, list<CartItem>>,
+     *     unavailableSelectedItemIds: list<string>,
+     *     unavailableSelectedReasons: array<string, string>,
+     *     unavailableCheckoutItemIds: list<string>,
+     *     unavailableCheckoutReasons: array<string, string>,
+     *     stockIssues: list<StockIssue>,
+     *     selectedStockIssues: list<StockIssue>
+     * } State keranjang per seller setelah read-repair beserta issue dari pilihan awal buyer.
      */
     public function getKeranjangs(string $user_id_buyer = ''): array
     {
@@ -56,8 +99,10 @@ class KeranjangService
         // --- step 1 - end - ambil item termasuk produk yang sudah di-soft-delete
 
         // --- step 2 - start - hitung status availability tanpa query alamat per item
+        /** @var array<int, string> $sellerIds */
+        $sellerIds = $keranjangs->pluck('k_user_id_seller')->filter()->all();
         $verifiedSellerIds = $this->productAvailabilityService->verifiedSellerIds(
-            $keranjangs->pluck('k_user_id_seller')->filter()->all()
+            $sellerIds
         );
         $verifiedSellerLookup = array_fill_keys($verifiedSellerIds, true);
         $unavailableCartIds = [];
@@ -71,23 +116,36 @@ class KeranjangService
         $totalPrice = 0;
 
         foreach ($keranjangs as $keranjang) {
+            // Alias query hanya tersedia pada proyeksi cart ini, bukan pada setiap model Keranjang.
+            /** @var string $cartId */
+            $cartId = $keranjang->getAttribute('k_id');
+            /** @var string $sellerId */
+            $sellerId = $keranjang->getAttribute('k_user_id_seller');
+            /** @var int|float|numeric-string $itemTotalPrice */
+            $itemTotalPrice = $keranjang->getAttribute('k_total_price');
+            /** @var int|numeric-string $productStock */
+            $productStock = $keranjang->getAttribute('p_stock') ?? 0;
+            /** @var int|numeric-string $cartTotal */
+            $cartTotal = $keranjang->getAttribute('k_total') ?? 0;
+
             // Samakan boolean PostgreSQL dan tiny integer MySQL dengan kontrak API berbentuk angka.
-            $keranjang->k_checked = (int) (bool) $keranjang->k_checked;
-            $keranjang->k_checkout = (int) (bool) $keranjang->k_checkout;
+            $keranjang->setAttribute('k_checked', (int) (bool) $keranjang->getAttribute('k_checked'));
+            $keranjang->setAttribute('k_checkout', (int) (bool) $keranjang->getAttribute('k_checkout'));
 
             $unavailableReason = $this->productAvailabilityService->unavailableReason(
-                productExists: $keranjang->p_exists_id !== null,
-                deletedAt: $keranjang->p_deleted_at,
-                stock: intval($keranjang->p_stock ?? 0),
-                sellerLocationVerified: isset($verifiedSellerLookup[$keranjang->k_user_id_seller]),
+                productExists: $keranjang->getAttribute('p_exists_id') !== null,
+                deletedAt: $keranjang->getAttribute('p_deleted_at'),
+                stock: intval($productStock),
+                sellerLocationVerified: isset($verifiedSellerLookup[$sellerId]),
             );
 
-            $keranjang->is_purchasable = $unavailableReason === null;
-            $keranjang->unavailable_reason = $unavailableReason;
-            $keranjang->stock_issue = null;
+            $isPurchasable = $unavailableReason === null;
+            $keranjang->setAttribute('is_purchasable', $isPurchasable);
+            $keranjang->setAttribute('unavailable_reason', $unavailableReason);
+            $keranjang->setAttribute('stock_issue', null);
 
-            $availableStock = intval($keranjang->p_stock ?? 0);
-            $cartQuantity = intval($keranjang->k_total ?? 0);
+            $availableStock = intval($productStock);
+            $cartQuantity = intval($cartTotal);
 
             if ($unavailableReason === null && $cartQuantity > $availableStock) {
                 $stockIssue = $this->makeStockIssue(
@@ -97,22 +155,22 @@ class KeranjangService
                     $availableStock,
                 );
 
-                $keranjang->stock_issue = $stockIssue;
-                $stockIssueCartIds[] = $keranjang->k_id;
+                $keranjang->setAttribute('stock_issue', $stockIssue);
+                $stockIssueCartIds[] = $cartId;
                 $stockIssues[] = $stockIssue;
 
-                if ((bool) $keranjang->k_checked) {
+                if ((bool) $keranjang->getAttribute('k_checked')) {
                     $selectedStockIssues[] = $stockIssue;
                 }
 
                 // Quantity tetap disimpan agar buyer dapat melihat dan menyetujui
                 // penyesuaian sebelum item dipilih kembali.
-                $keranjang->k_checked = 0;
-                $keranjang->k_checkout = 0;
+                $keranjang->setAttribute('k_checked', 0);
+                $keranjang->setAttribute('k_checkout', 0);
             }
 
             if ($unavailableReason !== null) {
-                $unavailableCartIds[] = $keranjang->k_id;
+                $unavailableCartIds[] = $cartId;
                 $outOfStockIssue = null;
 
                 if ($unavailableReason === ProductAvailabilityService::OUT_OF_STOCK) {
@@ -125,30 +183,31 @@ class KeranjangService
                     $stockIssues[] = $outOfStockIssue;
                 }
 
-                if ((bool) $keranjang->k_checked) {
-                    $unavailableSelectedItemIds[] = $keranjang->k_id;
-                    $unavailableSelectedReasons[$keranjang->k_id] = $unavailableReason;
+                if ((bool) $keranjang->getAttribute('k_checked')) {
+                    $unavailableSelectedItemIds[] = $cartId;
+                    $unavailableSelectedReasons[$cartId] = $unavailableReason;
 
                     if ($outOfStockIssue !== null) {
                         $selectedStockIssues[] = $outOfStockIssue;
                     }
                 }
 
-                if ((bool) $keranjang->k_checkout) {
-                    $unavailableCheckoutItemIds[] = $keranjang->k_id;
-                    $unavailableCheckoutReasons[$keranjang->k_id] = $unavailableReason;
+                if ((bool) $keranjang->getAttribute('k_checkout')) {
+                    $unavailableCheckoutItemIds[] = $cartId;
+                    $unavailableCheckoutReasons[$cartId] = $unavailableReason;
                 }
 
                 // Response harus langsung konsisten dengan read-repair yang disimpan setelah loop.
-                $keranjang->k_checked = 0;
-                $keranjang->k_checkout = 0;
+                $keranjang->setAttribute('k_checked', 0);
+                $keranjang->setAttribute('k_checkout', 0);
             }
 
-            $keranjang->is_selectable = $keranjang->is_purchasable
-                && $keranjang->stock_issue === null;
+            $isSelectable = $isPurchasable
+                && $keranjang->getAttribute('stock_issue') === null;
+            $keranjang->setAttribute('is_selectable', $isSelectable);
 
-            if ($keranjang->is_selectable && (bool) $keranjang->k_checked) {
-                $totalPrice += $keranjang->k_total_price;
+            if ($isSelectable && (bool) $keranjang->getAttribute('k_checked')) {
+                $totalPrice += $itemTotalPrice;
             }
         }
         // --- step 2 - end - hitung status availability tanpa query alamat per item
@@ -167,6 +226,7 @@ class KeranjangService
         // --- step 3 - end - simpan status tidak terpilih tanpa menghilangkan quantity buyer
 
         // --- step 4 - start - kelompokkan response berdasarkan seller
+        /** @var array<string, list<CartItem>> $groupKeranjangs */
         $groupKeranjangs = $keranjangs->groupBy('k_user_id_seller')
             ->toArray();
         // --- step 4 - end - kelompokkan response berdasarkan seller
@@ -190,26 +250,37 @@ class KeranjangService
      * semua endpoint. Struktur stabil ini memungkinkan controller memperbaiki selection tanpa
      * kehilangan penjelasan untuk UI.
      *
-     * @param  object  $keranjang  Model item keranjang yang menjadi target pemeriksaan.
+     * @param  Keranjang  $keranjang  Model hasil proyeksi cart yang memuat identitas item, produk, dan seller.
      * @param  string  $code  Kode alasan stabil yang dikembalikan kepada client.
      * @param  int  $cartQuantity  Quantity yang tersimpan pada item cart.
      * @param  int  $availableStock  Stok terbaru yang tersedia untuk produk.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return StockIssue Detail masalah stok beserta identitas item dan quantity yang tersimpan.
      */
     private function makeStockIssue(
-        object $keranjang,
+        Keranjang $keranjang,
         string $code,
         int $cartQuantity,
         int $availableStock,
     ): array {
+        /** @var string $cartId */
+        $cartId = $keranjang->getAttribute('k_id');
+        /** @var string $productId */
+        $productId = $keranjang->getAttribute('p_id');
+        /** @var string|null $productName */
+        $productName = $keranjang->getAttribute('p_name');
+        /** @var string $sellerId */
+        $sellerId = $keranjang->getAttribute('k_user_id_seller');
+        /** @var string $sellerName */
+        $sellerName = $keranjang->getAttribute('u_seller_name');
+
         return [
             'code' => $code,
-            'cart_id' => $keranjang->k_id,
-            'product_id' => $keranjang->p_id,
-            'product_name' => $keranjang->p_name,
-            'seller_id' => $keranjang->k_user_id_seller,
-            'seller_name' => $keranjang->u_seller_name,
+            'cart_id' => $cartId,
+            'product_id' => $productId,
+            'product_name' => $productName,
+            'seller_id' => $sellerId,
+            'seller_name' => $sellerName,
             'cart_quantity' => $cartQuantity,
             'available_stock' => $availableStock,
         ];
@@ -248,17 +319,19 @@ class KeranjangService
      * item hilang dari item yang tidak lagi dapat dibeli. Hasilnya mempertahankan kode alasan stabil
      * bagi keranjang dan checkout.
      *
-     * @param  array  $product_ids  Daftar ID produk yang akan diperiksa.
+     * @param  array<array-key, string>  $product_ids  Daftar ID produk yang akan diperiksa availability-nya; key input tidak dibatasi.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{ids: list<string>, reasons: array<string, string>} ID produk unavailable beserta alasan untuk setiap produk.
      */
     public function checkProductUnavailableByIds(array $product_ids = []): array
     {
         // --- step 1 - start - ambil produk dan seller terverifikasi
         $productIds = array_values(array_unique(array_filter($product_ids)));
         $products = Product::withTrashed()->whereIn('id', $productIds)->get();
+        /** @var array<int, string> $sellerIds */
+        $sellerIds = $products->pluck('user_id_seller')->filter()->all();
         $verifiedSellerIds = $this->productAvailabilityService->verifiedSellerIds(
-            $products->pluck('user_id_seller')->filter()->all()
+            $sellerIds
         );
         $verifiedSellerLookup = array_fill_keys($verifiedSellerIds, true);
         $productLookup = $products->keyBy('id');
@@ -294,9 +367,9 @@ class KeranjangService
     /**
      * Alias sementara untuk caller lama selama seluruh alur beralih ke availability umum.
      *
-     * @param  array  $product_ids  Daftar ID produk yang akan diperiksa.
+     * @param  array<array-key, string>  $product_ids  Daftar ID produk yang akan diperiksa availability-nya; key input tidak dibatasi.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{ids: list<string>, reasons: array<string, string>} Hasil pemeriksaan availability melalui alias kompatibilitas.
      */
     public function checkProductSoldOutByIds(array $product_ids = []): array
     {
@@ -308,7 +381,7 @@ class KeranjangService
      *
      * @param  string  $user_id_buyer  ID buyer pemilik cart, alamat, atau transaksi.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{checked: bool} Menunjukkan apakah buyer memiliki item checked dengan quantity positif.
      */
     public function checkKeranjangNotChecked(string $user_id_buyer = ''): array
     {
@@ -359,7 +432,7 @@ class KeranjangService
      *
      * @param  string  $user_id_buyer  ID buyer pemilik cart, alamat, atau transaksi.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{exists: bool} Menunjukkan apakah buyer memiliki alamat aktif bertipe buyer.
      */
     public function checkAlamatBuyerExist(string $user_id_buyer = ''): array
     {
