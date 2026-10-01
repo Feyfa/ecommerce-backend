@@ -61,8 +61,8 @@ class KeranjangController extends Controller
         }
 
         $getKeranjangs = $this->keranjangService->getKeranjangs($validate['user_id_buyer']);
-        $keranjangs = $getKeranjangs['keranjangs'] ?? [];
-        $totalPrice = $getKeranjangs['totalPrice'] ?? 0;
+        $keranjangs = $getKeranjangs['keranjangs'];
+        $totalPrice = $getKeranjangs['totalPrice'];
 
         return response()->json(['status' => 200, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 200);
     }
@@ -206,8 +206,8 @@ class KeranjangController extends Controller
         // --- step 2 - end - hapus item keranjang
 
         $getKeranjangs = $this->keranjangService->getKeranjangs($validate['user_id_buyer']);
-        $keranjangs = $getKeranjangs['keranjangs'] ?? [];
-        $totalPrice = $getKeranjangs['totalPrice'] ?? 0;
+        $keranjangs = $getKeranjangs['keranjangs'];
+        $totalPrice = $getKeranjangs['totalPrice'];
 
         return response()->json(['status' => 200, 'message' => 'Item In Basket Has Been Delete', 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 200);
     }
@@ -252,8 +252,8 @@ class KeranjangController extends Controller
 
         if (! $keranjang) {
             $getKeranjangs = $this->keranjangService->getKeranjangs($validate['user_id_buyer']);
-            $keranjangs = $getKeranjangs['keranjangs'] ?? [];
-            $totalPrice = $getKeranjangs['totalPrice'] ?? 0;
+            $keranjangs = $getKeranjangs['keranjangs'];
+            $totalPrice = $getKeranjangs['totalPrice'];
 
             return response()->json(['status' => 404, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice, 'message' => 'Keranjang tidak ditemukan'], 404);
         }
@@ -265,8 +265,8 @@ class KeranjangController extends Controller
         // --- step 2 - end - ubah pilihan dan validasi availability produk
 
         $getKeranjangs = $this->keranjangService->getKeranjangs($validate['user_id_buyer']);
-        $keranjangs = $getKeranjangs['keranjangs'] ?? [];
-        $totalPrice = $getKeranjangs['totalPrice'] ?? 0;
+        $keranjangs = $getKeranjangs['keranjangs'];
+        $totalPrice = $getKeranjangs['totalPrice'];
 
         return response()->json(['status' => 200, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 200);
     }
@@ -321,8 +321,8 @@ class KeranjangController extends Controller
 
         // --- step 3 - start - ambil state keranjang terbaru
         $getKeranjangs = $this->keranjangService->getKeranjangs($validate['user_id_buyer']);
-        $keranjangs = $getKeranjangs['keranjangs'] ?? [];
-        $totalPrice = $getKeranjangs['totalPrice'] ?? 0;
+        $keranjangs = $getKeranjangs['keranjangs'];
+        $totalPrice = $getKeranjangs['totalPrice'];
         // --- step 3 - end - ambil state keranjang terbaru
 
         return response()->json(['status' => 200, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 200);
@@ -374,8 +374,8 @@ class KeranjangController extends Controller
 
         // --- step 4 - start - ambil state keranjang terbaru
         $getKeranjangs = $this->keranjangService->getKeranjangs($validate['user_id_buyer']);
-        $keranjangs = $getKeranjangs['keranjangs'] ?? [];
-        $totalPrice = $getKeranjangs['totalPrice'] ?? 0;
+        $keranjangs = $getKeranjangs['keranjangs'];
+        $totalPrice = $getKeranjangs['totalPrice'];
         // --- step 4 - end - ambil state keranjang terbaru
 
         return response()->json(['status' => 200, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 200);
@@ -420,8 +420,8 @@ class KeranjangController extends Controller
 
         if (! $keranjang) {
             $getKeranjangs = $this->keranjangService->getKeranjangs($validate['user_id_buyer']);
-            $keranjangs = $getKeranjangs['keranjangs'] ?? [];
-            $totalPrice = $getKeranjangs['totalPrice'] ?? 0;
+            $keranjangs = $getKeranjangs['keranjangs'];
+            $totalPrice = $getKeranjangs['totalPrice'];
 
             return response()->json(['status' => 404, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice, 'message' => 'Keranjang tidak ditemukan'], 404);
         }
@@ -437,8 +437,8 @@ class KeranjangController extends Controller
 
         if (! $product) {
             $getKeranjangs = $this->keranjangService->getKeranjangs($validate['user_id_buyer']);
-            $keranjangs = $getKeranjangs['keranjangs'] ?? [];
-            $totalPrice = $getKeranjangs['totalPrice'] ?? 0;
+            $keranjangs = $getKeranjangs['keranjangs'];
+            $totalPrice = $getKeranjangs['totalPrice'];
 
             return response()->json(['status' => 404, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice, 'message' => 'Produk tidak ditemukan'], 404);
         }
@@ -456,8 +456,8 @@ class KeranjangController extends Controller
 
         // --- step 4 - start - ambil state keranjang terbaru
         $getKeranjangs = $this->keranjangService->getKeranjangs($validate['user_id_buyer']);
-        $keranjangs = $getKeranjangs['keranjangs'] ?? [];
-        $totalPrice = $getKeranjangs['totalPrice'] ?? 0;
+        $keranjangs = $getKeranjangs['keranjangs'];
+        $totalPrice = $getKeranjangs['totalPrice'];
         // --- step 4 - end - ambil state keranjang terbaru
 
         return response()->json(['status' => 200, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 200);
@@ -502,8 +502,8 @@ class KeranjangController extends Controller
 
         if (! $keranjang) {
             $getKeranjangs = $this->keranjangService->getKeranjangs($validate['user_id_buyer']);
-            $keranjangs = $getKeranjangs['keranjangs'] ?? [];
-            $totalPrice = $getKeranjangs['totalPrice'] ?? 0;
+            $keranjangs = $getKeranjangs['keranjangs'];
+            $totalPrice = $getKeranjangs['totalPrice'];
 
             return response()->json(['status' => 404, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice, 'message' => 'Keranjang tidak ditemukan'], 404);
         }
@@ -522,8 +522,8 @@ class KeranjangController extends Controller
 
         // --- step 3 - start - ambil state keranjang terbaru
         $getKeranjangs = $this->keranjangService->getKeranjangs($validate['user_id_buyer']);
-        $keranjangs = $getKeranjangs['keranjangs'] ?? [];
-        $totalPrice = $getKeranjangs['totalPrice'] ?? 0;
+        $keranjangs = $getKeranjangs['keranjangs'];
+        $totalPrice = $getKeranjangs['totalPrice'];
         // --- step 3 - end - ambil state keranjang terbaru
 
         return response()->json(['status' => 200, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 200);
@@ -569,8 +569,8 @@ class KeranjangController extends Controller
 
         if (! $keranjang) {
             $getKeranjangs = $this->keranjangService->getKeranjangs($validate['user_id_buyer']);
-            $keranjangs = $getKeranjangs['keranjangs'] ?? [];
-            $totalPrice = $getKeranjangs['totalPrice'] ?? 0;
+            $keranjangs = $getKeranjangs['keranjangs'];
+            $totalPrice = $getKeranjangs['totalPrice'];
 
             return response()->json(['status' => 404, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice, 'message' => 'Keranjang tidak ditemukan'], 404);
         }
@@ -586,8 +586,8 @@ class KeranjangController extends Controller
 
         if (! $product) {
             $getKeranjangs = $this->keranjangService->getKeranjangs($validate['user_id_buyer']);
-            $keranjangs = $getKeranjangs['keranjangs'] ?? [];
-            $totalPrice = $getKeranjangs['totalPrice'] ?? 0;
+            $keranjangs = $getKeranjangs['keranjangs'];
+            $totalPrice = $getKeranjangs['totalPrice'];
 
             return response()->json(['status' => 404, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice, 'message' => 'Produk tidak ditemukan'], 404);
         }
@@ -596,8 +596,8 @@ class KeranjangController extends Controller
         if ($validate['total'] > $product->stock) {
             // --- step 3 - start - ambil state keranjang terbaru
             $getKeranjangs = $this->keranjangService->getKeranjangs($validate['user_id_buyer']);
-            $keranjangs = $getKeranjangs['keranjangs'] ?? [];
-            $totalPrice = $getKeranjangs['totalPrice'] ?? 0;
+            $keranjangs = $getKeranjangs['keranjangs'];
+            $totalPrice = $getKeranjangs['totalPrice'];
             // --- step 3 - end - ambil state keranjang terbaru
 
             return response()->json(['status' => 422, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice, 'message' => ['stock_maximum' => ["This product stock is a maximum of {$product->stock}"]]], 422);
@@ -611,8 +611,8 @@ class KeranjangController extends Controller
 
         // --- step 5 - start - ambil state keranjang terbaru
         $getKeranjangs = $this->keranjangService->getKeranjangs($validate['user_id_buyer']);
-        $keranjangs = $getKeranjangs['keranjangs'] ?? [];
-        $totalPrice = $getKeranjangs['totalPrice'] ?? 0;
+        $keranjangs = $getKeranjangs['keranjangs'];
+        $totalPrice = $getKeranjangs['totalPrice'];
         // --- step 5 - end - ambil state keranjang terbaru
 
         return response()->json(['status' => 200, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 200);
@@ -662,8 +662,8 @@ class KeranjangController extends Controller
 
         // --- step 3 - start - sinkronkan availability produk terbaru
         $currentCart = $this->keranjangService->getKeranjangs($request->user_id_buyer);
-        $selectedStockIssues = $currentCart['selectedStockIssues'] ?? [];
-        $unavailableSelectedReasons = $currentCart['unavailableSelectedReasons'] ?? [];
+        $selectedStockIssues = $currentCart['selectedStockIssues'];
+        $unavailableSelectedReasons = $currentCart['unavailableSelectedReasons'];
         $hasNonStockUnavailableItem = collect($unavailableSelectedReasons)
             ->contains(fn (string $reason): bool => $reason !== ProductAvailabilityService::OUT_OF_STOCK);
 
@@ -675,8 +675,8 @@ class KeranjangController extends Controller
                 'status' => 'error',
                 'code' => 'SELLER_ADDRESS_REQUIRES_VERIFICATION',
                 'message' => 'Lokasi toko penjual belum diverifikasi. Produk terkait tidak dapat dilanjutkan ke checkout.',
-                'keranjangs' => $currentCart['keranjangs'] ?? [],
-                'totalPrice' => $currentCart['totalPrice'] ?? 0,
+                'keranjangs' => $currentCart['keranjangs'],
+                'totalPrice' => $currentCart['totalPrice'],
             ], 409);
         }
 
@@ -684,13 +684,13 @@ class KeranjangController extends Controller
             return $this->stockChangedResponse($currentCart, $selectedStockIssues);
         }
 
-        if (($currentCart['unavailableSelectedItemIds'] ?? []) !== []) {
+        if ($currentCart['unavailableSelectedItemIds'] !== []) {
             return response()->json([
                 'status' => 'error',
                 'code' => 'CHECKOUT_INVALID',
                 'message' => 'Produk yang dipilih berubah atau sudah tidak tersedia.',
-                'keranjangs' => $currentCart['keranjangs'] ?? [],
-                'totalPrice' => $currentCart['totalPrice'] ?? 0,
+                'keranjangs' => $currentCart['keranjangs'],
+                'totalPrice' => $currentCart['totalPrice'],
             ], 409);
         }
         // --- step 3 - end - sinkronkan availability produk terbaru
@@ -699,8 +699,8 @@ class KeranjangController extends Controller
         $keranjangNotChecked = $this->keranjangService->checkKeranjangNotChecked($request->user_id_buyer);
 
         if (! $keranjangNotChecked['checked']) {
-            $keranjangs = $currentCart['keranjangs'] ?? [];
-            $totalPrice = $currentCart['totalPrice'] ?? 0;
+            $keranjangs = $currentCart['keranjangs'];
+            $totalPrice = $currentCart['totalPrice'];
 
             return response()->json(['status' => 'error', 'message' => 'Keranjang belum ada yang di checked', 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 400);
         }
@@ -713,29 +713,32 @@ class KeranjangController extends Controller
             ->pluck('product_id')
             ->toArray();
 
-        $requestProductIds = array_values(array_unique($request->product_ids));
+        // Validasi UUID di atas menjamin nilai string tanpa membatasi key array request.
+        /** @var array<array-key, string> $productIds */
+        $productIds = $request->product_ids;
+        $requestProductIds = array_values(array_unique($productIds));
         $checkedProductIds = array_values(array_unique($checkedProductIds));
         sort($requestProductIds);
         sort($checkedProductIds);
 
         if ($requestProductIds !== $checkedProductIds) {
             $getKeranjangs = $this->keranjangService->getKeranjangs($request->user_id_buyer);
-            $keranjangs = $getKeranjangs['keranjangs'] ?? [];
-            $totalPrice = $getKeranjangs['totalPrice'] ?? 0;
+            $keranjangs = $getKeranjangs['keranjangs'];
+            $totalPrice = $getKeranjangs['totalPrice'];
 
             return response()->json(['status' => 'error', 'message' => 'Keranjang berubah, silakan cek ulang sebelum checkout', 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 409);
         }
         // --- step 5 - end - validasi state keranjang frontend
 
         // --- step 6 - start - periksa availability produk terpilih
-        $productSoldOutIds = $this->keranjangService->checkProductUnavailableByIds($request->product_ids);
+        $productSoldOutIds = $this->keranjangService->checkProductUnavailableByIds($productIds);
 
         if (! empty($productSoldOutIds['ids'])) {
             $getKeranjangs = $this->keranjangService->getKeranjangs($request->user_id_buyer);
-            $keranjangs = $getKeranjangs['keranjangs'] ?? [];
-            $totalPrice = $getKeranjangs['totalPrice'] ?? 0;
-            $selectedStockIssues = $getKeranjangs['selectedStockIssues'] ?? [];
-            $unavailableSelectedReasons = $getKeranjangs['unavailableSelectedReasons'] ?? [];
+            $keranjangs = $getKeranjangs['keranjangs'];
+            $totalPrice = $getKeranjangs['totalPrice'];
+            $selectedStockIssues = $getKeranjangs['selectedStockIssues'];
+            $unavailableSelectedReasons = $getKeranjangs['unavailableSelectedReasons'];
             $hasNonStockUnavailableItem = collect($unavailableSelectedReasons)
                 ->contains(fn (string $reason): bool => $reason !== ProductAvailabilityService::OUT_OF_STOCK);
 
@@ -772,10 +775,10 @@ class KeranjangController extends Controller
                 ->update(['checked' => 0, 'checkout' => 0]);
 
             $getKeranjangs = $this->keranjangService->getKeranjangs($request->user_id_buyer);
-            $keranjangs = $getKeranjangs['keranjangs'] ?? [];
-            $totalPrice = $getKeranjangs['totalPrice'] ?? 0;
+            $keranjangs = $getKeranjangs['keranjangs'];
+            $totalPrice = $getKeranjangs['totalPrice'];
 
-            $stockIssues = $getKeranjangs['stockIssues'] ?? [];
+            $stockIssues = $getKeranjangs['stockIssues'];
 
             if ($stockIssues !== []) {
                 return $this->stockChangedResponse($getKeranjangs, $stockIssues);
@@ -862,8 +865,8 @@ class KeranjangController extends Controller
             'status' => 409,
             'code' => $availability['reasons'][$productId] ?? 'PRODUCT_UNAVAILABLE',
             'message' => 'Produk sudah tidak tersedia. Quantity keranjang tetap dipertahankan.',
-            'keranjangs' => $currentCart['keranjangs'] ?? [],
-            'totalPrice' => $currentCart['totalPrice'] ?? 0,
+            'keranjangs' => $currentCart['keranjangs'],
+            'totalPrice' => $currentCart['totalPrice'],
         ], 409);
     }
 }

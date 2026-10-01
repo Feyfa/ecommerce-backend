@@ -55,7 +55,7 @@ Larastan without any baseline returned `[OK] No errors`. The full application
 The temporary diagnostic configuration was outside the repository and is not
 part of the implementation.
 
-## Verification Status
+## Verification Status Before Production Promotion
 
 | ID | Status | Verification | Evidence |
 | --- | --- | --- | --- |
@@ -69,8 +69,8 @@ part of the implementation.
 | TOK-64-BE-08 | ✅ | Check syntax and the working diff. | PHP 8.3 syntax checks passed for both application files and both transaction test files; `git diff --check` passed. |
 | TOK-64-BE-09 | ✅ | Review the final change and verify transaction behavior on PostgreSQL. | On September 30, 2026, final review found no defect in the scoped diff. Both transaction suites passed on an isolated PostgreSQL 16.13 database: 14 tests, 259 assertions. The temporary server was stopped after verification. |
 | TOK-64-BE-10 | ✅ | Run task-branch and staging-integration CI. | Backend CI passed for the task branch, staging integration branch, and staging PR. Release Branch Policy passed before PR #159 was merged; run links are recorded below. |
-| TOK-64-BE-11 | ⬜ | Validate the deployed staging transaction feature before production promotion. | Deployment and health checks passed. Authenticated buyer/seller reads, filtering, details, single/multi-store pending invoices, account isolation, and malformed-filter responses remain pending. An unauthenticated 401 probe does not verify these cases. |
-| TOK-64-BE-12 | ⬜ | Verify the approved production release. | Pending production approval, deployment, health checks, a bounded read-only transaction smoke test, and required repository synchronization. |
+| TOK-64-BE-11 | ✅ | Validate the deployed staging transaction feature before production promotion. | User-provided staging screenshots confirm authenticated buyer/seller reads, status filters, buyer-name search, seller details, oldest ordering, a restrictive date range, and field-specific 422 responses. Manual coverage limits are recorded below. |
+| TOK-64-BE-12 | ⬜ | Verify the approved production release. | At this pre-promotion snapshot, production was authorized on October 1, 2026, and execution had not started. Final CI/PR, deployment, health, synchronization, and post-deployment verification evidence is tracked in Jira TOK-64. |
 | TOK-64-BE-13 | ✅ | Verify the initial staging deployment and repository synchronization. | Deploy Staging run 36747363496 succeeded, activating immutable images after both HTTP checks and all nine service checks passed. Frontend/backend staging and main plus deploy main were refreshed; all three local repositories finished clean on main. |
 
 ## Initial Staging Release Evidence
@@ -107,6 +107,35 @@ A public read-only probe of
 response; it does not exercise the authenticated transaction controller or
 prove buyer/seller data, filtering, or 422 validation behavior on staging.
 
+## Authenticated Staging Smoke Evidence
+
+On October 1, 2026, the user supplied screenshots from
+`staging.tokshop.click` against `staging-api.tokshop.click`:
+
+- Buyer paid and pending-payment reads returned HTTP 200 with products,
+  formatted dates, payment details, and the displayed totals.
+- Seller reads returned HTTP 200 for all, pending-payment, waiting-seller,
+  and done filters. The five-row sample had two pending, one waiting, and
+  two completed transactions; displayed counts matched the selected lists.
+- Searching for `Muhammad Jidan 703` reduced the seller list to three matching
+  transactions. Opening a pending seller detail displayed the product,
+  shipping information, and product-only seller income.
+- `sort=oldest` returned HTTP 200 with August 8, 9, 15, and 25 transactions
+  in ascending order, including ascending times for August 25.
+- `date_from=2026-08-25&date_to=2026-08-25` returned HTTP 200 with exactly
+  the two August 25 transactions, excluding the other three rows.
+- Authenticated seller requests with `search[]=bca` and `page=abc` each
+  returned HTTP 422 with `status: error`. Errors appeared respectively under
+  `message.search` (string required) and `message.page` (number required).
+
+The accepted smoke scope does not claim manual verification of date reset,
+multiple pagination pages, cross-account isolation, raw seller payment-field
+absence, or multi-store pending invoice grouping. Those backend behaviors are
+covered by the automated transaction tests; no new transaction or payment was
+created for this smoke test. Earlier screenshots using production URLs and
+failed cross-environment/CORS requests are not staging validation evidence.
+The assistant did not open or automate a browser.
+
 ## Verification Boundary and Release Status
 
 The full configured Unit/Feature suite was rerun during final review using the
@@ -130,8 +159,9 @@ authentication is required before production promotion. Use existing
 transaction fixtures and GET requests; approval, payments, and withdrawals are
 outside this smoke scope. Browser automation requires explicit user permission.
 
-Browser testing and authenticated transaction smoke testing have not run.
-Production has not been promoted or deployed. Jira records the verified staging
-release and was moved to Done for that scope; this does not establish production
-readiness or mark the remaining smoke cases as verified. The public request
-probe and deployment health checks are the only live HTTP verification claimed.
+The user completed the bounded authenticated staging smoke test above and
+authorized production promotion on October 1, 2026. This is the pre-promotion
+QA snapshot; final production completion evidence is tracked in Jira TOK-64.
+Jira was previously moved to Done for the staging scope. Production workflow
+and health evidence will be recorded in Jira after terminal verification,
+without treating that earlier status as proof of production completion.
