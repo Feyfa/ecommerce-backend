@@ -33,6 +33,50 @@ When adding, removing, renumbering, or otherwise changing checklist rows in
 finishing. Preserve meaningful section headings, but ensure the row sequence
 across the document does not leave lower-numbered IDs after higher-numbered IDs.
 
+## Released Task Content Consistency
+
+Every production-bound task must deliver the same task changes to staging and
+production, including code, tests, Markdown, agent instructions, lockfiles, and
+every other Git-tracked file. Documentation-only changes have no exemption.
+
+- Complete the task changes on its main Jira task branch. Integrate and deploy
+  those changes to staging before promoting the same changes to production.
+- Any additional tracked change after staging verification must follow that
+  staging integration/deployment flow before production, even one Markdown line.
+- Compare task content, not only file names or merge commit SHAs. Different
+  merge history is allowed; missing, changed, or overwritten task content is not.
+- Staging may include other tasks that have not reached production. Attribute
+  every remaining content difference to those tasks; do not require whole-branch
+  equality or promote unfinished work merely to make a diff empty.
+- If another pending task changes the same file, inspect the relevant hunks and
+  integration behavior. Its presence does not excuse losing or changing the
+  released task's changes. Resolve an unclear difference before promotion.
+- Preserve staging-only work. Never reset staging to main or merge staging or a
+  task staging branch into main to establish consistency.
+- Before reporting completion or Jira Done, verify the task's tracked changes
+  in both application branches and the source revisions actually active on both
+  servers. Local pulls and merged PRs alone are not runtime evidence.
+- If tracked content is packaged into an image, deploy the image containing the
+  final content to both environments. For deploy repository changes, verify
+  the same released deploy revision on both VMs.
+- Record content comparisons, pending-task exceptions, deployment revisions,
+  and health evidence in Jira/PR/Actions. Keep the task open when consistency
+  or a required deployment is unverified.
+
+## Local QA Documentation Boundary
+
+Application `backend/docs/qa/` and `frontend/docs/qa/` documents describe local
+verification only: scenarios, expected results, executed local tests, static
+analysis, formatting, builds, code review, and local coverage limitations.
+
+Finalize that evidence with the implementation before commit. Do not add
+checklist rows or update tracked QA documents for post-commit CI, push, PR,
+merge, staging/production smoke, deployment, runtime health, image revisions,
+or Jira completion. Keep those results in Jira, PRs, and GitHub Actions instead.
+CI and deployed verification remain required; their evidence location changes.
+A local check that is still pending must be described honestly as local.
+Do not mass-rewrite historical QA outside the task's authorized scope.
+
 ## Incremental Change Batches
 
 Make file changes incrementally around one clear objective or behavior at a
@@ -368,6 +412,13 @@ mandatory and must follow the rules below; do not choose a different tool merely
 because it is available.
 
 ### GitHub Pull Requests
+
+Use `[TOK-X-staging] <description>` for application PRs targeting staging and
+`[TOK-X] <description>` for application PRs targeting main. Use the actual Jira
+key and the same concise description for the paired PRs. Deploy PRs target main
+and use `[TOK-X] <description>`; deploy has no task staging PR.
+Do not add a redundant `PR-` prefix or change branch naming/commit-message
+conventions. Push-triggered Action titles may still show commit subjects.
 
 When the user asks to inspect, create, open, update, review, merge, or otherwise
 operate a pull request, use the connected GitHub integration first so the action
