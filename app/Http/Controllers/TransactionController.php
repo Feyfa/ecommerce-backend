@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\TransactionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 
 class TransactionController extends Controller
 {
@@ -22,9 +23,10 @@ class TransactionController extends Controller
     /**
      * Menampilkan transaksi sesuai peran dan filter pengguna.
      *
-     * Identitas, role, pencarian, tanggal, dan status divalidasi sebelum service membentuk query
-     * transaksi. Data selalu dibatasi ke perspektif buyer atau seller yang sedang digunakan oleh user
-     * tersebut.
+     * Identitas user diperiksa sebelum tipe filter divalidasi. Filter salah tipe menghasilkan 422;
+     * role string yang kosong atau tidak dikenal tetap ditolak oleh service dengan respons 400.
+     * Default, batas pagination, serta fallback status, urutan, dan tanggal tetap mengikuti service.
+     * Data selalu dibatasi ke perspektif buyer atau seller milik user yang terautentikasi.
      *
      * @param  Request  $request  Filter dan identitas pengguna.
      *
@@ -33,8 +35,13 @@ class TransactionController extends Controller
     public function getTransaction(Request $request): JsonResponse
     {
         // --- step 1 - start - validasi user
-        $user_type = $request->user_type ?? '';
-        $user_id = optional(auth()->user())->id;
+        $user = $request->user();
+
+        if (! $user instanceof User) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
+        }
+
+        $user_id = $user->id;
         $userExists = User::where('id', $user_id)->exists();
 
         if (! $userExists) {
@@ -42,18 +49,52 @@ class TransactionController extends Controller
         }
         // --- step 1 - end - validasi user
 
-        // --- step 2 - start - ambil transaksi sebagai seller
+        // --- step 2 - start - validasi tipe filter sebelum membentuk query transaksi
+        $validator = Validator::make($request->all(), [
+            'user_type' => ['nullable', 'string'],
+            'status_filter' => ['nullable', 'string'],
+            'search' => ['nullable', 'string'],
+            'sort' => ['nullable', 'string'],
+            'page' => ['nullable', 'numeric'],
+            'per_page' => ['nullable', 'numeric'],
+            'date_from' => ['nullable', 'string'],
+            'date_to' => ['nullable', 'string'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['status' => 'error', 'message' => $validator->messages()], 422);
+        }
+
+        /**
+         * @var array{
+         *     user_type?: string|null,
+         *     status_filter?: string|null,
+         *     search?: string|null,
+         *     sort?: string|null,
+         *     page?: int|float|numeric-string|null,
+         *     per_page?: int|float|numeric-string|null,
+         *     date_from?: string|null,
+         *     date_to?: string|null
+         * } $validated
+         */
+        $validated = $validator->validated();
+        $user_type = $validated['user_type'] ?? '';
+
+        // Only validate types here; the service retains its existing fallback and pagination rules.
         $filters = [
-            'status' => $request->status_filter ?? 'all',
-            'search' => $request->search ?? '',
-            'sort' => $request->sort ?? 'newest',
-            'page' => $request->page ?? 1,
-            'per_page' => $request->per_page ?? 5,
-            'date_from' => $request->date_from ?? '',
-            'date_to' => $request->date_to ?? '',
+            'status' => $validated['status_filter'] ?? 'all',
+            'search' => $validated['search'] ?? '',
+            'sort' => $validated['sort'] ?? 'newest',
+            'page' => $validated['page'] ?? 1,
+            'per_page' => $validated['per_page'] ?? 5,
+            'date_from' => $validated['date_from'] ?? '',
+            'date_to' => $validated['date_to'] ?? '',
         ];
+        // --- step 2 - end - validasi tipe filter sebelum membentuk query transaksi
+
+        // --- step 3 - start - ambil transaksi sesuai perspektif pengguna
         $getTransaction = $this->transactionService->getTransaction($user_id, $user_type, $filters);
-        $status = $getTransaction['status'] ?? '';
+        $status = $getTransaction['status'];
         $message = $getTransaction['message'] ?? '';
         $transactions = $getTransaction['transactions'] ?? [];
         $counts = $getTransaction['counts'] ?? [];
@@ -61,7 +102,7 @@ class TransactionController extends Controller
         if ($status == 'error') {
             return response()->json(['status' => $status, 'message' => $message], 400);
         }
-        // --- step 2 - end - ambil transaksi sebagai seller
+        // --- step 3 - end - ambil transaksi sesuai perspektif pengguna
 
         return response()->json([
             'status' => 'success',

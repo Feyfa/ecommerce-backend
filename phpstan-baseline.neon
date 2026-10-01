@@ -182,7 +182,7 @@ parameters:
 
 		-
 			message: "#^Cannot access property \\$id on mixed\\.$#"
-			count: 2
+			count: 1
 			path: app/Http/Controllers/TransactionController.php
 
 		-
@@ -192,7 +192,7 @@ parameters:
 
 		-
 			message: "#^Parameter \\#2 \\$user_type of method App\\\\Services\\\\TransactionService\\:\\:getTransaction\\(\\) expects string, mixed given\\.$#"
-			count: 2
+			count: 1
 			path: app/Http/Controllers/TransactionController.php
 
 		-
@@ -594,81 +594,6 @@ parameters:
 			message: "#^Parameter \\#1 \\$num of function number_format expects float, float\\|null given\\.$#"
 			count: 2
 			path: app/Services/SaldoService.php
-
-		-
-			message: "#^Cannot access property \\$alamat_buyer on mixed\\.$#"
-			count: 1
-			path: app/Services/TransactionService.php
-
-		-
-			message: "#^Cannot access property \\$expired_at on mixed\\.$#"
-			count: 3
-			path: app/Services/TransactionService.php
-
-		-
-			message: "#^Cannot access property \\$id on mixed\\.$#"
-			count: 1
-			path: app/Services/TransactionService.php
-
-		-
-			message: "#^Cannot access property \\$invoice_id on mixed\\.$#"
-			count: 2
-			path: app/Services/TransactionService.php
-
-		-
-			message: "#^Cannot access property \\$invoice_status on mixed\\.$#"
-			count: 1
-			path: app/Services/TransactionService.php
-
-		-
-			message: "#^Cannot access property \\$payment_account on mixed\\.$#"
-			count: 1
-			path: app/Services/TransactionService.php
-
-		-
-			message: "#^Cannot access property \\$payment_name on mixed\\.$#"
-			count: 1
-			path: app/Services/TransactionService.php
-
-		-
-			message: "#^Cannot access property \\$products on mixed\\.$#"
-			count: 1
-			path: app/Services/TransactionService.php
-
-		-
-			message: "#^Cannot access property \\$total_price on mixed\\.$#"
-			count: 1
-			path: app/Services/TransactionService.php
-
-		-
-			message: "#^Cannot access property \\$transaction_date on mixed\\.$#"
-			count: 3
-			path: app/Services/TransactionService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\TransactionService\\:\\:getPendingBuyerInvoices\\(\\) return type with generic class Illuminate\\\\Support\\\\Collection does not specify its types\\: TKey, TValue$#"
-			count: 1
-			path: app/Services/TransactionService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\TransactionService\\:\\:getTransaction\\(\\) has parameter \\$filters with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/TransactionService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\TransactionService\\:\\:getTransaction\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/TransactionService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\TransactionService\\:\\:prepareTransactionRows\\(\\) has parameter \\$transactions with generic class Illuminate\\\\Support\\\\Collection but does not specify its types\\: TKey, TValue$#"
-			count: 1
-			path: app/Services/TransactionService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\TransactionService\\:\\:prepareTransactionRows\\(\\) return type with generic class Illuminate\\\\Support\\\\Collection does not specify its types\\: TKey, TValue$#"
-			count: 1
-			path: app/Services/TransactionService.php
 
 		-
 			message: "#^Cannot access offset 'message' on mixed\\.$#"

@@ -75,6 +75,41 @@ Optional query parameters:
 - `date_from`: optional `YYYY-MM-DD` start date.
 - `date_to`: optional `YYYY-MM-DD` end date.
 
+### Filter Type Validation
+
+Authentication and the local user existence check run before filter validation.
+The read endpoint validates these request types before calling the transaction service:
+
+- `user_type`, `status_filter`, `search`, `sort`, `date_from`, and `date_to`:
+  nullable strings. Arrays, objects, booleans, and numbers are rejected.
+- `page` and `per_page`: nullable numeric values. Numbers and numeric strings,
+  including decimals, are accepted and retain the service's integer casts and
+  pagination bounds. Arrays, objects, booleans, and nonnumeric text are rejected.
+
+Invalid types return HTTP `422` with a field-keyed error map:
+
+```json
+{
+  "status": "error",
+  "message": {
+    "search": ["The search field must be a string."]
+  }
+}
+```
+
+Missing or null optional fields retain their existing defaults. The global
+request middleware trims strings and converts empty strings to null.
+Validation checks types without adding enum or date-format restrictions:
+
+- Missing, empty, null, or unknown string `user_type` still returns the service's
+  HTTP `400` business error. A compound or non-string `user_type` returns `422`.
+- Unknown string `status_filter` leaves status filtering unapplied.
+- Only `oldest` selects ascending order; other string sort values use newest first.
+- String dates that do not match the existing `YYYY-MM-DD` check are ignored.
+
+This validation applies only to `GET /api/transaction`. Seller approval retains
+its existing request handling.
+
 Request example:
 
 ```text
@@ -85,7 +120,7 @@ High-level behavior:
 
 1. Reads the authenticated user id.
 2. Validates that the authenticated user exists.
-3. Validates `user_type` in `TransactionService::getTransaction()`.
+3. Validates filter types, then validates the `user_type` value in `TransactionService::getTransaction()`.
 4. Builds a base query from `transaction_users`.
 5. Joins `transaction_invoices`.
 6. Joins buyer and seller users.
@@ -226,6 +261,10 @@ Rules:
 - maximum `per_page` is `20`;
 - default page is `1`;
 - page values below `1` are normalized to `1`.
+
+Numeric pagination inputs are cast to integers before these bounds apply;
+for example, `page=1.9` becomes `1`, and `per_page=30.5` is capped at `20`.
+Nonnumeric pagination input returns `422` at the read endpoint.
 
 The buyer frontend sends a larger page size for `pending_payment`, but does not render pagination for that action queue.
 
