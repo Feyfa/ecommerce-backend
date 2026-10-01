@@ -10,6 +10,10 @@ selection flags, availability priority, quantities, and read-repair behavior.
 Jira: [TOK-65](https://muhammadjidan-31088882.atlassian.net/browse/TOK-65).
 Implementation branch: `task/jd-tok-65`.
 
+This document records local implementation verification only. It contains
+scenarios, executed local checks, and local coverage limitations; post-commit
+CI and deployed verification evidence belong in Jira, PRs, and GitHub Actions.
+
 ## Implementation Contract
 
 - Query aliases are read through Eloquent attribute access with locally proven
@@ -64,7 +68,7 @@ The service was independently analyzed with Larastan, PHP 8.3, and `level: max`
 without any baseline. It returned `[OK] No errors`. The diagnostic configuration
 and analysis reports live outside the repository.
 
-## Verification
+## Local Verification
 
 Status: ✅ verified, ⬜ pending.
 
@@ -77,10 +81,7 @@ Status: ✅ verified, ⬜ pending.
 | TOK-65-BE-05 | ✅ | Run the configured Unit/Feature suite. | Final PHP 8.3 `artisan test` passed on isolated SQLite: 279 tests, 3,732 assertions. Separate Integration suites were not run. |
 | TOK-65-BE-06 | ✅ | Check formatting, syntax, and whitespace. | PHP 8.3 `composer format:check` passed for 179 files. Syntax checks passed for the service, controller, and changed test file; `git diff --check` passed. |
 | TOK-65-BE-07 | ✅ | Restore the full application PHPStan gate. | After removing only the four proven-stale controller patterns, PHP 8.3 `composer analyse` passed with `[OK] No errors`. `level: max` and unmatched-ignore reporting remain enabled. |
-| TOK-65-BE-08 | ✅ | Review the final diff before staging release. | On October 1, 2026, final review found no defect in the scoped diff. Laravel magic attribute access delegates to the same get/set methods now used explicitly; query structure, read-repair ordering, validated UUID inputs, nullable projections, and decimal amounts were checked. PHPStan and the full SQLite suite were rerun successfully: 279 tests, 3,732 assertions. |
-| TOK-65-BE-09 | ⬜ | Pass task-branch and staging-integration CI. | This document records the local readiness snapshot before the initial release. Terminal remote CI and PR evidence will be recorded in Jira TOK-65. |
-| TOK-65-BE-10 | ⬜ | Deploy staging and verify runtime health and local synchronization. | The user authorized staging deployment on October 1, 2026. Deployment source revisions, workflow completion, HTTP/container health, and final repository synchronization will be recorded in Jira TOK-65 after verification. |
-| TOK-65-BE-11 | ⬜ | Smoke-test the deployed cart with real authentication. | After staging deployment, verify cart loading and totals, checked state, quantity changes, checkout validation, and existing unavailable items when present. Automated tests cover the controlled edge cases; no browser is opened without explicit permission. |
+| TOK-65-BE-08 | ✅ | Review the final local implementation diff. | On October 1, 2026, final local review found no defect in the scoped diff. Laravel magic attribute access delegates to the same get/set methods now used explicitly; query structure, read-repair ordering, validated UUID inputs, nullable projections, and decimal amounts were checked. PHPStan and the full SQLite suite were rerun successfully: 279 tests, 3,732 assertions. |
 
 ## Caller Compatibility Boundary
 
@@ -97,14 +98,14 @@ Two existing collection-template patterns became unmatched because the
 unavailable reason maps are now typed. No new request rule, cast, error status,
 or business operation was introduced.
 
-## Environment and Delivery Boundary
+## Local Test Environment
 
 PostgreSQL verification used a newly initialized PostgreSQL 16.13 cluster under
 `/private/tmp`, listening on localhost port 55465, with a dedicated
 `tok65_testing` database and role. Environment overrides isolated database,
 queue, cache, session, Redis namespaces, and search-index settings. Test queues
 were faked by the shared test base class. No development, staging, or production
-database was used, and no browser or live provider smoke test was performed.
+database was used by automated tests, and no live provider test was performed.
 The temporary PostgreSQL server was stopped after the final verification.
 
 The initial sandbox PostgreSQL bootstrap and PHPStan worker socket were blocked
@@ -112,10 +113,3 @@ by host permissions. Permitted executions resolved those environment issues.
 The first PostgreSQL test invocation was stopped by the application's Redis
 testing-safety guard before running tests; explicit testing namespaces resolved
 that configuration boundary.
-
-The user authorized committing and promoting this work through the required CI
-and PR flow to staging on October 1, 2026. This is the readiness snapshot before
-the initial staging release; terminal CI, PR, deployment, health, and
-synchronization evidence is tracked in Jira TOK-65 to avoid treating planned
-release steps as completed verification. TOK-65 remains In Progress pending the
-remaining verification. Production promotion has not been authorized.
