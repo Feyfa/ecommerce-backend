@@ -77,6 +77,45 @@ CI and deployed verification remain required; their evidence location changes.
 A local check that is still pending must be described honestly as local.
 Do not mass-rewrite historical QA outside the task's authorized scope.
 
+## Manual QA Guidance And Evidence Reuse
+
+Guide manual QA with the fewest useful actions while preserving the required
+coverage and strength of evidence. Adapt the next step to what has already
+been proven, rather than following a fixed checklist order.
+
+- Define the affected behavior, relevant regression risks, required scenarios,
+  and pass criteria from the task changes before asking for manual checks.
+  Review existing tests, screenshots, logs, and prior results first.
+- Keep a concise scenario-to-evidence record of verified, pending, failed, or
+  blocked checks, including the environment and relevant deployed revision when
+  known. Reuse existing revision evidence; do not ask the user to collect it
+  again. Keep deployed QA results in Jira/PR/Actions, not local QA documents.
+- Combine related checks into a natural sequence when one action or capture can
+  prove several scenarios. Give manageable steps with the exact action,
+  expected result, and minimum screenshot, response, or log needed. Avoid
+  unnecessary navigation, resets, and duplicate screenshots.
+- After every user result, evaluate all scenarios it actually proves, including
+  those outside the current requested step. Update every supported result and
+  ask only for the remaining evidence gaps.
+- Reuse valid evidence for the same behavior, environment, and relevant task
+  content. A refresh showing preserved quantity, selection, and total can prove
+  those persistence checks together; do not request separate refreshes.
+- Do not repeat a passed check solely because it was not performed in the
+  original order. Repeat only when evidence is ambiguous or incomplete, a
+  failure needs investigation, relevant code/configuration/data changed, or the
+  evidence no longer applies. Explain the reason and retest only the affected
+  scenarios and necessary regressions.
+- Match each conclusion to the evidence: an HTTP 200 alone does not prove
+  correct business behavior, a screenshot does not prove unseen persistence,
+  and automated/local results do not replace required deployed manual checks.
+  Distinguish observed facts, supported inferences, and unresolved assumptions.
+- Stop requesting manual actions once all required scenarios have sufficient
+  valid evidence. Report the covered scope and any remaining limitations; add
+  checks only for a concrete task risk or new finding, not an unrelated flow.
+- Respect browser authorization and the approved QA scope. Guiding user-run
+  checks does not authorize opening a browser or performing real payments,
+  destructive actions, or other unapproved state changes.
+
 ## Incremental Change Batches
 
 Make file changes incrementally around one clear objective or behavior at a
@@ -170,11 +209,23 @@ and a branch that follows the shared release flow in
   not leave the repository on the staging integration branch.
 - When an operation involves only `main` and `staging` without a Jira task
   branch, finish on `main`, not `staging`.
-- After an actual staging or production deployment and its required health
-  checks succeed, first confirm the working tree is safe to switch, then update
-  local `staging` with `git pull --ff-only origin staging`, update local `main`
-  with `git pull --ff-only origin main`, and finish on `main`. This
-  post-deployment rule takes precedence over the task-preparation end state.
+- After every successful staging or production deployment and its required
+  health checks, first confirm each working tree is safe to switch. Refresh
+  local application `staging` and `main` and deploy `main` with `--ff-only`.
+  Synchronization and the final local checkout are separate decisions.
+- After staging, while the task still needs QA, fixes, or production promotion,
+  return each participating application repository to its main Jira task
+  branch, never its `*-staging` branch. If deploy has a branch for that active
+  task, return it to that task branch too. Repositories without a branch for
+  the task finish on `main`; do not create a task branch merely for checkout.
+- After production deployment and all required validation succeed, or the task
+  has completed its declared scope, finish the affected repositories on `main`.
+  A production-bound task remains active after staging; merging its PR into
+  `main` alone does not establish production completion.
+- These end states govern local working copies, not deployment sources.
+  Application staging uses `staging`, production uses `main`, and deploy
+  workflows and VMs use deploy `main`. Preserve local changes and task branches;
+  never force a switch, reset a branch, or delete work to reach an end state.
 - Before reporting completion, run `git branch --show-current` and verify the
   expected final branch. Report any failed pull or branch check instead of
   claiming synchronization succeeded.
@@ -410,6 +461,34 @@ Before performing any GitHub operation, identify the repository and whether the
 requested operation concerns a pull request or GitHub Actions. Tool selection is
 mandatory and must follow the rules below; do not choose a different tool merely
 because it is available.
+
+### GitHub CLI Authentication Checks
+
+In this local workspace, sandboxed `gh auth status` has reported invalid
+credentials while the same check succeeded outside the sandbox using the
+host keyring. Do not treat that sandbox-only result as proof of invalid
+credentials.
+
+- When a task requires GitHub CLI authentication verification, run the standard
+  `gh auth status` directly outside the sandbox using
+  `sandbox_permissions: "require_escalated"` and the available approval flow.
+  Skip the initial sandbox attempt in this local environment.
+- Keep the command standalone and read-only. State that purpose in the approval
+  question. If a reusable approval is appropriate, scope it to
+  `["gh", "auth", "status"]`, not all `gh` commands.
+- Do not use `--show-token`, `gh auth token`, credential extraction, or token
+  values in output or documentation. Do not automatically log in, log out,
+  switch accounts, refresh tokens, or modify authentication configuration.
+- If escalation is unavailable or denied, report that the host authentication
+  check could not be completed; do not declare credentials invalid or bypass
+  the restriction. If the permitted host check fails, report its actual output
+  and distinguish authentication failure from network or environment errors.
+- Verify the active account and relevant scopes from the successful result.
+  Authentication alone does not prove access to a particular repository or
+  permission to perform a requested operation.
+- This exception applies only to the authentication status check. It does not
+  disable sandboxing or authorize other `gh` commands, pushes, PR changes, or
+  deployments. Preserve the PR connector-first and Actions CLI rules below.
 
 ### GitHub Pull Requests
 
