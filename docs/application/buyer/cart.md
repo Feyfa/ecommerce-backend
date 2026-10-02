@@ -280,16 +280,17 @@ Required body data:
 Validation order:
 
 1. Validates request shape.
-2. Validates that the buyer has an enabled address; a missing address returns `400 BUYER_ADDRESS_REQUIRED` without mutating cart state.
-3. Reconciles unavailable products and saved quantities against current stock.
-4. Validates that at least one cart item is checked.
-5. Validates stale checked state by comparing request `product_ids` with the database checked product ids.
-6. Validates that checked products remain active, in stock, and owned by sellers with verified locations.
-7. Validates checked quantities:
+2. Verifies that the validated buyer UUID matches the authenticated local user; another buyer returns `403 CART_FORBIDDEN` before cart reads or mutations.
+3. Validates that the buyer has an enabled address; a missing address returns `400 BUYER_ADDRESS_REQUIRED` without mutating cart state.
+4. Reconciles unavailable products and saved quantities against current stock.
+5. Validates that at least one cart item is checked.
+6. Validates stale checked state by comparing request `product_ids` with the database checked product ids.
+7. Validates that checked products remain active, in stock, and owned by sellers with verified locations.
+8. Validates checked quantities:
    - product still exists
    - cart `total >= 1`
    - cart `total <= products.stock`
-8. Updates checkout rows through `KeranjangService::updateCheckoutKeranjang()`.
+9. Updates checkout rows through `KeranjangService::updateCheckoutKeranjang()`.
 
 If selected products become unavailable, the affected cart rows are updated to:
 
