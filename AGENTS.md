@@ -516,6 +516,54 @@ repository, pull request number when applicable, source branch, and target
 branch. After the operation, verify the resulting pull request state through the
 connected integration or the explained fallback tool.
 
+### CI And Deployment Monitoring
+
+Reduce repeated model/tool interaction while preserving every release gate.
+Prefer one CLI watcher per workflow run; subagents are not the default for
+routine waiting.
+
+- Identify the repository, run ID, workflow/event, source SHA, and attempt.
+  Use `gh run list` for discovery, not as a parallel polling loop after the
+  run has been identified. Keep a concise run-to-evidence record.
+- For a queued or running run, prefer
+  `gh run watch <run-id> --repo <owner/repo> --exit-status --compact --interval 30`.
+  Let the CLI perform its refreshes. Do not add a model-driven
+  `sleep -> gh run view/list` loop while that watcher is healthy.
+- Run long watchers in one resumable command session. Redirect recurring
+  output to a task/run-specific temporary log outside the repository when
+  practical. Resume the existing session with waits of at most 60 seconds;
+  do not start a new watcher after each tool yield or stream every refresh
+  into model context. Read only a small relevant tail when needed.
+- Keep user updates within the required communication cadence. Report known
+  changes or the last observed state briefly, without inventing progress or
+  repeatedly rereading status solely to produce an update.
+- Additional status reads are appropriate for run discovery, the final
+  checkpoint, or a concrete interruption, timeout, ambiguous result, failure
+  indication, or user status request. Explain recovery checks. If the watcher
+  disconnects or is unsupported by the installed CLI/authentication method,
+  check the run once and resume one watcher when possible; otherwise use
+  bounded, compact CLI polling without duplicate monitors.
+- A watcher exit code alone is not deployment proof. A nonzero exit can be a
+  monitor/network/authentication error. Confirm terminal `status`,
+  `conclusion`, source SHA, and attempt through `gh run view` before deciding
+  success or failure. A timeout does not itself cancel or fail the remote run.
+- On workflow failure, start with `gh run view <run-id> --log-failed` and
+  return only the relevant error and rollback/health evidence. On success,
+  inspect only the log sections needed to prove active revisions and health;
+  do not dump full build logs by default. Never rerun or dispatch another
+  deployment merely because the watcher stopped.
+- Reuse valid checks for unchanged content and the same verification context.
+  A changed commit/target, different required push/PR check, new attempt,
+  stale evidence, or concrete regression risk may require fresh verification.
+  Do not skip required PR CI by substituting a successful push CI result.
+- Required CI before merge, task-content parity, actual deployed revisions,
+  service/HTTP health, local synchronization/end branches, Jira evidence,
+  production authorization, and existing tool/permission rules still apply.
+  Keep post-commit evidence outside tracked local QA documents.
+- Use subagents only when explicitly authorized and useful for distinct
+  analysis; do not delegate routine waiting or duplicate monitoring merely to
+  claim usage savings. No reduction in plan usage is guaranteed.
+
 ### GitHub Actions
 
 When the user explicitly asks to inspect, run, dispatch, monitor, rerun, or
