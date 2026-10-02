@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Keranjang;
 use App\Models\Product;
+use App\Models\User;
 use App\Services\KeranjangService;
 use App\Services\ProductAvailabilityService;
 use Illuminate\Http\JsonResponse;
@@ -111,7 +112,11 @@ class KeranjangController extends Controller
             return response()->json(['status' => 404, 'message' => 'Produk tidak ditemukan'], 404);
         }
 
-        if ($product->user_id_seller !== $validate['user_id_seller']) {
+        // Pemeriksaan lokasi memakai UUID ini hanya setelah seller produk cocok.
+        /** @var string $sellerId */
+        $sellerId = $validate['user_id_seller'];
+
+        if ($product->user_id_seller !== $sellerId) {
             return response()->json(['status' => 422, 'message' => 'Data seller produk tidak valid'], 422);
         }
 
@@ -120,7 +125,7 @@ class KeranjangController extends Controller
             deletedAt: $product->deleted_at,
             stock: intval($product->stock),
             sellerLocationVerified: $this->productAvailabilityService
-                ->sellerHasVerifiedAddress($product->user_id_seller),
+                ->sellerHasVerifiedAddress($sellerId),
         );
 
         if ($unavailableReason !== null) {
@@ -643,13 +648,17 @@ class KeranjangController extends Controller
             return response()->json(['status' => 'error', 'message' => $validator->messages()], 422);
         }
 
-        if ($response = $this->buyerOwnershipResponse($request, $request->user_id_buyer)) {
+        // Validasi UUID di atas menjamin buyer ID berupa string tanpa mengubah nilainya.
+        /** @var string $buyerId */
+        $buyerId = $request->user_id_buyer;
+
+        if ($response = $this->buyerOwnershipResponse($request, $buyerId)) {
             return $response;
         }
         // --- step 1 - end - validasi request dan ambil data
 
         // --- step 2 - start - validasi alamat buyer
-        $checkAlamatBuyerExist = $this->keranjangService->checkAlamatBuyerExist($request->user_id_buyer);
+        $checkAlamatBuyerExist = $this->keranjangService->checkAlamatBuyerExist($buyerId);
 
         if (! $checkAlamatBuyerExist['exists']) {
             return response()->json([
@@ -661,7 +670,7 @@ class KeranjangController extends Controller
         // --- step 2 - end - validasi alamat buyer
 
         // --- step 3 - start - sinkronkan availability produk terbaru
-        $currentCart = $this->keranjangService->getKeranjangs($request->user_id_buyer);
+        $currentCart = $this->keranjangService->getKeranjangs($buyerId);
         $selectedStockIssues = $currentCart['selectedStockIssues'];
         $unavailableSelectedReasons = $currentCart['unavailableSelectedReasons'];
         $hasNonStockUnavailableItem = collect($unavailableSelectedReasons)
@@ -696,7 +705,7 @@ class KeranjangController extends Controller
         // --- step 3 - end - sinkronkan availability produk terbaru
 
         // --- step 4 - start - validasi item keranjang terpilih
-        $keranjangNotChecked = $this->keranjangService->checkKeranjangNotChecked($request->user_id_buyer);
+        $keranjangNotChecked = $this->keranjangService->checkKeranjangNotChecked($buyerId);
 
         if (! $keranjangNotChecked['checked']) {
             $keranjangs = $currentCart['keranjangs'];
@@ -707,7 +716,7 @@ class KeranjangController extends Controller
         // --- step 4 - end - validasi item keranjang terpilih
 
         // --- step 5 - start - validasi state keranjang frontend
-        $checkedProductIds = Keranjang::where('user_id_buyer', $request->user_id_buyer)
+        $checkedProductIds = Keranjang::where('user_id_buyer', $buyerId)
             ->where('checked', 1)
             ->where('total', '>', 0)
             ->pluck('product_id')
@@ -722,7 +731,7 @@ class KeranjangController extends Controller
         sort($checkedProductIds);
 
         if ($requestProductIds !== $checkedProductIds) {
-            $getKeranjangs = $this->keranjangService->getKeranjangs($request->user_id_buyer);
+            $getKeranjangs = $this->keranjangService->getKeranjangs($buyerId);
             $keranjangs = $getKeranjangs['keranjangs'];
             $totalPrice = $getKeranjangs['totalPrice'];
 
@@ -734,7 +743,7 @@ class KeranjangController extends Controller
         $productSoldOutIds = $this->keranjangService->checkProductUnavailableByIds($productIds);
 
         if (! empty($productSoldOutIds['ids'])) {
-            $getKeranjangs = $this->keranjangService->getKeranjangs($request->user_id_buyer);
+            $getKeranjangs = $this->keranjangService->getKeranjangs($buyerId);
             $keranjangs = $getKeranjangs['keranjangs'];
             $totalPrice = $getKeranjangs['totalPrice'];
             $selectedStockIssues = $getKeranjangs['selectedStockIssues'];
@@ -758,7 +767,7 @@ class KeranjangController extends Controller
 
         // --- step 7 - start - validasi quantity checkout
         $invalidCheckoutKeranjangIds = Keranjang::leftJoin('products', 'keranjangs.product_id', '=', 'products.id')
-            ->where('keranjangs.user_id_buyer', $request->user_id_buyer)
+            ->where('keranjangs.user_id_buyer', $buyerId)
             ->where('keranjangs.checked', 1)
             ->where(function ($query) {
                 $query->whereNull('products.id')
@@ -770,11 +779,11 @@ class KeranjangController extends Controller
             ->all();
 
         if ($invalidCheckoutKeranjangIds !== []) {
-            Keranjang::where('user_id_buyer', $request->user_id_buyer)
+            Keranjang::where('user_id_buyer', $buyerId)
                 ->whereIn('id', $invalidCheckoutKeranjangIds)
                 ->update(['checked' => 0, 'checkout' => 0]);
 
-            $getKeranjangs = $this->keranjangService->getKeranjangs($request->user_id_buyer);
+            $getKeranjangs = $this->keranjangService->getKeranjangs($buyerId);
             $keranjangs = $getKeranjangs['keranjangs'];
             $totalPrice = $getKeranjangs['totalPrice'];
 
@@ -789,7 +798,7 @@ class KeranjangController extends Controller
         // --- step 7 - end - validasi quantity checkout
 
         // --- step 8 - start - perbarui item checkout
-        $this->keranjangService->updateCheckoutKeranjang($request->user_id_buyer);
+        $this->keranjangService->updateCheckoutKeranjang($buyerId);
         // --- step 8 - end - perbarui item checkout
 
         return response()->json(['status' => 'success', 'message' => 'Checkout validation successful']);
@@ -828,7 +837,11 @@ class KeranjangController extends Controller
      */
     private function buyerOwnershipResponse(Request $request, string $buyerId): ?JsonResponse
     {
-        if ((string) optional($request->user())->id === $buyerId) {
+        // Middleware autentikasi memasang model user lokal; null tetap ditolak oleh ownership.
+        /** @var User|null $user */
+        $user = $request->user();
+
+        if ((string) ($user?->id) === $buyerId) {
             return null;
         }
 

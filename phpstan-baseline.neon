@@ -47,41 +47,6 @@ parameters:
 
 		-
 			message: "#^Cannot access property \\$id on mixed\\.$#"
-			count: 1
-			path: app/Http/Controllers/KeranjangController.php
-
-		-
-			message: "#^Parameter \\#1 \\$sellerId of method App\\\\Services\\\\ProductAvailabilityService\\:\\:sellerHasVerifiedAddress\\(\\) expects string, string\\|null given\\.$#"
-			count: 1
-			path: app/Http/Controllers/KeranjangController.php
-
-		-
-			message: "#^Parameter \\#1 \\$user_id_buyer of method App\\\\Services\\\\KeranjangService\\:\\:checkAlamatBuyerExist\\(\\) expects string, mixed given\\.$#"
-			count: 1
-			path: app/Http/Controllers/KeranjangController.php
-
-		-
-			message: "#^Parameter \\#1 \\$user_id_buyer of method App\\\\Services\\\\KeranjangService\\:\\:checkKeranjangNotChecked\\(\\) expects string, mixed given\\.$#"
-			count: 1
-			path: app/Http/Controllers/KeranjangController.php
-
-		-
-			message: "#^Parameter \\#1 \\$user_id_buyer of method App\\\\Services\\\\KeranjangService\\:\\:getKeranjangs\\(\\) expects string, mixed given\\.$#"
-			count: 4
-			path: app/Http/Controllers/KeranjangController.php
-
-		-
-			message: "#^Parameter \\#1 \\$user_id_buyer of method App\\\\Services\\\\KeranjangService\\:\\:updateCheckoutKeranjang\\(\\) expects string, mixed given\\.$#"
-			count: 1
-			path: app/Http/Controllers/KeranjangController.php
-
-		-
-			message: "#^Parameter \\#2 \\$buyerId of method App\\\\Http\\\\Controllers\\\\KeranjangController\\:\\:buyerOwnershipResponse\\(\\) expects string, mixed given\\.$#"
-			count: 1
-			path: app/Http/Controllers/KeranjangController.php
-
-		-
-			message: "#^Cannot access property \\$id on mixed\\.$#"
 			count: 5
 			path: app/Http/Controllers/PaymentController.php
 
