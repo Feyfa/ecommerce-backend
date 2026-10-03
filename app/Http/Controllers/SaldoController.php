@@ -147,7 +147,7 @@ class SaldoController extends Controller
 
         // --- step 3 - start - ambil data payment
         $getPayment = $this->paymentService->getWithdrawalPayment($user_id, $paymentAccount);
-        $status = $getPayment['status'] ?? '';
+        $status = $getPayment['status'];
         $message = $getPayment['message'] ?? '';
         $paymentUserId = isset($getPayment['payment']['id']) ? $getPayment['payment']['id'] : '';
         $userName = isset($getPayment['payment']['user_name']) ? $getPayment['payment']['user_name'] : '';

@@ -48,6 +48,28 @@ Important local fields:
 - `transaction_invoices.expired_at`
 - `transaction_users.status`
 
+## Fixed Virtual Account Simulation
+
+`POST /api/payment/simulate/charge-virtual-account` is the existing authenticated
+simulation operation. It uses `XenditService::simulateVirtualAccountFixed()`.
+
+Authentication/local user existence is checked first. `payment_slug` and
+`payment_account` must be nullable strings; other types return HTTP 422 with
+field errors under `message` before the provider is called. Missing/null/empty
+values retain the existing HTTP 400 messages. The invoice must belong to the
+buyer, use VA payment, remain pending and not be expired.
+
+The stored invoice price is explicitly cast to `int` with a null fallback of
+zero before the provider call. This preserves the existing weak integer-parameter
+conversion, including truncation of fractional legacy values; it adds no new
+rounding or amount-validation rule. Checkout already converts its VA and saved
+invoice amounts to integers. Historical fractional invoice data is not audited
+by this change.
+
+Provider business failure retains HTTP 400 and the invoice status. Success marks
+the invoice `done` and returns `Success Charge Virtual Account`. Automated
+verification uses provider mocks; no live simulation or payment is performed.
+
 ## Disbursement
 
 Saldo withdrawal flow can call Xendit disbursement code through `XenditService`.

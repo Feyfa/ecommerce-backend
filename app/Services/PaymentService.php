@@ -10,14 +10,15 @@ class PaymentService
     /**
      * Mengambil katalog metode pembayaran yang dapat dipilih buyer saat checkout.
      *
-     * Query mengambil metode pembayaran aktif yang dapat dipakai pada checkout dan mengembalikannya
+     * Query mengambil metode incoming VA BCA yang dapat dipakai pada checkout dan mengembalikannya
      * dalam bentuk daftar sederhana. Data rekening withdrawal milik user tidak ikut tercampur dalam
      * pilihan pembayaran buyer.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{payments: list<array{slug: string|null, method: string|null, name: string|null}>} Katalog VA BCA untuk checkout, termasuk hasil kosong.
      */
     public function getCheckoutPayment(): array
     {
+        /** @var list<array{slug: string|null, method: string|null, name: string|null}> $paymentList */
         $paymentList = PaymentList::select('slug', 'method', 'name')
             ->where('type', 'incoming')
             ->where('method', 'va')
@@ -37,11 +38,11 @@ class PaymentService
      * pencarian. Hasil hanya mencakup rekening yang dapat dipakai untuk pencairan dana.
      *
      * @param  string  $user_id  ID user yang menjadi scope data atau mutasi.
-     * @param  string  $search  Kata kunci pencarian yang akan diterapkan.
+     * @param  string  $search  Kata kunci tervalidasi; string kosong menonaktifkan filter pencarian.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{status: 'success', payments: \Illuminate\Database\Eloquent\Collection<int, PaymentUser>} Koleksi rekening withdrawal milik user dengan alias hasil query.
      */
-    public function getWithdrawalPayments(string $user_id = '', $search = ''): array
+    public function getWithdrawalPayments(string $user_id = '', string $search = ''): array
     {
         // --- step 1 - start - ambil data payment
         $payments = PaymentUser::select(
@@ -72,16 +73,16 @@ class PaymentService
     }
 
     /**
-     * Mengambil satu metode withdrawal berdasarkan ID.
+     * Mengambil satu rekening withdrawal berdasarkan nomor rekening dan user pemiliknya.
      *
      * Identifier rekening dan user digunakan bersama sebagai scope ownership. Detail metode
      * dikembalikan ketika ditemukan, sedangkan rekening asing atau tidak ada menghasilkan error
      * terstruktur.
      *
      * @param  string  $user_id  ID user yang menjadi scope data atau mutasi.
-     * @param  string  $account  ID rekening pembayaran yang dicari.
+     * @param  string  $account  Nomor rekening pembayaran yang dicari, termasuk nol di awal.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{status: 'error', message: string}|array{status: 'success', payment: array{id: string, user_name: string|null, payment_slug: string|null}} Detail rekening milik user atau pesan kegagalan bisnis.
      */
     public function getWithdrawalPayment(string $user_id, string $account): array
     {
@@ -109,10 +110,11 @@ class PaymentService
         if (empty($payment)) {
             return ['status' => 'error', 'message' => 'rekening anda tidak ditemukan'];
         }
-        $payment = $payment->toArray();
+        /** @var array{id: string, user_name: string|null, payment_slug: string|null} $paymentData */
+        $paymentData = $payment->toArray();
 
-        $paymentSlug = $payment['payment_slug'] ?? '';
-        $userName = $payment['user_name'] ?? '';
+        $paymentSlug = $paymentData['payment_slug'] ?? '';
+        $userName = $paymentData['user_name'] ?? '';
         if (empty($paymentSlug) || trim($paymentSlug) == '') {
             return ['status' => 'error', 'message' => 'Payment Slug Cannot Be Empty'];
         }
@@ -121,7 +123,7 @@ class PaymentService
         }
         // --- step 2 - end - ambil data payment
 
-        return ['status' => 'success', 'payment' => $payment];
+        return ['status' => 'success', 'payment' => $paymentData];
     }
 
     /**
