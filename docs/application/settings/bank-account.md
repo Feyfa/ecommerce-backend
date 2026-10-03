@@ -26,6 +26,29 @@ DELETE /api/payment/{id}
 
 Bank account routes use payment records with withdrawal payment type.
 
+## Input Types and Validation Order
+
+The five payment operations requiring a local user check authentication before
+payload validation. Missing or deleted local users retain HTTP 401.
+
+Text fields accept strings only. Numbers (including zero), booleans, arrays and
+objects return HTTP 422 with `status: error` and field errors under `message`.
+Type validation precedes account insertion/deletion or provider calls. Account
+numbers are strings so leading zeroes are preserved.
+
+- `searchPayment` on GET, POST and DELETE payment accepts missing/null/empty
+  values as no search. The service retains its existing `ILIKE` search, wildcard
+  behavior, ordering and special no-filter behavior for the string `"0"`.
+- Account validation accepts nullable string `paymentAccount` and `paymentSlug`;
+  missing/null/empty strings still reach the existing HTTP 400 business errors.
+- Account creation requires string `paymentName`, `paymentSlug`, `paymentAccount`
+  and `paymentUsername`. Missing/null/empty required values return HTTP 422.
+- Deletion rejects malformed search before deleting an account. A valid request
+  for an absent or foreign account retains the existing HTTP 400 response.
+
+These checks do not change account ownership, the ten-account limit, duplicate
+account validation, successful response shapes or the synthetic owner-name flow.
+
 ## GET /api/payment
 
 Returns withdrawal bank accounts for the authenticated user.

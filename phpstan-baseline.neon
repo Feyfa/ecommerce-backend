@@ -47,31 +47,6 @@ parameters:
 
 		-
 			message: "#^Cannot access property \\$id on mixed\\.$#"
-			count: 5
-			path: app/Http/Controllers/PaymentController.php
-
-		-
-			message: "#^Parameter \\#1 \\$string of function trim expects string, mixed given\\.$#"
-			count: 4
-			path: app/Http/Controllers/PaymentController.php
-
-		-
-			message: "#^Parameter \\$amount of method App\\\\Services\\\\XenditService\\:\\:simulateVirtualAccountFixed\\(\\) expects int, float\\|int given\\.$#"
-			count: 1
-			path: app/Http/Controllers/PaymentController.php
-
-		-
-			message: "#^Parameter \\$search of method App\\\\Services\\\\PaymentService\\:\\:getWithdrawalPayments\\(\\) expects string, mixed given\\.$#"
-			count: 3
-			path: app/Http/Controllers/PaymentController.php
-
-		-
-			message: "#^Part \\$request\\-\\>paymentSlug \\(mixed\\) of encapsed string cannot be cast to string\\.$#"
-			count: 1
-			path: app/Http/Controllers/PaymentController.php
-
-		-
-			message: "#^Cannot access property \\$id on mixed\\.$#"
 			count: 3
 			path: app/Http/Controllers/SaldoController.php
 
@@ -319,26 +294,6 @@ parameters:
 			message: "#^Parameter \\#2 \\$data of function hash expects string, string\\|false given\\.$#"
 			count: 1
 			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\PaymentService\\:\\:getCheckoutPayment\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/PaymentService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\PaymentService\\:\\:getWithdrawalPayment\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/PaymentService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\PaymentService\\:\\:getWithdrawalPayments\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/PaymentService.php
-
-		-
-			message: "#^Parameter \\#1 \\$string of function trim expects string, mixed given\\.$#"
-			count: 1
-			path: app/Services/PaymentService.php
 
 		-
 			message: "#^Access to an undefined property App\\\\Models\\\\SaldoHistory\\:\\:\\$buyer_name\\.$#"
