@@ -53,7 +53,7 @@ class ProductController extends Controller
      */
     public function index(string $user_id_seller, Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi parameter seller, pagination, filter, dan sorting
+        // --- step 1 - validasi parameter seller, pagination, filter, dan sorting - start ---
         $validator = Validator::make(
             [
                 'user_id_seller' => $user_id_seller,
@@ -78,17 +78,17 @@ class ProductController extends Controller
         }
 
         $validate = $validator->validate();
-        // --- step 1 - end - validasi parameter seller, pagination, filter, dan sorting
+        // --- step 1 - validasi parameter seller, pagination, filter, dan sorting - end ---
 
-        // --- step 2 - start - pastikan seller hanya membaca daftar produknya sendiri
+        // --- step 2 - pastikan seller hanya membaca daftar produknya sendiri - start ---
         $user = $this->authenticatedUser($request);
 
         if ($user->id !== $validate['user_id_seller']) {
             return response()->json(['status' => 403, 'message' => 'Forbidden'], 403);
         }
-        // --- step 2 - end - pastikan seller hanya membaca daftar produknya sendiri
+        // --- step 2 - pastikan seller hanya membaca daftar produknya sendiri - end ---
 
-        // --- step 3 - start - ambil batch produk dan tentukan metadata pagination
+        // --- step 3 - ambil batch produk dan tentukan metadata pagination - start ---
         $per_page = (int) ($validate['per_page'] ?? config('seller_product.per_page'));
         $search_product = trim($validate['search_product'] ?? '');
         $stock_filter = $validate['stock_filter'] ?? 'all';
@@ -145,7 +145,7 @@ class ProductController extends Controller
         $products->each(
             fn (Product $product) => $this->sellerProductCursorService->hideInternalAttribute($product),
         );
-        // --- step 3 - end - ambil batch produk dan tentukan metadata pagination
+        // --- step 3 - ambil batch produk dan tentukan metadata pagination - end ---
 
         return response()->json([
             'status' => 200,
@@ -172,7 +172,7 @@ class ProductController extends Controller
      */
     public function show(string $user_id_seller, string $id, Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi UUID seller dan produk
+        // --- step 1 - validasi UUID seller dan produk - start ---
         $validator = Validator::make(
             ['user_id_seller' => $user_id_seller, 'id' => $id],
             ['user_id_seller' => ['required', 'uuid'], 'id' => ['required', 'uuid']]
@@ -183,17 +183,17 @@ class ProductController extends Controller
         }
 
         $validate = $validator->validate();
-        // --- step 1 - end - validasi UUID seller dan produk
+        // --- step 1 - validasi UUID seller dan produk - end ---
 
-        // --- step 2 - start - pastikan seller hanya membaca produknya sendiri
+        // --- step 2 - pastikan seller hanya membaca produknya sendiri - start ---
         $user = $this->authenticatedUser($request);
 
         if ($user->id !== $validate['user_id_seller']) {
             return response()->json(['status' => 403, 'message' => 'Forbidden'], 403);
         }
-        // --- step 2 - end - pastikan seller hanya membaca produknya sendiri
+        // --- step 2 - pastikan seller hanya membaca produknya sendiri - end ---
 
-        // --- step 3 - start - ambil produk dan seluruh gambar sesuai urutan
+        // --- step 3 - ambil produk dan seluruh gambar sesuai urutan - start ---
         $product = Product::with('images')
             ->where('user_id_seller', $validate['user_id_seller'])
             ->where('id', $validate['id'])
@@ -202,7 +202,7 @@ class ProductController extends Controller
         if (! $product) {
             return response()->json(['status' => 404, 'message' => 'Product Not Found'], 404);
         }
-        // --- step 3 - end - ambil produk dan seluruh gambar sesuai urutan
+        // --- step 3 - ambil produk dan seluruh gambar sesuai urutan - end ---
 
         return response()->json(['status' => 200, 'product' => $product]);
     }
@@ -220,7 +220,7 @@ class ProductController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi data produk, file, manifest urutan, dan seller
+        // --- step 1 - validasi data produk, file, manifest urutan, dan seller - start ---
         $validator = $this->productValidator($request, true);
 
         if ($validator->fails()) {
@@ -241,15 +241,15 @@ class ProductController extends Controller
                 'message' => 'Verifikasi lokasi toko dengan Pinpoint sebelum menambahkan produk.',
             ], 409);
         }
-        // --- step 1 - end - validasi data produk, file, manifest urutan, dan seller
+        // --- step 1 - validasi data produk, file, manifest urutan, dan seller - end ---
 
-        // --- step 2 - start - susun manifest final sebelum menyimpan file
+        // --- step 2 - susun manifest final sebelum menyimpan file - start ---
         /** @var array<int, array{file: UploadedFile}> $orderedImages */
         $orderedImages = $this->resolveImageOrder($request);
         $storedPaths = [];
-        // --- step 2 - end - susun manifest final sebelum menyimpan file
+        // --- step 2 - susun manifest final sebelum menyimpan file - end ---
 
-        // --- step 3 - start - simpan file lalu buat produk dan relasi gambar dalam transaksi
+        // --- step 3 - simpan file lalu buat produk dan relasi gambar dalam transaksi - start ---
         try {
             foreach ($orderedImages as $index => $orderedImage) {
                 $storedPath = $orderedImage['file']->store('product-imgs');
@@ -287,7 +287,7 @@ class ProductController extends Controller
             Storage::delete($storedPaths);
             throw $exception;
         }
-        // --- step 3 - end - simpan file lalu buat produk dan relasi gambar dalam transaksi
+        // --- step 3 - simpan file lalu buat produk dan relasi gambar dalam transaksi - end ---
 
         return response()->json(['status' => 200, 'message' => 'Add Product Success', 'product' => $product], 200);
     }
@@ -306,7 +306,7 @@ class ProductController extends Controller
      */
     public function update(string $id, Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi UUID dan cari produk melalui seller terautentikasi
+        // --- step 1 - validasi UUID dan cari produk melalui seller terautentikasi - start ---
         $idValidator = Validator::make(['id' => $id], ['id' => ['required', 'uuid']]);
 
         if ($idValidator->fails()) {
@@ -322,9 +322,9 @@ class ProductController extends Controller
         if (! $product) {
             return response()->json(['status' => 404, 'message' => 'Product Not Found'], 404);
         }
-        // --- step 1 - end - validasi UUID dan cari produk melalui seller terautentikasi
+        // --- step 1 - validasi UUID dan cari produk melalui seller terautentikasi - end ---
 
-        // --- step 2 - start - validasi data produk dan susun urutan gambar final
+        // --- step 2 - validasi data produk dan susun urutan gambar final - start ---
         $validator = $this->productValidator($request, false, $product);
 
         if ($validator->fails()) {
@@ -336,9 +336,9 @@ class ProductController extends Controller
         $beforeValues = $this->productValues($product);
         $imageChanges = $this->imageChanges($product, $orderedImages);
         $storedPaths = [];
-        // --- step 2 - end - validasi data produk dan susun urutan gambar final
+        // --- step 2 - validasi data produk dan susun urutan gambar final - end ---
 
-        // --- step 3 - start - simpan file baru dan hitung file lama yang harus dihapus
+        // --- step 3 - simpan file baru dan hitung file lama yang harus dihapus - start ---
         try {
             foreach ($orderedImages as $index => $orderedImage) {
                 if (isset($orderedImage['file'])) {
@@ -362,7 +362,7 @@ class ProductController extends Controller
                 ->diff($keptPaths)
                 ->all();
 
-            // --- step 4 - start - bangun ulang posisi gambar dan sinkronkan cover dalam transaksi
+            // --- step 4 - bangun ulang posisi gambar dan sinkronkan cover dalam transaksi - start ---
             $product = DB::transaction(function () use (
                 $user,
                 $request,
@@ -404,16 +404,16 @@ class ProductController extends Controller
 
                 return $product;
             });
-            // --- step 4 - end - bangun ulang posisi gambar dan sinkronkan cover dalam transaksi
+            // --- step 4 - bangun ulang posisi gambar dan sinkronkan cover dalam transaksi - end ---
         } catch (Throwable $exception) {
             Storage::delete($storedPaths);
             throw $exception;
         }
-        // --- step 3 - end - simpan file baru dan hitung file lama yang harus dihapus
+        // --- step 3 - simpan file baru dan hitung file lama yang harus dihapus - end ---
 
-        // --- step 5 - start - hapus file lama setelah transaksi database berhasil
+        // --- step 5 - hapus file lama setelah transaksi database berhasil - start ---
         Storage::delete($deletedPaths);
-        // --- step 5 - end - hapus file lama setelah transaksi database berhasil
+        // --- step 5 - hapus file lama setelah transaksi database berhasil - end ---
 
         return response()->json(['status' => 200, 'message' => 'Update Product Success', 'product' => $product]);
     }
@@ -433,7 +433,7 @@ class ProductController extends Controller
      */
     public function delete(string $user_id_seller, string $id, Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi UUID seller dan produk
+        // --- step 1 - validasi UUID seller dan produk - start ---
         $validator = Validator::make(
             ['user_id_seller' => $user_id_seller, 'id' => $id],
             ['user_id_seller' => ['required', 'uuid'], 'id' => ['required', 'uuid']]
@@ -444,9 +444,9 @@ class ProductController extends Controller
         }
 
         $validate = $validator->validate();
-        // --- step 1 - end - validasi UUID seller dan produk
+        // --- step 1 - validasi UUID seller dan produk - end ---
 
-        // --- step 2 - start - pastikan seller hanya menghapus produknya sendiri
+        // --- step 2 - pastikan seller hanya menghapus produknya sendiri - start ---
         $user = $this->authenticatedUser($request);
 
         if ($user->id !== $validate['user_id_seller']) {
@@ -461,16 +461,16 @@ class ProductController extends Controller
         if (! $product) {
             return response()->json(['status' => 404, 'message' => 'Product Not Found'], 404);
         }
-        // --- step 2 - end - pastikan seller hanya menghapus produknya sendiri
+        // --- step 2 - pastikan seller hanya menghapus produknya sendiri - end ---
 
-        // --- step 3 - start - simpan snapshot audit sebelum produk dinonaktifkan
+        // --- step 3 - simpan snapshot audit sebelum produk dinonaktifkan - start ---
         $snapshot = [
             'name' => (string) $product->name,
             ...$this->auditLogService->productSnapshot($product),
         ];
-        // --- step 3 - end - simpan snapshot audit sebelum produk dinonaktifkan
+        // --- step 3 - simpan snapshot audit sebelum produk dinonaktifkan - end ---
 
-        // --- step 4 - start - soft-delete produk tanpa menghapus keranjang dan gambar
+        // --- step 4 - soft-delete produk tanpa menghapus keranjang dan gambar - start ---
         DB::transaction(function () use ($user, $request, $product, $snapshot) {
             $product->delete();
             $this->auditLogService->recordProductDeleted($user, $product, $request, $snapshot);
@@ -479,7 +479,7 @@ class ProductController extends Controller
                 OutboxRecorderService::SOURCE_PRODUCT_DELETED,
             );
         });
-        // --- step 4 - end - soft-delete produk tanpa menghapus keranjang dan gambar
+        // --- step 4 - soft-delete produk tanpa menghapus keranjang dan gambar - end ---
 
         return response()->json(['status' => 200, 'message' => 'Delete Product Success'], 200);
     }
@@ -517,7 +517,7 @@ class ProductController extends Controller
      */
     private function productValidator(Request $request, bool $creating, ?Product $product = null): ValidationValidator
     {
-        // --- step 1 - start - susun aturan dasar untuk create atau update
+        // --- step 1 - susun aturan dasar untuk create atau update - start ---
         $rules = [
             'name' => ['required', 'min:3'],
             'price' => ['required', 'integer', 'min:1'],
@@ -531,9 +531,9 @@ class ProductController extends Controller
         if ($creating) {
             $rules['user_id_seller'] = ['required', 'uuid'];
         }
-        // --- step 1 - end - susun aturan dasar untuk create atau update
+        // --- step 1 - susun aturan dasar untuk create atau update - end ---
 
-        // --- step 2 - start - tambahkan validasi lintas-field untuk manifest gambar
+        // --- step 2 - tambahkan validasi lintas-field untuk manifest gambar - start ---
         $validator = Validator::make($request->all(), $rules);
         $validator->after(function ($validator) use ($request, $product) {
             try {
@@ -542,7 +542,7 @@ class ProductController extends Controller
                 $validator->errors()->add('images', $exception->getMessage());
             }
         });
-        // --- step 2 - end - tambahkan validasi lintas-field untuk manifest gambar
+        // --- step 2 - tambahkan validasi lintas-field untuk manifest gambar - end ---
 
         return $validator;
     }
@@ -561,16 +561,16 @@ class ProductController extends Controller
      */
     private function resolveImageOrder(Request $request, ?Product $product = null): array
     {
-        // --- step 1 - start - ambil manifest kiriman dan gambar lama milik produk
+        // --- step 1 - ambil manifest kiriman dan gambar lama milik produk - start ---
         $imageOrder = $request->input('image_order', []);
         $uploadedImages = $request->file('images', []);
         $existingImages = $product ? $product->images->keyBy('id') : collect();
         $usedNewIndexes = [];
         /** @var array<int, array{file: UploadedFile}|array{id: string, path: string}> $orderedImages */
         $orderedImages = [];
-        // --- step 1 - end - ambil manifest kiriman dan gambar lama milik produk
+        // --- step 1 - ambil manifest kiriman dan gambar lama milik produk - end ---
 
-        // --- step 2 - start - tolak collection malformed sebelum dilakukan iterasi
+        // --- step 2 - tolak collection malformed sebelum dilakukan iterasi - start ---
         if (! is_array($imageOrder) || ! is_array($uploadedImages)) {
             throw new InvalidArgumentException('Image order and uploaded images must be arrays.');
         }
@@ -579,9 +579,9 @@ class ProductController extends Controller
         if (count($imageOrder) < 1 || count($imageOrder) > 5) {
             throw new InvalidArgumentException('Product must have between 1 and 5 images.');
         }
-        // --- step 2 - end - tolak collection malformed sebelum dilakukan iterasi
+        // --- step 2 - tolak collection malformed sebelum dilakukan iterasi - end ---
 
-        // --- step 3 - start - ubah setiap token menjadi upload baru atau gambar lama yang valid
+        // --- step 3 - ubah setiap token menjadi upload baru atau gambar lama yang valid - start ---
         foreach ($imageOrder as $token) {
             if (! is_string($token)) {
                 throw new InvalidArgumentException('Image order contains an invalid image reference.');
@@ -608,13 +608,13 @@ class ProductController extends Controller
             $image = $existingImages->get($token);
             $orderedImages[] = ['id' => $image->id, 'path' => $image->path];
         }
-        // --- step 3 - end - ubah setiap token menjadi upload baru atau gambar lama yang valid
+        // --- step 3 - ubah setiap token menjadi upload baru atau gambar lama yang valid - end ---
 
-        // --- step 4 - start - pastikan semua file upload tercantum dalam manifest final
+        // --- step 4 - pastikan semua file upload tercantum dalam manifest final - start ---
         if (count($usedNewIndexes) !== count($uploadedImages)) {
             throw new InvalidArgumentException('Every uploaded image must appear exactly once in image order.');
         }
-        // --- step 4 - end - pastikan semua file upload tercantum dalam manifest final
+        // --- step 4 - pastikan semua file upload tercantum dalam manifest final - end ---
 
         return $orderedImages;
     }
@@ -650,7 +650,7 @@ class ProductController extends Controller
      */
     private function productChanges(array $beforeValues, Product $product): array
     {
-        // --- step 1 - start - siapkan nilai pembanding dan label audit
+        // --- step 1 - siapkan nilai pembanding dan label audit - start ---
         $afterValues = $this->productValues($product);
         $labels = [
             'name' => 'Nama produk',
@@ -658,9 +658,9 @@ class ProductController extends Controller
             'stock' => 'Stok',
         ];
         $changes = [];
-        // --- step 1 - end - siapkan nilai pembanding dan label audit
+        // --- step 1 - siapkan nilai pembanding dan label audit - end ---
 
-        // --- step 2 - start - kumpulkan field produk yang benar-benar berubah
+        // --- step 2 - kumpulkan field produk yang benar-benar berubah - start ---
         foreach ($labels as $field => $label) {
             if ($beforeValues[$field] === $afterValues[$field]) {
                 continue;
@@ -673,7 +673,7 @@ class ProductController extends Controller
                 'after' => $afterValues[$field],
             ];
         }
-        // --- step 2 - end - kumpulkan field produk yang benar-benar berubah
+        // --- step 2 - kumpulkan field produk yang benar-benar berubah - end ---
 
         return $changes;
     }
@@ -689,7 +689,7 @@ class ProductController extends Controller
      */
     private function imageChanges(Product $product, array $orderedImages): array
     {
-        // --- step 1 - start - hitung urutan gambar sebelum dan sesudah update
+        // --- step 1 - hitung urutan gambar sebelum dan sesudah update - start ---
         /** @var array<int, string> $beforeIds */
         $beforeIds = $product->images
             ->pluck('id')
@@ -708,9 +708,9 @@ class ProductController extends Controller
             static fn (string $id): bool => in_array($id, $afterExistingIds, true)
         ));
         $afterCoverId = $orderedImages[0]['id'] ?? null;
-        // --- step 1 - end - hitung urutan gambar sebelum dan sesudah update
+        // --- step 1 - hitung urutan gambar sebelum dan sesudah update - end ---
 
-        // --- step 2 - start - bentuk ringkasan perubahan gambar untuk audit
+        // --- step 2 - bentuk ringkasan perubahan gambar untuk audit - start ---
         $changes = [
             'before_count' => count($beforeIds),
             'after_count' => count($orderedImages),
@@ -722,7 +722,7 @@ class ProductController extends Controller
             'cover_changed' => ($beforeIds[0] ?? null) !== $afterCoverId,
             'order_changed' => $beforeRetainedIds !== $afterExistingIds,
         ];
-        // --- step 2 - end - bentuk ringkasan perubahan gambar untuk audit
+        // --- step 2 - bentuk ringkasan perubahan gambar untuk audit - end ---
 
         return $changes;
     }

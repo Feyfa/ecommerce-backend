@@ -27,17 +27,17 @@ class SellerDashboardController extends Controller
      */
     public function show(): JsonResponse
     {
-        // --- step 1 - start - validasi user
+        // --- step 1 - validasi user - start ---
         $user = auth()->user();
 
         if (empty($user)) {
             return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
         }
-        // --- step 1 - end - validasi user
+        // --- step 1 - validasi user - end ---
 
-        // --- step 2 - start - ambil data dashboard
+        // --- step 2 - ambil data dashboard - start ---
         $dashboard = $this->sellerDashboardService->getDashboard($user->id);
-        // --- step 2 - end - ambil data dashboard
+        // --- step 2 - ambil data dashboard - end ---
 
         return response()->json([
             'status' => 'success',

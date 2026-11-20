@@ -28,7 +28,7 @@ class CompanyService
      */
     public function getCompany(string $user_id = ''): array
     {
-        // --- step 1 - start - ambil profil toko
+        // --- step 1 - ambil profil toko - start ---
         $company = Company::where('user_id', $user_id)->first();
         $companyFillables = (new Company())->getFillable();
 
@@ -36,9 +36,9 @@ class CompanyService
         foreach ($companyFillables as $field) {
             $companyFormat[$field] = $company->$field ?? '';
         }
-        // --- step 1 - end - ambil profil toko
+        // --- step 1 - ambil profil toko - end ---
 
-        // --- step 2 - start - ambil alamat
+        // --- step 2 - ambil alamat - start ---
         $alamat = Alamat::where('user_id', $user_id)
             ->where('type', 'seller')
             ->orderBy('created_at', 'DESC')
@@ -51,7 +51,7 @@ class CompanyService
         $companyFormat['address_detail'] = $alamat->address_detail ?? null;
         $companyFormat['location_source'] = $alamat->location_source ?? 'manual';
         $companyFormat['seller_location_verified'] = $this->alamatService->isVerifiedPinpoint($alamat);
-        // --- step 2 - end - ambil alamat
+        // --- step 2 - ambil alamat - end ---
 
         return ['status' => 'success', 'company' => $companyFormat];
     }

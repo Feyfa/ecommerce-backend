@@ -41,7 +41,7 @@ class PaymentController extends Controller
      */
     public function getPayment(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi user
+        // --- step 1 - validasi user - start ---
         $user = $request->user();
         if (! $user instanceof User) {
             return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
@@ -52,9 +52,9 @@ class PaymentController extends Controller
         if (! $userExists) {
             return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
         }
-        // --- step 1 - end - validasi user
+        // --- step 1 - validasi user - end ---
 
-        // --- step 2 - start - validasi pencarian sebelum membaca rekening
+        // --- step 2 - validasi pencarian sebelum membaca rekening - start ---
         $validator = Validator::make($request->all(), [
             'searchPayment' => ['nullable', 'string'],
         ]);
@@ -64,15 +64,15 @@ class PaymentController extends Controller
         /** @var array{searchPayment?: string|null} $validated */
         $validated = $validator->validated();
         $searchPayment = $validated['searchPayment'] ?? '';
-        // --- step 2 - end - validasi pencarian sebelum membaca rekening
+        // --- step 2 - validasi pencarian sebelum membaca rekening - end ---
 
-        // --- step 3 - start - proses pengambilan payment
+        // --- step 3 - proses pengambilan payment - start ---
         $getWithdrawalPayments = $this->paymentService->getWithdrawalPayments(
             user_id: $user_id,
             search: $searchPayment,
         );
         $payments = $getWithdrawalPayments['payments'];
-        // --- step 3 - end - proses pengambilan payment
+        // --- step 3 - proses pengambilan payment - end ---
 
         return response()->json(['status' => 'success', 'payments' => $payments]);
     }
@@ -84,11 +84,11 @@ class PaymentController extends Controller
      */
     public function getPaymentList(): JsonResponse
     {
-        // --- step 1 - start - ambil daftar payment
+        // --- step 1 - ambil daftar payment - start ---
         $paymentList = PaymentList::select('id', 'slug', 'name')
             ->where('type', 'withdrawal')
             ->get();
-        // --- step 1 - end - ambil daftar payment
+        // --- step 1 - ambil daftar payment - end ---
 
         return response()->json(['status' => 'success', 'paymentList' => $paymentList]);
     }
@@ -106,7 +106,7 @@ class PaymentController extends Controller
      */
     public function validatePaymentAccount(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi user
+        // --- step 1 - validasi user - start ---
         $user = $request->user();
         if (! $user instanceof User) {
             return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
@@ -117,9 +117,9 @@ class PaymentController extends Controller
         if (! $userExists) {
             return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
         }
-        // --- step 1 - end - validasi user
+        // --- step 1 - validasi user - end ---
 
-        // --- step 2 - start - validasi akun payment
+        // --- step 2 - validasi akun payment - start ---
         $validator = Validator::make($request->all(), [
             'paymentAccount' => ['nullable', 'string'],
             'paymentSlug' => ['nullable', 'string'],
@@ -134,9 +134,9 @@ class PaymentController extends Controller
         if (empty($paymentAccount) || trim($paymentAccount) == '') {
             return response()->json(['status' => 'error', 'message' => 'Nomor Rekening Tidak Boleh Kosong'], 400);
         }
-        // --- step 2 - end - validasi akun payment
+        // --- step 2 - validasi akun payment - end ---
 
-        // --- step 3 - start - validasi slug payment
+        // --- step 3 - validasi slug payment - start ---
         $slugs = PaymentList::distinct()
             ->pluck('slug')
             ->toArray();
@@ -146,9 +146,9 @@ class PaymentController extends Controller
         } elseif (! in_array($paymentSlug, $slugs)) {
             return response()->json(['status' => 'error', 'message' => "Nama Bank {$paymentSlug} Tidak Tersedia"], 400);
         }
-        // --- step 3 - end - validasi slug payment
+        // --- step 3 - validasi slug payment - end ---
 
-        // --- step 4 - start - periksa duplikasi akun payment
+        // --- step 4 - periksa duplikasi akun payment - start ---
         $paymentExists = PaymentUser::join('payment_lists', 'payment_lists.id', '=', 'payment_users.payment_id')
             ->where('payment_users.user_id', $user_id)
             ->where('payment_users.account', $paymentAccount)
@@ -157,12 +157,12 @@ class PaymentController extends Controller
         if ($paymentExists) {
             return response()->json(['status' => 'error', 'message' => 'Nomor Rekening Sudah Digunakan'], 400);
         }
-        // --- step 4 - end - periksa duplikasi akun payment
+        // --- step 4 - periksa duplikasi akun payment - end ---
 
-        // --- step 5 - start - buat nama payment sementara
+        // --- step 5 - buat nama payment sementara - start ---
         $generateFakeUser = $this->paymentService->generateFakeUser();
         $name = $generateFakeUser['user']['name'];
-        // --- step 5 - end - buat nama payment sementara
+        // --- step 5 - buat nama payment sementara - end ---
 
         return response()->json(['status' => 'success', 'username' => $name]);
     }
@@ -180,7 +180,7 @@ class PaymentController extends Controller
      */
     public function addPayment(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi id user
+        // --- step 1 - validasi id user - start ---
         $user = $request->user();
         if (! $user instanceof User) {
             return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
@@ -191,9 +191,9 @@ class PaymentController extends Controller
         if (! $userExists) {
             return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
         }
-        // --- step 1 - end - validasi id user
+        // --- step 1 - validasi id user - end ---
 
-        // --- step 2 - start - validasi request
+        // --- step 2 - validasi request - start ---
         $validator = Validator::make($request->all(), [
             'paymentName' => ['required', 'string'],
             'paymentSlug' => ['required', 'string'],
@@ -208,18 +208,18 @@ class PaymentController extends Controller
         /** @var array{paymentName: string, paymentSlug: string, paymentAccount: string, paymentUsername: string, searchPayment?: string|null} $validated */
         $validated = $validator->validated();
         $searchPayment = $validated['searchPayment'] ?? '';
-        // --- step 2 - end - validasi request
+        // --- step 2 - validasi request - end ---
 
-        // --- step 3 - start - validasi batas maksimal sepuluh payment
+        // --- step 3 - validasi batas maksimal sepuluh payment - start ---
         $totalPayment = PaymentUser::where('user_id', $user_id)
             ->count();
 
         if ($totalPayment >= 10) {
             return response()->json(['status' => 'error', 'message' => 'Rekening Tidak Boleh Lebih Dari 10'], 400);
         }
-        // --- step 3 - end - validasi batas maksimal sepuluh payment
+        // --- step 3 - validasi batas maksimal sepuluh payment - end ---
 
-        // --- step 4 - start - validasi nama dan slug payment
+        // --- step 4 - validasi nama dan slug payment - start ---
         $paymentList = PaymentList::where('type', 'withdrawal')
             ->where('slug', $validated['paymentSlug'])
             ->where('name', $validated['paymentName'])
@@ -228,24 +228,24 @@ class PaymentController extends Controller
         if (! $paymentList) {
             return response()->json(['status' => 'error', 'message' => 'Tipe Rekening Bank Tidak Tersedia'], 400);
         }
-        // --- step 4 - end - validasi nama dan slug payment
+        // --- step 4 - validasi nama dan slug payment - end ---
 
-        // --- step 5 - start - buat akun payment user
+        // --- step 5 - buat akun payment user - start ---
         PaymentUser::create([
             'user_id' => $user_id,
             'payment_id' => ($paymentList->id ?? null),
             'name' => $validated['paymentUsername'],
             'account' => $validated['paymentAccount'],
         ]);
-        // --- step 5 - end - buat akun payment user
+        // --- step 5 - buat akun payment user - end ---
 
-        // --- step 6 - start - proses pengambilan payment
+        // --- step 6 - proses pengambilan payment - start ---
         $getWithdrawalPayments = $this->paymentService->getWithdrawalPayments(
             user_id: $user_id,
             search: $searchPayment,
         );
         $payments = $getWithdrawalPayments['payments'];
-        // --- step 6 - end - proses pengambilan payment
+        // --- step 6 - proses pengambilan payment - end ---
 
         return response()->json(['status' => 'success', 'payments' => $payments, 'message' => 'Rekening Berhasil Ditambah']);
     }
@@ -264,7 +264,7 @@ class PaymentController extends Controller
      */
     public function deletePayment(string $id, Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi id user
+        // --- step 1 - validasi id user - start ---
         $user = $request->user();
         if (! $user instanceof User) {
             return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
@@ -275,9 +275,9 @@ class PaymentController extends Controller
         if (! $userExists) {
             return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
         }
-        // --- step 1 - end - validasi id user
+        // --- step 1 - validasi id user - end ---
 
-        // --- step 2 - start - validasi pencarian sebelum menghapus rekening
+        // --- step 2 - validasi pencarian sebelum menghapus rekening - start ---
         $validator = Validator::make($request->all(), [
             'searchPayment' => ['nullable', 'string'],
         ]);
@@ -287,9 +287,9 @@ class PaymentController extends Controller
         /** @var array{searchPayment?: string|null} $validated */
         $validated = $validator->validated();
         $searchPayment = $validated['searchPayment'] ?? '';
-        // --- step 2 - end - validasi pencarian sebelum menghapus rekening
+        // --- step 2 - validasi pencarian sebelum menghapus rekening - end ---
 
-        // --- step 3 - start - validasi lalu hapus payment
+        // --- step 3 - validasi lalu hapus payment - start ---
         $paymentUser = PaymentUser::where('id', $id)
             ->where('user_id', $user_id)
             ->first();
@@ -299,15 +299,15 @@ class PaymentController extends Controller
         }
 
         $paymentUser->delete();
-        // --- step 3 - end - validasi lalu hapus payment
+        // --- step 3 - validasi lalu hapus payment - end ---
 
-        // --- step 4 - start - proses pengambilan payment
+        // --- step 4 - proses pengambilan payment - start ---
         $getWithdrawalPayments = $this->paymentService->getWithdrawalPayments(
             user_id: $user_id,
             search: $searchPayment,
         );
         $payments = $getWithdrawalPayments['payments'];
-        // --- step 4 - end - proses pengambilan payment
+        // --- step 4 - proses pengambilan payment - end ---
 
         return response()->json(['status' => 'success', 'payments' => $payments, 'message' => 'Rekening Berhasil Dihapus']);
     }
@@ -325,7 +325,7 @@ class PaymentController extends Controller
      */
     public function simulateChargeVirtualAccount(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi id user
+        // --- step 1 - validasi id user - start ---
         $user = $request->user();
         if (! $user instanceof User) {
             return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
@@ -336,9 +336,9 @@ class PaymentController extends Controller
         if (! $userExists) {
             return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
         }
-        // --- step 1 - end - validasi id user
+        // --- step 1 - validasi id user - end ---
 
-        // --- step 2 - start - validasi request
+        // --- step 2 - validasi request - start ---
         $validator = Validator::make($request->all(), [
             'payment_slug' => ['nullable', 'string'],
             'payment_account' => ['nullable', 'string'],
@@ -356,9 +356,9 @@ class PaymentController extends Controller
         if (empty($paymentAccount) || trim($paymentAccount) == '') {
             return response()->json(['status' => 'error', 'message' => 'Nomor Virtual Account Harus Dipilih'], 400);
         }
-        // --- step 2 - end - validasi request
+        // --- step 2 - validasi request - end ---
 
-        // --- step 3 - start - validasi kepemilikan virtual account
+        // --- step 3 - validasi kepemilikan virtual account - start ---
         $now = Carbon::now('Asia/Jakarta')->format('Y-m-d H:i:s');
         $transactionInvoice = TransactionInvoice::where('user_id_buyer', $user_id)
             ->where('payment_account', $paymentAccount)
@@ -372,9 +372,9 @@ class PaymentController extends Controller
         if ($transactionInvoice->expired_at <= $now) {
             return response()->json(['status' => 'error', 'message' => 'Nomor Virtual Account Ini Sudah Expired'], 400);
         }
-        // --- step 3 - end - validasi kepemilikan virtual account
+        // --- step 3 - validasi kepemilikan virtual account - end ---
 
-        // --- step 4 - start - proses pembayaran virtual account
+        // --- step 4 - proses pembayaran virtual account - start ---
         // Preserve the existing weak int-parameter conversion, including truncation of legacy fractions.
         $amount = (int) ($transactionInvoice->price ?? 0);
         $simulateVirtualAccountFixed = $this->xenditService->simulateVirtualAccountFixed(
@@ -384,12 +384,12 @@ class PaymentController extends Controller
         if ($simulateVirtualAccountFixed['status'] == 'error') {
             return response()->json(['status' => 'error', 'message' => $simulateVirtualAccountFixed['message']], 400);
         }
-        // --- step 4 - end - proses pembayaran virtual account
+        // --- step 4 - proses pembayaran virtual account - end ---
 
-        // --- step 5 - start - perbarui status invoice transaksi
+        // --- step 5 - perbarui status invoice transaksi - start ---
         $transactionInvoice->status = 'done';
         $transactionInvoice->save();
-        // --- step 5 - end - perbarui status invoice transaksi
+        // --- step 5 - perbarui status invoice transaksi - end ---
 
         return response()->json(['status' => 'success', 'message' => 'Success Charge Virtual Account']);
     }

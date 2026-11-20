@@ -33,7 +33,7 @@ class BelanjaController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi pagination, pencarian, filter katalog, dan sorting
+        // --- step 1 - validasi pagination, pencarian, filter katalog, dan sorting - start ---
         $validator = Validator::make(
             [
                 'page' => $request->page,
@@ -69,12 +69,12 @@ class BelanjaController extends Controller
         }
 
         $validate = $validator->validate();
-        // --- step 1 - end - validasi pagination, pencarian, filter katalog, dan sorting
+        // --- step 1 - validasi pagination, pencarian, filter katalog, dan sorting - end ---
 
         // Identitas token menjadi satu-satunya sumber seller yang dikecualikan dari katalog buyer.
         $authenticatedUserId = $this->authenticatedUser($request)->id;
 
-        // --- step 2 - start - siapkan parameter query katalog buyer
+        // --- step 2 - siapkan parameter query katalog buyer - start ---
         $page = (int) ($validate['page'] ?? 1);
         $perPage = (int) ($validate['per_page'] ?? config('buyer_product_search.per_page'));
         $search_product = trim($validate['search_product'] ?? '');
@@ -82,9 +82,9 @@ class BelanjaController extends Controller
         $max_price = $validate['max_price'] ?? null;
         $added_within = $validate['added_within'] ?? null;
         $sort_product = $validate['sort_product'] ?? ($search_product === '' ? 'latest' : 'relevance');
-        // --- step 2 - end - siapkan parameter query katalog buyer
+        // --- step 2 - siapkan parameter query katalog buyer - end ---
 
-        // --- step 3 - start - jalankan query katalog melalui Meilisearch tanpa fallback PostgreSQL
+        // --- step 3 - jalankan query katalog melalui Meilisearch tanpa fallback PostgreSQL - start ---
         try {
             $result = $this->buyerProductSearchService->search(
                 (string) $authenticatedUserId,
@@ -107,7 +107,7 @@ class BelanjaController extends Controller
                 'message' => 'Pencarian produk sedang tidak tersedia. Silakan coba lagi beberapa saat lagi.',
             ], 503);
         }
-        // --- step 3 - end - jalankan query katalog melalui Meilisearch tanpa fallback PostgreSQL
+        // --- step 3 - jalankan query katalog melalui Meilisearch tanpa fallback PostgreSQL - end ---
 
         return response()->json(['status' => 200, ...$result], 200);
     }

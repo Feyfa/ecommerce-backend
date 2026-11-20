@@ -21,7 +21,7 @@ class UserAgentParserService
      */
     public function parse(?string $userAgent): array
     {
-        // --- step 1 - start - normalisasi input dan kembalikan bentuk data stabil saat header kosong
+        // --- step 1 - normalisasi input dan kembalikan bentuk data stabil saat header kosong - start ---
         $userAgent = trim((string) $userAgent);
 
         if ($userAgent === '') {
@@ -31,15 +31,15 @@ class UserAgentParserService
                 'device_type' => null,
             ];
         }
-        // --- step 1 - end - normalisasi input dan kembalikan bentuk data stabil saat header kosong
+        // --- step 1 - normalisasi input dan kembalikan bentuk data stabil saat header kosong - end ---
 
-        // --- step 2 - start - resolve setiap atribut secara independen agar data parsial tetap bisa dipakai
+        // --- step 2 - resolve setiap atribut secara independen agar data parsial tetap bisa dipakai - start ---
         $device = [
             'browser' => $this->resolveBrowser($userAgent),
             'operating_system' => $this->resolveOperatingSystem($userAgent),
             'device_type' => $this->resolveDeviceType($userAgent),
         ];
-        // --- step 2 - end - resolve setiap atribut secara independen agar data parsial tetap bisa dipakai
+        // --- step 2 - resolve setiap atribut secara independen agar data parsial tetap bisa dipakai - end ---
 
         return $device;
     }

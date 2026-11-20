@@ -197,7 +197,7 @@ class AuditLogTest extends TestCase
      */
     public function test_mixed_event_cursor_pagination_has_no_missing_or_duplicate_rows(): void
     {
-        // --- step 1 - start - prepare mixed events including equal timestamps for the ID tie-breaker
+        // --- step 1 - prepare mixed events including equal timestamps for the ID tie-breaker - start ---
         $user = $this->createUser();
         $events = AuditEvent::cases();
         $baseTime = CarbonImmutable::parse('2026-07-20 12:00:00');
@@ -219,9 +219,9 @@ class AuditLogTest extends TestCase
             ->orderByDesc('id')
             ->pluck('id')
             ->all();
-        // --- step 1 - end - prepare mixed events including equal timestamps for the ID tie-breaker
+        // --- step 1 - prepare mixed events including equal timestamps for the ID tie-breaker - end ---
 
-        // --- step 2 - start - follow every cursor exactly as the frontend load-more flow does
+        // --- step 2 - follow every cursor exactly as the frontend load-more flow does - start ---
         $collectedIds = [];
         $collectedEvents = [];
         $cursor = null;
@@ -247,9 +247,9 @@ class AuditLogTest extends TestCase
             $this->assertLessThanOrEqual(5, $pageCount, 'Pagination menghasilkan cursor yang tidak berakhir.');
             $this->assertSame($hasMore, $cursor !== null);
         } while ($hasMore);
-        // --- step 2 - end - follow every cursor exactly as the frontend load-more flow does
+        // --- step 2 - follow every cursor exactly as the frontend load-more flow does - end ---
 
-        // --- step 3 - start - verify order, completeness, uniqueness, and event coverage
+        // --- step 3 - verify order, completeness, uniqueness, and event coverage - start ---
         $this->assertSame(5, $pageCount);
         $this->assertSame($expectedIds, $collectedIds);
         $this->assertCount(30, $collectedIds);
@@ -258,7 +258,7 @@ class AuditLogTest extends TestCase
         foreach ($events as $event) {
             $this->assertContains($event->value, $collectedEvents);
         }
-        // --- step 3 - end - verify order, completeness, uniqueness, and event coverage
+        // --- step 3 - verify order, completeness, uniqueness, and event coverage - end ---
     }
 
     /**

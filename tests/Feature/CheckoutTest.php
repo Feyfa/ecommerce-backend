@@ -225,7 +225,7 @@ class CheckoutTest extends TestCase
     {
         $this->withoutMiddleware();
 
-        // --- step 1 - start - siapkan buyer, seller, dan alamat terverifikasi
+        // --- step 1 - siapkan buyer, seller, dan alamat terverifikasi - start ---
         $buyer = User::factory()->create();
         $otherBuyer = User::factory()->create();
         $seller = User::factory()->create();
@@ -253,9 +253,9 @@ class CheckoutTest extends TestCase
             'location_source' => 'map',
             'enable' => 1,
         ]);
-        // --- step 1 - end - siapkan buyer, seller, dan alamat terverifikasi
+        // --- step 1 - siapkan buyer, seller, dan alamat terverifikasi - end ---
 
-        // --- step 2 - start - siapkan cart terpilih, tidak terpilih, dan milik buyer lain
+        // --- step 2 - siapkan cart terpilih, tidak terpilih, dan milik buyer lain - start ---
         $selectedProduct = Product::create([
             'user_id_seller' => $seller->id,
             'img' => 'product-imgs/selected-checkout-test.jpg',
@@ -309,9 +309,9 @@ class CheckoutTest extends TestCase
             'checkout' => 0,
             'total' => 1,
         ]);
-        // --- step 2 - end - siapkan cart terpilih, tidak terpilih, dan milik buyer lain
+        // --- step 2 - siapkan cart terpilih, tidak terpilih, dan milik buyer lain - end ---
 
-        // --- step 3 - start - validasi checkout dan pastikan update hanya mengenai cart yang tepat
+        // --- step 3 - validasi checkout dan pastikan update hanya mengenai cart yang tepat - start ---
         $this->actingAs($buyer)
             ->postJson('/api/keranjang/validate/checkout', [
                 'user_id_buyer' => $buyer->id,
@@ -347,7 +347,7 @@ class CheckoutTest extends TestCase
             'checkout' => 0,
             'total' => 1,
         ]);
-        // --- step 3 - end - validasi checkout dan pastikan update hanya mengenai cart yang tepat
+        // --- step 3 - validasi checkout dan pastikan update hanya mengenai cart yang tepat - end ---
     }
 
     /**
@@ -440,7 +440,7 @@ class CheckoutTest extends TestCase
     {
         $this->withoutMiddleware();
 
-        // --- step 1 - start - siapkan checkout yang valid beserta metode pembayaran
+        // --- step 1 - siapkan checkout yang valid beserta metode pembayaran - start ---
         $fixture = $this->createCheckoutLockFixture();
         $buyer = $fixture['buyer'];
         $buyerAddress = $fixture['buyerAddress'];
@@ -452,9 +452,9 @@ class CheckoutTest extends TestCase
             'slug' => 'bca',
             'name' => 'BCA Virtual Account',
         ]);
-        // --- step 1 - end - siapkan checkout yang valid beserta metode pembayaran
+        // --- step 1 - siapkan checkout yang valid beserta metode pembayaran - end ---
 
-        // --- step 2 - start - palsukan pembuatan virtual account agar test tidak memanggil provider
+        // --- step 2 - palsukan pembuatan virtual account agar test tidak memanggil provider - start ---
         $this->mock(XenditService::class, function (MockInterface $mock): void {
             $mock->shouldReceive('createVirtualAccount')
                 ->once()
@@ -466,9 +466,9 @@ class CheckoutTest extends TestCase
                     ],
                 ]);
         });
-        // --- step 2 - end - palsukan pembuatan virtual account agar test tidak memanggil provider
+        // --- step 2 - palsukan pembuatan virtual account agar test tidak memanggil provider - end ---
 
-        // --- step 3 - start - proses checkout dan periksa identitas pesanan pada response
+        // --- step 3 - proses checkout dan periksa identitas pesanan pada response - start ---
         $response = $this->actingAs($buyer)
             ->postJson('/api/checkout/process', [
                 'payment_slug' => 'bca',
@@ -494,17 +494,17 @@ class CheckoutTest extends TestCase
                 'status' => 'success',
                 'message' => 'Pembayaran Berhasil',
             ]);
-        // --- step 3 - end - proses checkout dan periksa identitas pesanan pada response
+        // --- step 3 - proses checkout dan periksa identitas pesanan pada response - end ---
 
-        // --- step 4 - start - pastikan id invoice pada response cocok dengan baris yang tersimpan
+        // --- step 4 - pastikan id invoice pada response cocok dengan baris yang tersimpan - start ---
         $invoice = TransactionInvoice::where('user_id_buyer', $buyer->id)->firstOrFail();
 
         $this->assertDatabaseHas('transaction_users', ['transaction_invoice_id' => $invoice->id]);
 
         $response->assertJsonPath('transaction_invoice_id', $invoice->id);
-        // --- step 4 - end - pastikan id invoice pada response cocok dengan baris yang tersimpan
+        // --- step 4 - pastikan id invoice pada response cocok dengan baris yang tersimpan - end ---
 
-        // --- step 5 - start - pastikan stok terbaru dicatat durable bersama checkout
+        // --- step 5 - pastikan stok terbaru dicatat durable bersama checkout - start ---
         $outbox = OutboxMessage::query()->sole();
         $this->assertSame(OutboxEventType::BUYER_CATALOG_PRODUCT_SYNC->value, $outbox->event_type);
         $this->assertSame(OutboxAggregateType::PRODUCT->value, $outbox->aggregate_type);
@@ -515,7 +515,7 @@ class CheckoutTest extends TestCase
             'source' => OutboxRecorderService::SOURCE_CHECKOUT_STOCK_CHANGED,
         ], $outbox->payload);
         Queue::assertNothingPushed();
-        // --- step 5 - end - pastikan stok terbaru dicatat durable bersama checkout
+        // --- step 5 - pastikan stok terbaru dicatat durable bersama checkout - end ---
     }
 
     /**

@@ -28,19 +28,19 @@ class TransactionServiceTest extends TestCase
      */
     public function test_buyer_pending_transactions_are_grouped_by_invoice_with_all_store_packages(): void
     {
-        // --- step 1 - start - siapkan satu invoice pending dengan dua paket toko
+        // --- step 1 - siapkan satu invoice pending dengan dua paket toko - start ---
         $fixture = $this->createMultiStoreInvoiceFixture();
-        // --- step 1 - end - siapkan satu invoice pending dengan dua paket toko
+        // --- step 1 - siapkan satu invoice pending dengan dua paket toko - end ---
 
-        // --- step 2 - start - ambil daftar pending dari perspektif buyer
+        // --- step 2 - ambil daftar pending dari perspektif buyer - start ---
         $response = app(TransactionService::class)->getTransaction(
             $fixture['buyer']->id,
             'buyer',
             ['status' => 'pending_payment', 'search' => 'Produk Kedua']
         );
-        // --- step 2 - end - ambil daftar pending dari perspektif buyer
+        // --- step 2 - ambil daftar pending dari perspektif buyer - end ---
 
-        // --- step 3 - start - pastikan invoice dan seluruh paket toko tetap utuh
+        // --- step 3 - pastikan invoice dan seluruh paket toko tetap utuh - start ---
         $this->assertSame(1, $response['counts']['pending_payment']);
         $this->assertCount(1, $response['transactions']);
         $this->assertSame($fixture['invoice']->id, $response['transactions']->first()->invoice_id);
@@ -50,9 +50,9 @@ class TransactionServiceTest extends TestCase
         $packagesBySeller = $response['transactions']->first()->packages->keyBy('seller_name');
         $this->assertSame('Produk Pertama', $packagesBySeller->get('Toko Pertama')->products->first()->name);
         $this->assertSame('Produk Kedua', $packagesBySeller->get('Toko Kedua')->products->first()->name);
-        // --- step 3 - end - pastikan invoice dan seluruh paket toko tetap utuh
+        // --- step 3 - pastikan invoice dan seluruh paket toko tetap utuh - end ---
 
-        // --- step 4 - start - pastikan transaksi setelah pembayaran tetap terpisah per toko
+        // --- step 4 - pastikan transaksi setelah pembayaran tetap terpisah per toko - start ---
         $fixture['invoice']->update(['status' => 'done']);
 
         $paidResponse = app(TransactionService::class)->getTransaction(
@@ -66,7 +66,7 @@ class TransactionServiceTest extends TestCase
         $paidTransactionsBySeller = $paidResponse['transactions']->keyBy('seller_name');
         $this->assertSame(315000.0, (float) $paidTransactionsBySeller->get('Toko Pertama')->total_price);
         $this->assertSame(37000.0, (float) $paidTransactionsBySeller->get('Toko Kedua')->total_price);
-        // --- step 4 - end - pastikan transaksi setelah pembayaran tetap terpisah per toko
+        // --- step 4 - pastikan transaksi setelah pembayaran tetap terpisah per toko - end ---
     }
 
     /**
@@ -76,19 +76,19 @@ class TransactionServiceTest extends TestCase
      */
     public function test_buyer_single_store_pending_transaction_keeps_the_regular_transaction_shape(): void
     {
-        // --- step 1 - start - siapkan satu invoice pending dengan satu paket toko
+        // --- step 1 - siapkan satu invoice pending dengan satu paket toko - start ---
         $fixture = $this->createSingleStoreInvoiceFixture();
-        // --- step 1 - end - siapkan satu invoice pending dengan satu paket toko
+        // --- step 1 - siapkan satu invoice pending dengan satu paket toko - end ---
 
-        // --- step 2 - start - ambil daftar pending dari perspektif buyer
+        // --- step 2 - ambil daftar pending dari perspektif buyer - start ---
         $response = app(TransactionService::class)->getTransaction(
             $fixture['buyer']->id,
             'buyer',
             ['status' => 'pending_payment']
         );
-        // --- step 2 - end - ambil daftar pending dari perspektif buyer
+        // --- step 2 - ambil daftar pending dari perspektif buyer - end ---
 
-        // --- step 3 - start - pastikan transaksi satu toko tidak berubah menjadi invoice gabungan
+        // --- step 3 - pastikan transaksi satu toko tidak berubah menjadi invoice gabungan - start ---
         $transaction = $response['transactions']->first();
 
         $this->assertSame(1, $response['counts']['pending_payment']);
@@ -98,7 +98,7 @@ class TransactionServiceTest extends TestCase
         $this->assertSame('Toko Tunggal', $transaction->seller_name);
         $this->assertSame(25000.0, (float) $transaction->total_price);
         $this->assertArrayNotHasKey('packages', $transaction->getAttributes());
-        // --- step 3 - end - pastikan transaksi satu toko tidak berubah menjadi invoice gabungan
+        // --- step 3 - pastikan transaksi satu toko tidak berubah menjadi invoice gabungan - end ---
     }
 
     /**
@@ -111,7 +111,7 @@ class TransactionServiceTest extends TestCase
         $user = User::factory()->create();
         $service = app(TransactionService::class);
 
-        // --- step 1 - start - verify empty regular buyer and seller pagination
+        // --- step 1 - verify empty regular buyer and seller pagination - start ---
         foreach (['buyer', 'seller'] as $perspective) {
             $response = $service->getTransaction($user->id, $perspective);
             $this->assertSame('success', $response['status']);
@@ -119,13 +119,13 @@ class TransactionServiceTest extends TestCase
             $this->assertSame(['all' => 0, 'paid' => 0, 'pending_payment' => 0, 'waiting_seller' => 0, 'done' => 0], $response['counts']);
             $this->assertSame(['current_page' => 1, 'last_page' => 1, 'per_page' => 5, 'total' => 0, 'from' => null, 'to' => null], $response['pagination']);
         }
-        // --- step 1 - end - verify empty regular buyer and seller pagination
+        // --- step 1 - verify empty regular buyer and seller pagination - end ---
 
-        // --- step 2 - start - verify the empty pending invoice action queue
+        // --- step 2 - verify the empty pending invoice action queue - start ---
         $pending = $service->getTransaction($user->id, 'buyer', ['status' => 'pending_payment']);
         $this->assertCount(0, $pending['transactions']);
         $this->assertSame(['current_page' => 1, 'last_page' => 1, 'per_page' => 0, 'total' => 0, 'from' => 0, 'to' => 0], $pending['pagination']);
-        // --- step 2 - end - verify the empty pending invoice action queue
+        // --- step 2 - verify the empty pending invoice action queue - end ---
     }
 
     /**
@@ -135,21 +135,21 @@ class TransactionServiceTest extends TestCase
      */
     public function test_ownership_and_seller_payment_field_boundaries_are_preserved(): void
     {
-        // --- step 1 - start - prepare one invoice and an unrelated buyer
+        // --- step 1 - prepare one invoice and an unrelated buyer - start ---
         $fixture = $this->createMultiStoreInvoiceFixture();
         $service = app(TransactionService::class);
         $foreignBuyer = User::factory()->create();
-        // --- step 1 - end - prepare one invoice and an unrelated buyer
+        // --- step 1 - prepare one invoice and an unrelated buyer - end ---
 
-        // --- step 2 - start - prevent another buyer from reading any invoice packages
+        // --- step 2 - prevent another buyer from reading any invoice packages - start ---
         foreach (['all', 'pending_payment'] as $status) {
             $response = $service->getTransaction($foreignBuyer->id, 'buyer', ['status' => $status]);
             $this->assertCount(0, $response['transactions']);
             $this->assertSame(0, $response['counts']['all']);
         }
-        // --- step 2 - end - prevent another buyer from reading any invoice packages
+        // --- step 2 - prevent another buyer from reading any invoice packages - end ---
 
-        // --- step 3 - start - restrict each seller to its own package without buyer payment details
+        // --- step 3 - restrict each seller to its own package without buyer payment details - start ---
         foreach (TransactionUser::where('transaction_invoice_id', $fixture['invoice']->id)->get() as $package) {
             $response = $service->getTransaction($package->user_id_seller, 'seller', ['status' => 'pending_payment']);
             $this->assertCount(1, $response['transactions']);
@@ -160,7 +160,7 @@ class TransactionServiceTest extends TestCase
             $this->assertArrayNotHasKey('packages', $row->getAttributes());
             $this->assertArrayNotHasKey('payment_account', $row->getAttributes());
         }
-        // --- step 3 - end - restrict each seller to its own package without buyer payment details
+        // --- step 3 - restrict each seller to its own package without buyer payment details - end ---
     }
 
     /**
@@ -170,14 +170,14 @@ class TransactionServiceTest extends TestCase
      */
     public function test_projection_mapping_preserves_dates_products_and_batch_loading(): void
     {
-        // --- step 1 - start - prepare paid packages with explicit timestamps
+        // --- step 1 - prepare paid packages with explicit timestamps - start ---
         $fixture = $this->createMultiStoreInvoiceFixture();
         $fixture['invoice']->update(['status' => 'done', 'expired_at' => '2026-09-02 03:04:00']);
         TransactionUser::where('transaction_invoice_id', $fixture['invoice']->id)
             ->update(['created_at' => '2026-09-01 01:02:00']);
-        // --- step 1 - end - prepare paid packages with explicit timestamps
+        // --- step 1 - prepare paid packages with explicit timestamps - end ---
 
-        // --- step 2 - start - capture product query count during response mapping
+        // --- step 2 - capture product query count during response mapping - start ---
         DB::enableQueryLog();
         try {
             $response = app(TransactionService::class)->getTransaction($fixture['buyer']->id, 'buyer', ['status' => 'paid']);
@@ -186,9 +186,9 @@ class TransactionServiceTest extends TestCase
             DB::disableQueryLog();
             DB::flushQueryLog();
         }
-        // --- step 2 - end - capture product query count during response mapping
+        // --- step 2 - capture product query count during response mapping - end ---
 
-        // --- step 3 - start - verify dates, payment details, and products on both rows
+        // --- step 3 - verify dates, payment details, and products on both rows - start ---
         $this->assertCount(1, $productQueries);
         $this->assertCount(2, $response['transactions']);
         foreach ($response['transactions'] as $row) {
@@ -198,7 +198,7 @@ class TransactionServiceTest extends TestCase
             $this->assertCount(1, $row->products);
             $this->assertContains($row->products->first()->name, ['Produk Pertama', 'Produk Kedua']);
         }
-        // --- step 3 - end - verify dates, payment details, and products on both rows
+        // --- step 3 - verify dates, payment details, and products on both rows - end ---
     }
 
     /**
@@ -226,16 +226,16 @@ class TransactionServiceTest extends TestCase
      */
     public function test_pagination_casts_bounds_and_filter_fallbacks_are_preserved(): void
     {
-        // --- step 1 - start - prepare deterministically ordered invoice packages
+        // --- step 1 - prepare deterministically ordered invoice packages - start ---
         $fixture = $this->createMultiStoreInvoiceFixture();
         $packages = TransactionUser::where('transaction_invoice_id', $fixture['invoice']->id)->get();
         // Fixture timestamps are guarded model attributes, so set them explicitly for ordering tests.
         $packages[0]->forceFill(['created_at' => '2026-09-01 00:00:00'])->save();
         $packages[1]->forceFill(['created_at' => '2026-09-02 00:00:00'])->save();
         $service = app(TransactionService::class);
-        // --- step 1 - end - prepare deterministically ordered invoice packages
+        // --- step 1 - prepare deterministically ordered invoice packages - end ---
 
-        // --- step 2 - start - verify pagination casts and unsupported string filter fallbacks
+        // --- step 2 - verify pagination casts and unsupported string filter fallbacks - start ---
         foreach ([['-1.5', '30.5', 1, 20], [0, 0, 1, 1], [1.9, 1.9, 1, 1], ['2', '1', 2, 1]] as [$page, $perPage, $expectedPage, $expectedPerPage]) {
             $response = $service->getTransaction($fixture['buyer']->id, 'buyer', [
                 'page' => $page,
@@ -254,15 +254,15 @@ class TransactionServiceTest extends TestCase
                 'Unexpected ordering for page '.json_encode($page).' and per_page '.json_encode($perPage)
             );
         }
-        // --- step 2 - end - verify pagination casts and unsupported string filter fallbacks
+        // --- step 2 - verify pagination casts and unsupported string filter fallbacks - end ---
 
-        // --- step 3 - start - verify explicit ascending order and a valid date range
+        // --- step 3 - verify explicit ascending order and a valid date range - start ---
         $oldest = $service->getTransaction($fixture['buyer']->id, 'buyer', ['sort' => 'oldest', 'per_page' => 1]);
         $this->assertSame($packages[0]->id, $oldest['transactions']->first()->id);
         $dated = $service->getTransaction($fixture['buyer']->id, 'buyer', ['date_from' => '2026-09-02', 'date_to' => '2026-09-02']);
         $this->assertCount(1, $dated['transactions']);
         $this->assertSame($packages[1]->id, $dated['transactions']->first()->id);
-        // --- step 3 - end - verify explicit ascending order and a valid date range
+        // --- step 3 - verify explicit ascending order and a valid date range - end ---
     }
 
     /**
@@ -272,15 +272,15 @@ class TransactionServiceTest extends TestCase
      */
     private function createMultiStoreInvoiceFixture(): array
     {
-        // --- step 1 - start - buat buyer, seller, dan profil toko
+        // --- step 1 - buat buyer, seller, dan profil toko - start ---
         $buyer = User::factory()->create(['name' => 'Buyer Test']);
         $firstSeller = User::factory()->create(['name' => 'Akun Seller Pertama']);
         $secondSeller = User::factory()->create(['name' => 'Akun Seller Kedua']);
         Company::create(['user_id' => $firstSeller->id, 'name' => 'Toko Pertama']);
         Company::create(['user_id' => $secondSeller->id, 'name' => 'Toko Kedua']);
-        // --- step 1 - end - buat buyer, seller, dan profil toko
+        // --- step 1 - buat buyer, seller, dan profil toko - end ---
 
-        // --- step 2 - start - buat invoice dan paket transaksi setiap toko
+        // --- step 2 - buat invoice dan paket transaksi setiap toko - start ---
         $invoice = TransactionInvoice::create([
             'user_id_buyer' => $buyer->id,
             'alamat_buyer' => 'Jakarta',
@@ -293,13 +293,13 @@ class TransactionServiceTest extends TestCase
 
         $firstTransaction = $this->createStorePackage($invoice, $buyer, $firstSeller, 'Produk Pertama', 300000, 15000);
         $secondTransaction = $this->createStorePackage($invoice, $buyer, $secondSeller, 'Produk Kedua', 27000, 10000);
-        // --- step 2 - end - buat invoice dan paket transaksi setiap toko
+        // --- step 2 - buat invoice dan paket transaksi setiap toko - end ---
 
-        // --- step 3 - start - tetapkan waktu sama agar urutan paket dapat diprediksi
+        // --- step 3 - tetapkan waktu sama agar urutan paket dapat diprediksi - start ---
         $createdAt = Carbon::now()->subMinute();
         $firstTransaction->update(['created_at' => $createdAt, 'updated_at' => $createdAt]);
         $secondTransaction->update(['created_at' => $createdAt, 'updated_at' => $createdAt]);
-        // --- step 3 - end - tetapkan waktu sama agar urutan paket dapat diprediksi
+        // --- step 3 - tetapkan waktu sama agar urutan paket dapat diprediksi - end ---
 
         return compact('buyer', 'invoice');
     }
@@ -311,13 +311,13 @@ class TransactionServiceTest extends TestCase
      */
     private function createSingleStoreInvoiceFixture(): array
     {
-        // --- step 1 - start - buat buyer, seller, dan profil toko tunggal
+        // --- step 1 - buat buyer, seller, dan profil toko tunggal - start ---
         $buyer = User::factory()->create(['name' => 'Buyer Toko Tunggal']);
         $seller = User::factory()->create(['name' => 'Akun Seller Tunggal']);
         Company::create(['user_id' => $seller->id, 'name' => 'Toko Tunggal']);
-        // --- step 1 - end - buat buyer, seller, dan profil toko tunggal
+        // --- step 1 - buat buyer, seller, dan profil toko tunggal - end ---
 
-        // --- step 2 - start - buat invoice dan paket transaksi tunggal
+        // --- step 2 - buat invoice dan paket transaksi tunggal - start ---
         $invoice = TransactionInvoice::create([
             'user_id_buyer' => $buyer->id,
             'alamat_buyer' => 'Jakarta',
@@ -328,7 +328,7 @@ class TransactionServiceTest extends TestCase
             'expired_at' => Carbon::now()->addDay(),
         ]);
         $transaction = $this->createStorePackage($invoice, $buyer, $seller, 'Produk Tunggal', 10000, 15000);
-        // --- step 2 - end - buat invoice dan paket transaksi tunggal
+        // --- step 2 - buat invoice dan paket transaksi tunggal - end ---
 
         return compact('buyer', 'invoice', 'transaction');
     }

@@ -71,7 +71,7 @@ class SellerDashboardTest extends TestCase
      */
     public function test_recent_transactions_keep_joined_aliases_and_seller_scope(): void
     {
-        // --- step 1 - start - siapkan transaksi seller dan satu transaksi toko lain
+        // --- step 1 - siapkan transaksi seller dan satu transaksi toko lain - start ---
         $buyer = User::factory()->create(['name' => 'Buyer Dashboard']);
         $invoice = TransactionInvoice::create(['user_id_buyer' => $buyer->id, 'status' => null]);
         $product = $this->createProduct($this->seller, 'Produk Dashboard', 10, 10000);
@@ -104,9 +104,9 @@ class SellerDashboardTest extends TestCase
             'approved_seller',
             Carbon::now('Asia/Jakarta')
         );
-        // --- step 1 - end - siapkan transaksi seller dan satu transaksi toko lain
+        // --- step 1 - siapkan transaksi seller dan satu transaksi toko lain - end ---
 
-        // --- step 2 - start - periksa proyeksi hasil join dan batas lima transaksi
+        // --- step 2 - periksa proyeksi hasil join dan batas lima transaksi - start ---
         $response = $this->getJson('/api/dashboard')
             ->assertOk()
             ->assertJsonCount(5, 'recent_transactions');
@@ -120,7 +120,7 @@ class SellerDashboardTest extends TestCase
         $this->assertSame('Produk Dashboard', $recentTransactions[0]['product_names']);
         $this->assertSame('approved_seller', $recentTransactions[0]['status']);
         $this->assertEquals(10000.0, $recentTransactions[0]['total_price']);
-        // --- step 2 - end - periksa proyeksi hasil join dan batas lima transaksi
+        // --- step 2 - periksa proyeksi hasil join dan batas lima transaksi - end ---
     }
 
     /**
@@ -130,7 +130,7 @@ class SellerDashboardTest extends TestCase
      */
     public function test_metrics_keep_completed_and_paid_transaction_rules(): void
     {
-        // --- step 1 - start - siapkan produk serta kombinasi status transaksi
+        // --- step 1 - siapkan produk serta kombinasi status transaksi - start ---
         $buyer = User::factory()->create();
         $activeProduct = $this->createProduct($this->seller, 'Produk Aktif', 10, 10000);
         $lowStockProduct = $this->createProduct($this->seller, 'Produk Stok Rendah', 3, 15000);
@@ -146,9 +146,9 @@ class SellerDashboardTest extends TestCase
         $otherSeller = User::factory()->create();
         $otherProduct = $this->createProduct($otherSeller, 'Produk Seller Lain', 10, 25000);
         $this->createTransaction($otherSeller, $buyer, $paidInvoice, $otherProduct, 'done', $createdAt);
-        // --- step 1 - end - siapkan produk serta kombinasi status transaksi
+        // --- step 1 - siapkan produk serta kombinasi status transaksi - end ---
 
-        // --- step 2 - start - periksa metrik yang mengikuti status dan kepemilikan
+        // --- step 2 - periksa metrik yang mengikuti status dan kepemilikan - start ---
         $response = $this->getJson('/api/dashboard')
             ->assertOk()
             ->assertJsonPath('summary.total_products', 3)
@@ -165,7 +165,7 @@ class SellerDashboardTest extends TestCase
         $this->assertSame(2, $response->json('performance.sales.29'));
         $this->assertEquals(20000.0, $response->json('performance.revenue.29'));
         $this->assertEquals(20000.0, $response->json('performance.total_revenue'));
-        // --- step 2 - end - periksa metrik yang mengikuti status dan kepemilikan
+        // --- step 2 - periksa metrik yang mengikuti status dan kepemilikan - end ---
     }
 
     /**

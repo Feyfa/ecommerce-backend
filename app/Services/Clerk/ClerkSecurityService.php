@@ -89,14 +89,14 @@ class ClerkSecurityService
      */
     public function getSummary(string $clerkUserId): array
     {
-        // --- step 1 - start - ambil status metode login dan perlindungan akun
+        // --- step 1 - ambil status metode login dan perlindungan akun - start ---
         $clerkUser = $this->getClerkUser($clerkUserId);
         $hasGoogleAccount = $this->hasVerifiedProvider($clerkUser, 'google');
         $passkeyCount = count($clerkUser->passkeys);
         $isMfaEnabled = $clerkUser->twoFactorEnabled || $clerkUser->totpEnabled;
-        // --- step 1 - end - ambil status metode login dan perlindungan akun
+        // --- step 1 - ambil status metode login dan perlindungan akun - end ---
 
-        // --- step 2 - start - bentuk ringkasan keamanan untuk frontend
+        // --- step 2 - bentuk ringkasan keamanan untuk frontend - start ---
         $summary = [
             'sign_in_methods' => [
                 [
@@ -149,7 +149,7 @@ class ClerkSecurityService
                 ],
             ],
         ];
-        // --- step 2 - end - bentuk ringkasan keamanan untuk frontend
+        // --- step 2 - bentuk ringkasan keamanan untuk frontend - end ---
 
         return $summary;
     }
@@ -172,7 +172,7 @@ class ClerkSecurityService
      */
     public function getActiveSessions(string $clerkUserId, string $currentSessionId): array
     {
-        // --- step 1 - start - ambil session aktif dari Clerk
+        // --- step 1 - ambil session aktif dari Clerk - start ---
         $response = $this->clerkBackendClientService
             ->makeSdk()
             ->sessions
@@ -183,15 +183,15 @@ class ClerkSecurityService
                 limit: 50,
                 offset: 0
             ));
-        // --- step 1 - end - ambil session aktif dari Clerk
+        // --- step 1 - ambil session aktif dari Clerk - end ---
 
-        // --- step 2 - start - format dan urutkan session berdasarkan aktivitas terbaru
+        // --- step 2 - format dan urutkan session berdasarkan aktivitas terbaru - start ---
         $sessions = collect($response->sessionList ?? [])
             ->map(fn (Session $session) => $this->formatSession($session, $currentSessionId))
             ->sortByDesc('last_active_at_timestamp')
             ->values()
             ->all();
-        // --- step 2 - end - format dan urutkan session berdasarkan aktivitas terbaru
+        // --- step 2 - format dan urutkan session berdasarkan aktivitas terbaru - end ---
 
         return [
             'current_session_id' => $currentSessionId,
@@ -249,13 +249,13 @@ class ClerkSecurityService
      */
     public function revokeOtherSessions(string $clerkUserId, string $currentSessionId): array
     {
-        // --- step 1 - start - siapkan session dan client Clerk
+        // --- step 1 - siapkan session dan client Clerk - start ---
         $sessionList = $this->getActiveSessions($clerkUserId, $currentSessionId)['sessions'];
         $revokedSessionIds = [];
         $sdk = $this->clerkBackendClientService->makeSdk();
-        // --- step 1 - end - siapkan session dan client Clerk
+        // --- step 1 - siapkan session dan client Clerk - end ---
 
-        // --- step 2 - start - cabut seluruh session selain session aktif
+        // --- step 2 - cabut seluruh session selain session aktif - start ---
         foreach ($sessionList as $session) {
             if ($session['is_current']) {
                 continue;
@@ -265,7 +265,7 @@ class ClerkSecurityService
 
             $revokedSessionIds[] = $session['id'];
         }
-        // --- step 2 - end - cabut seluruh session selain session aktif
+        // --- step 2 - cabut seluruh session selain session aktif - end ---
 
         return [
             'revoked_total' => count($revokedSessionIds),
@@ -292,7 +292,7 @@ class ClerkSecurityService
      */
     public function validateGoogleAccountLink(string $clerkUserId, LocalUser $localUser): array
     {
-        // --- step 1 - start - pisahkan akun Google terverifikasi dan belum terverifikasi
+        // --- step 1 - pisahkan akun Google terverifikasi dan belum terverifikasi - start ---
         $clerkUser = $this->getClerkUser($clerkUserId);
         $googleAccounts = $this->getProviderAccounts($clerkUser, 'google');
         $verifiedGoogleAccounts = collect($googleAccounts)
@@ -306,15 +306,15 @@ class ClerkSecurityService
             ->all();
 
         $this->deleteProviderAccounts($clerkUser, $unverifiedGoogleAccounts);
-        // --- step 1 - end - pisahkan akun Google terverifikasi dan belum terverifikasi
+        // --- step 1 - pisahkan akun Google terverifikasi dan belum terverifikasi - end ---
 
-        // --- step 2 - start - pastikan tersedia akun Google terverifikasi
+        // --- step 2 - pastikan tersedia akun Google terverifikasi - start ---
         if (count($verifiedGoogleAccounts) === 0) {
             throw new RuntimeException('Akun Google belum berhasil dihubungkan.');
         }
-        // --- step 2 - end - pastikan tersedia akun Google terverifikasi
+        // --- step 2 - pastikan tersedia akun Google terverifikasi - end ---
 
-        // --- step 3 - start - cari akun Google dengan email lokal yang sama
+        // --- step 3 - cari akun Google dengan email lokal yang sama - start ---
         $validGoogleAccount = null;
 
         foreach ($verifiedGoogleAccounts as $googleAccount) {
@@ -326,9 +326,9 @@ class ClerkSecurityService
             $validGoogleAccount = $googleAccount;
             break;
         }
-        // --- step 3 - end - cari akun Google dengan email lokal yang sama
+        // --- step 3 - cari akun Google dengan email lokal yang sama - end ---
 
-        // --- step 4 - start - bersihkan akun tidak valid dan bentuk hasil
+        // --- step 4 - bersihkan akun tidak valid dan bentuk hasil - start ---
         if (! $validGoogleAccount) {
             $this->deleteProviderAccounts($clerkUser, $verifiedGoogleAccounts);
 
@@ -342,7 +342,7 @@ class ClerkSecurityService
             'email' => $validGoogleAccount->emailAddress,
             'external_account_id' => $this->getExternalAccountDeletionId($validGoogleAccount),
         ];
-        // --- step 4 - end - bersihkan akun tidak valid dan bentuk hasil
+        // --- step 4 - bersihkan akun tidak valid dan bentuk hasil - end ---
 
         return $result;
     }
@@ -412,11 +412,11 @@ class ClerkSecurityService
      */
     private function hydrateExternalAccountDeletionIds(ClerkUser $clerkUser, ResponseInterface $rawResponse): void
     {
-        // --- step 1 - start - ekstrak id penghapusan dari raw response
+        // --- step 1 - ekstrak id penghapusan dari raw response - start ---
         $deletionIds = $this->extractExternalAccountDeletionIds($rawResponse);
-        // --- step 1 - end - ekstrak id penghapusan dari raw response
+        // --- step 1 - ekstrak id penghapusan dari raw response - end ---
 
-        // --- step 2 - start - pasangkan id penghapusan ke model external account
+        // --- step 2 - pasangkan id penghapusan ke model external account - start ---
         foreach ($clerkUser->externalAccounts as $externalAccount) {
             if (! $externalAccount instanceof ExternalAccountWithVerification) {
                 continue;
@@ -436,7 +436,7 @@ class ClerkSecurityService
                 ['external_account_id' => $deletionIds[$lookupKey]]
             );
         }
-        // --- step 2 - end - pasangkan id penghapusan ke model external account
+        // --- step 2 - pasangkan id penghapusan ke model external account - end ---
     }
 
     /**
@@ -449,15 +449,15 @@ class ClerkSecurityService
      */
     private function extractExternalAccountDeletionIds(ResponseInterface $rawResponse): array
     {
-        // --- step 1 - start - validasi payload external account
+        // --- step 1 - validasi payload external account - start ---
         $payload = json_decode((string) $rawResponse->getBody(), true);
 
         if (! is_array($payload) || ! is_array($payload['external_accounts'] ?? null)) {
             return [];
         }
-        // --- step 1 - end - validasi payload external account
+        // --- step 1 - validasi payload external account - end ---
 
-        // --- step 2 - start - indeks id penghapusan berdasarkan provider dan identification
+        // --- step 2 - indeks id penghapusan berdasarkan provider dan identification - start ---
         $deletionIds = [];
 
         foreach ($payload['external_accounts'] as $externalAccount) {
@@ -483,7 +483,7 @@ class ClerkSecurityService
 
             $deletionIds[$this->getExternalAccountLookupKey($provider, $identificationId)] = $deletionId;
         }
-        // --- step 2 - end - indeks id penghapusan berdasarkan provider dan identification
+        // --- step 2 - indeks id penghapusan berdasarkan provider dan identification - end ---
 
         return $deletionIds;
     }
@@ -736,15 +736,15 @@ class ClerkSecurityService
      */
     private function ensureProviderAccountsAreDeleted(string $clerkUserId, array $deletedExternalAccounts): void
     {
-        // --- step 1 - start - validasi dan muat ulang user Clerk
+        // --- step 1 - validasi dan muat ulang user Clerk - start ---
         if (count($deletedExternalAccounts) === 0) {
             return;
         }
 
         $currentClerkUser = $this->getClerkUser($clerkUserId);
-        // --- step 1 - end - validasi dan muat ulang user Clerk
+        // --- step 1 - validasi dan muat ulang user Clerk - end ---
 
-        // --- step 2 - start - pastikan akun yang dihapus tidak lagi terhubung
+        // --- step 2 - pastikan akun yang dihapus tidak lagi terhubung - start ---
         foreach ($deletedExternalAccounts as $deletedExternalAccount) {
             if (! $deletedExternalAccount instanceof ExternalAccountWithVerification) {
                 continue;
@@ -760,7 +760,7 @@ class ClerkSecurityService
                 throw new RuntimeException('Akun Google yang tidak sesuai belum berhasil dilepaskan. Silakan coba lagi.');
             }
         }
-        // --- step 2 - end - pastikan akun yang dihapus tidak lagi terhubung
+        // --- step 2 - pastikan akun yang dihapus tidak lagi terhubung - end ---
     }
 
     /**
@@ -887,16 +887,16 @@ class ClerkSecurityService
      */
     private function resolveDeviceLabel(?SessionActivityResponse $activity): string
     {
-        // --- step 1 - start - validasi dan normalisasi informasi perangkat
+        // --- step 1 - validasi dan normalisasi informasi perangkat - start ---
         if (! $activity) {
             return 'Perangkat tidak dikenal';
         }
 
         $browserName = trim((string) $activity->browserName);
         $deviceType = $this->resolveSessionDeviceType($activity);
-        // --- step 1 - end - validasi dan normalisasi informasi perangkat
+        // --- step 1 - validasi dan normalisasi informasi perangkat - end ---
 
-        // --- step 2 - start - pilih label perangkat paling informatif
+        // --- step 2 - pilih label perangkat paling informatif - start ---
         if ($browserName !== '' && $deviceType !== '') {
             return "{$browserName} di {$deviceType}";
         }
@@ -909,7 +909,7 @@ class ClerkSecurityService
             return $deviceType;
         }
 
-        // --- step 2 - end - pilih label perangkat paling informatif
+        // --- step 2 - pilih label perangkat paling informatif - end ---
 
         return 'Perangkat tidak dikenal';
     }

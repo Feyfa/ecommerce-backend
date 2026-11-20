@@ -44,16 +44,16 @@ class CheckoutController extends Controller
      */
     public function getDataCheckout(): JsonResponse
     {
-        // --- step 1 - start - validasi buyer terautentikasi
+        // --- step 1 - validasi buyer terautentikasi - start ---
         $user_id_buyer = optional(auth()->user())->id;
         $userExists = User::where('id', $user_id_buyer)->exists();
 
         if (! $userExists) {
             return response()->json(['result' => 'error', 'message' => 'Unauthorized'], 401);
         }
-        // --- step 1 - end - validasi buyer terautentikasi
+        // --- step 1 - validasi buyer terautentikasi - end ---
 
-        // --- step 2 - start - sinkronkan availability item checkout
+        // --- step 2 - sinkronkan availability item checkout - start ---
         $cartState = $this->checkoutService->reconcileCheckoutCart($user_id_buyer);
         $availabilityError = $this->checkoutService->checkoutAvailabilityError($cartState);
 
@@ -63,9 +63,9 @@ class CheckoutController extends Controller
                 ...$availabilityError,
             ], 409);
         }
-        // --- step 2 - end - sinkronkan availability item checkout
+        // --- step 2 - sinkronkan availability item checkout - end ---
 
-        // --- step 3 - start - validasi alamat aktif buyer
+        // --- step 3 - validasi alamat aktif buyer - start ---
         $getAlamatBuyer = $this->checkoutService->getAlamatBuyer($user_id_buyer);
         $alamat = $getAlamatBuyer['alamat'];
 
@@ -80,9 +80,9 @@ class CheckoutController extends Controller
                 'message' => 'Alamat pengiriman perlu diverifikasi dengan pinpoint sebelum melanjutkan checkout.',
             ], 409);
         }
-        // --- step 3 - end - validasi alamat aktif buyer
+        // --- step 3 - validasi alamat aktif buyer - end ---
 
-        // --- step 4 - start - ambil dan validasi kelompok item checkout
+        // --- step 4 - ambil dan validasi kelompok item checkout - start ---
         $getKeranjangCheckout = $this->checkoutService->getKeranjangCheckout($user_id_buyer);
         $checkouts = $getKeranjangCheckout['checkouts'];
         $totalPrice = $getKeranjangCheckout['totalPrice'];
@@ -102,16 +102,16 @@ class CheckoutController extends Controller
                 'message' => 'Lokasi toko penjual belum diverifikasi. Checkout belum dapat dilanjutkan.',
             ], 409);
         }
-        // --- step 4 - end - ambil dan validasi kelompok item checkout
+        // --- step 4 - ambil dan validasi kelompok item checkout - end ---
 
-        // --- step 5 - start - ambil metode pembayaran checkout
+        // --- step 5 - ambil metode pembayaran checkout - start ---
         $getCheckoutPayment = $this->paymentService->getCheckoutPayment();
         $payments = $getCheckoutPayment['payments'];
 
         if (count($payments) == 0) {
             return response()->json(['status' => 'error', 'message' => 'Payment List Empty'], 400);
         }
-        // --- step 5 - end - ambil metode pembayaran checkout
+        // --- step 5 - ambil metode pembayaran checkout - end ---
 
         return response()->json([
             'status' => 'success',
@@ -138,16 +138,16 @@ class CheckoutController extends Controller
      */
     public function processCheckout(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi buyer terautentikasi
+        // --- step 1 - validasi buyer terautentikasi - start ---
         $user_id_buyer = optional(auth()->user())->id;
         $user = User::where('id', $user_id_buyer)->first();
 
         if (! $user) {
             return response()->json(['result' => 'error', 'message' => 'Unauthorized'], 401);
         }
-        // --- step 1 - end - validasi buyer terautentikasi
+        // --- step 1 - validasi buyer terautentikasi - end ---
 
-        // --- step 2 - start - validasi payload checkout
+        // --- step 2 - validasi payload checkout - start ---
         $validator = Validator::make($request->all(), [
             'payment_slug' => ['required'],
             'shipping_options' => ['required', 'array'],
@@ -166,9 +166,9 @@ class CheckoutController extends Controller
         if ($validator->fails()) {
             return response()->json(['status' => 'error', 'message' => $validator->messages()], 422);
         }
-        // --- step 2 - end - validasi payload checkout
+        // --- step 2 - validasi payload checkout - end ---
 
-        // --- step 3 - start - bangun dan bandingkan snapshot checkout backend
+        // --- step 3 - bangun dan bandingkan snapshot checkout backend - start ---
         $checkoutSnapshot = $this->checkoutService->buildCheckoutSnapshot(
             user_id_buyer: $user_id_buyer,
             shippingOptions: $request->shipping_options ?? [],
@@ -199,20 +199,20 @@ class CheckoutController extends Controller
                 'checkout' => $this->checkoutService->formatCheckoutSnapshotForFrontend($checkoutSnapshot),
             ], 409);
         }
-        // --- step 3 - end - bangun dan bandingkan snapshot checkout backend
+        // --- step 3 - bangun dan bandingkan snapshot checkout backend - end ---
 
         $checkoutKey = '';
 
         try {
-            // --- step 4 - start - kunci proses checkout yang sama
+            // --- step 4 - kunci proses checkout yang sama - start ---
             $checkoutKey = $this->checkoutService->generateCheckoutKey(
                 user_id_buyer: $user_id_buyer,
                 checkoutSnapshot: $checkoutSnapshot,
             );
             $this->checkoutService->lockCheckoutKey($checkoutKey);
-            // --- step 4 - end - kunci proses checkout yang sama
+            // --- step 4 - kunci proses checkout yang sama - end ---
 
-            // --- step 5 - start - cegah checkout yang sudah diproses
+            // --- step 5 - cegah checkout yang sudah diproses - start ---
             $existingCheckoutInvoice = $this->checkoutService->getExistingCheckoutInvoice(
                 user_id_buyer: $user_id_buyer,
                 checkout_key: $checkoutKey,
@@ -225,9 +225,9 @@ class CheckoutController extends Controller
                     'message' => 'Checkout ini sudah diproses, silakan cek transaksi Anda',
                 ], 409);
             }
-            // --- step 5 - end - cegah checkout yang sudah diproses
+            // --- step 5 - cegah checkout yang sudah diproses - end ---
 
-            // --- step 6 - start - siapkan data payment
+            // --- step 6 - siapkan data payment - start ---
             $now = Carbon::now()->timestamp;
             $uniqid = uniqid();
             $external_id = "{$checkoutSnapshot['data']['payment']['method']}-{$checkoutSnapshot['data']['payment']['slug']}-{$user_id_buyer}-{$now}-{$uniqid}";
@@ -242,9 +242,9 @@ class CheckoutController extends Controller
             $expired_at = Carbon::now()->addDay()->setMinutes(0)->setSeconds(0)->setMicroseconds(0);
             $expired_at_xendit = $expired_at->toIso8601String();
             $expired_at_transaction = $expired_at->format('Y-m-d H:i:s');
-            // --- step 6 - end - siapkan data payment
+            // --- step 6 - siapkan data payment - end ---
 
-            // --- step 7 - start - proses checkout secara atomik
+            // --- step 7 - proses checkout secara atomik - start ---
             $transactionInvoiceId = DB::transaction(function () use (
                 $user_id_buyer,
                 $checkoutSnapshot,
@@ -332,7 +332,7 @@ class CheckoutController extends Controller
                 // transaksi hasil checkout ini secara langsung, bukan menebak data terbaru buyer.
                 return $saveCheckoutToDatabase['transaction_invoice_id'] ?? '';
             });
-            // --- step 7 - end - proses checkout secara atomik
+            // --- step 7 - proses checkout secara atomik - end ---
 
         } catch (CheckoutAvailabilityException $e) {
             // Transaksi database sudah rollback pada titik ini, sehingga perubahan cart
@@ -393,7 +393,7 @@ class CheckoutController extends Controller
      */
     private function recordCheckoutProductOutbox(array $checkouts): void
     {
-        // --- step 1 - start - kumpulkan ID produk checkout secara unik
+        // --- step 1 - kumpulkan ID produk checkout secara unik - start ---
         $productIds = [];
 
         foreach ($checkouts as $checkout) {
@@ -405,13 +405,13 @@ class CheckoutController extends Controller
                 }
             }
         }
-        // --- step 1 - end - kumpulkan ID produk checkout secara unik
+        // --- step 1 - kumpulkan ID produk checkout secara unik - end ---
 
-        // --- step 2 - start - catat proyeksi terbaru bersama commit checkout
+        // --- step 2 - catat proyeksi terbaru bersama commit checkout - start ---
         $this->outboxRecorder->recordProductSyncMany(
             array_keys($productIds),
             OutboxRecorderService::SOURCE_CHECKOUT_STOCK_CHANGED,
         );
-        // --- step 2 - end - catat proyeksi terbaru bersama commit checkout
+        // --- step 2 - catat proyeksi terbaru bersama commit checkout - end ---
     }
 }

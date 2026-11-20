@@ -333,16 +333,16 @@ class ProductAvailabilityTest extends TestCase
      */
     public function cart_endpoints_reject_an_authenticated_user_targeting_another_buyers_cart(): void
     {
-        // --- step 1 - start - siapkan cart korban dan user penyerang terautentikasi
+        // --- step 1 - siapkan cart korban dan user penyerang terautentikasi - start ---
         $buyer = User::factory()->create();
         $attacker = User::factory()->create();
         $seller = User::factory()->create();
         $this->createVerifiedSellerAddress($seller);
         $product = $this->createProduct($seller, 'Cart Milik Buyer Lain', 8);
         $cart = $this->createCart($buyer, $seller, $product, 2);
-        // --- step 1 - end - siapkan cart korban dan user penyerang terautentikasi
+        // --- step 1 - siapkan cart korban dan user penyerang terautentikasi - end ---
 
-        // --- step 2 - start - coba seluruh endpoint cart menggunakan id korban
+        // --- step 2 - coba seluruh endpoint cart menggunakan id korban - start ---
         $requests = [
             ['GET', "/api/keranjang/{$buyer->id}", []],
             ['POST', '/api/keranjang', [
@@ -390,9 +390,9 @@ class ProductAvailabilityTest extends TestCase
                 ->assertForbidden()
                 ->assertJsonPath('code', 'CART_FORBIDDEN');
         }
-        // --- step 2 - end - coba seluruh endpoint cart menggunakan id korban
+        // --- step 2 - coba seluruh endpoint cart menggunakan id korban - end ---
 
-        // --- step 3 - start - pastikan tidak ada state korban yang berubah
+        // --- step 3 - pastikan tidak ada state korban yang berubah - start ---
         $this->assertDatabaseCount('keranjangs', 1);
         $this->assertDatabaseHas('keranjangs', [
             'id' => $cart->id,
@@ -404,7 +404,7 @@ class ProductAvailabilityTest extends TestCase
         $this->assertDatabaseMissing('keranjangs', [
             'user_id_buyer' => $attacker->id,
         ]);
-        // --- step 3 - end - pastikan tidak ada state korban yang berubah
+        // --- step 3 - pastikan tidak ada state korban yang berubah - end ---
     }
 
     /**
@@ -475,7 +475,7 @@ class ProductAvailabilityTest extends TestCase
      */
     public function cart_checkout_validation_reports_a_concurrently_unverified_seller(): void
     {
-        // --- step 1 - start - siapkan pilihan cart yang awalnya valid
+        // --- step 1 - siapkan pilihan cart yang awalnya valid - start ---
         $buyer = User::factory()->create();
         $seller = User::factory()->create();
         $this->createBuyerAddress($buyer);
@@ -483,9 +483,9 @@ class ProductAvailabilityTest extends TestCase
         $product = $this->createProduct($seller, 'Seller Berubah Sebelum Checkout', 5);
         $cart = $this->createCart($buyer, $seller, $product, 1);
         $cart->update(['checkout' => 0]);
-        // --- step 1 - end - siapkan pilihan cart yang awalnya valid
+        // --- step 1 - siapkan pilihan cart yang awalnya valid - end ---
 
-        // --- step 2 - start - hilangkan verifikasi seller lalu validasi dari cart
+        // --- step 2 - hilangkan verifikasi seller lalu validasi dari cart - start ---
         $this->invalidateSellerAddress($seller);
 
         $this->actingAs($buyer)
@@ -499,7 +499,7 @@ class ProductAvailabilityTest extends TestCase
                 "keranjangs.{$seller->id}.0.unavailable_reason",
                 ProductAvailabilityService::SELLER_LOCATION_UNVERIFIED,
             );
-        // --- step 2 - end - hilangkan verifikasi seller lalu validasi dari cart
+        // --- step 2 - hilangkan verifikasi seller lalu validasi dari cart - end ---
 
         $this->assertDatabaseHas('keranjangs', [
             'id' => $cart->id,
@@ -561,16 +561,16 @@ class ProductAvailabilityTest extends TestCase
      */
     public function processing_checkout_reports_a_concurrently_unverified_seller_before_payment(): void
     {
-        // --- step 1 - start - siapkan checkout yang sudah terbuka saat seller masih valid
+        // --- step 1 - siapkan checkout yang sudah terbuka saat seller masih valid - start ---
         $buyer = User::factory()->create();
         $seller = User::factory()->create();
         $this->createBuyerAddress($buyer);
         $this->createVerifiedSellerAddress($seller);
         $product = $this->createProduct($seller, 'Seller Berubah Sebelum Pembayaran', 5);
         $cart = $this->createCart($buyer, $seller, $product, 1);
-        // --- step 1 - end - siapkan checkout yang sudah terbuka saat seller masih valid
+        // --- step 1 - siapkan checkout yang sudah terbuka saat seller masih valid - end ---
 
-        // --- step 2 - start - hilangkan verifikasi seller tepat sebelum pembayaran
+        // --- step 2 - hilangkan verifikasi seller tepat sebelum pembayaran - start ---
         $this->invalidateSellerAddress($seller);
 
         $this->actingAs($buyer)
@@ -599,7 +599,7 @@ class ProductAvailabilityTest extends TestCase
                 'code' => 'SELLER_ADDRESS_REQUIRES_VERIFICATION',
                 'message' => 'Lokasi toko penjual belum diverifikasi. Checkout belum dapat dilanjutkan.',
             ]);
-        // --- step 2 - end - hilangkan verifikasi seller tepat sebelum pembayaran
+        // --- step 2 - hilangkan verifikasi seller tepat sebelum pembayaran - end ---
 
         $this->assertDatabaseCount('transaction_invoices', 0);
         $this->assertDatabaseHas('keranjangs', [
@@ -666,7 +666,7 @@ class ProductAvailabilityTest extends TestCase
      */
     public function stock_change_blocks_the_first_checkout_but_preserves_valid_multi_seller_items(): void
     {
-        // --- step 1 - start - siapkan dua seller dengan satu item berubah dan satu item valid
+        // --- step 1 - siapkan dua seller dengan satu item berubah dan satu item valid - start ---
         $buyer = User::factory()->create();
         $changedSeller = User::factory()->create();
         $validSeller = User::factory()->create();
@@ -685,9 +685,9 @@ class ProductAvailabilityTest extends TestCase
         $changedCart->update(['checkout' => 0]);
         $validCart->update(['checkout' => 0]);
         $changedProduct->update(['stock' => 1]);
-        // --- step 1 - end - siapkan dua seller dengan satu item berubah dan satu item valid
+        // --- step 1 - siapkan dua seller dengan satu item berubah dan satu item valid - end ---
 
-        // --- step 2 - start - checkout pertama dibatalkan dengan detail masalah stok
+        // --- step 2 - checkout pertama dibatalkan dengan detail masalah stok - start ---
         $this->actingAs($buyer)
             ->postJson('/api/keranjang/validate/checkout', [
                 'user_id_buyer' => $buyer->id,
@@ -720,9 +720,9 @@ class ProductAvailabilityTest extends TestCase
             'checkout' => 0,
             'total' => 2,
         ]);
-        // --- step 2 - end - checkout pertama dibatalkan dengan detail masalah stok
+        // --- step 2 - checkout pertama dibatalkan dengan detail masalah stok - end ---
 
-        // --- step 3 - start - checkout kedua hanya melanjutkan item yang tetap valid
+        // --- step 3 - checkout kedua hanya melanjutkan item yang tetap valid - start ---
         $this->postJson('/api/keranjang/validate/checkout', [
             'user_id_buyer' => $buyer->id,
             'product_ids' => [$validProduct->id],
@@ -740,7 +740,7 @@ class ProductAvailabilityTest extends TestCase
             'checkout' => 1,
             'total' => 2,
         ]);
-        // --- step 3 - end - checkout kedua hanya melanjutkan item yang tetap valid
+        // --- step 3 - checkout kedua hanya melanjutkan item yang tetap valid - end ---
     }
 
     /**

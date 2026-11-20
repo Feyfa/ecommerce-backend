@@ -22,18 +22,18 @@ class SaldoService
      */
     public function getSaldo(string $user_id): array
     {
-        // --- step 1 - start - validasi input
+        // --- step 1 - validasi input - start ---
         if (empty($user_id) || trim($user_id) == '') {
             return ['status' => 'error', 'message' => 'user id cannot be empty'];
         }
-        // --- step 1 - end - validasi input
+        // --- step 1 - validasi input - end ---
 
-        // --- step 2 - start - ambil saldo user
+        // --- step 2 - ambil saldo user - start ---
         $saldoUser = SaldoUser::where('user_id', $user_id)->first();
         $saldoIncome = (int) ($saldoUser->saldo_income ?? 0);
         $saldoRefund = (int) ($saldoUser->saldo_refund ?? 0);
         $saldoTotal = $saldoIncome + $saldoRefund;
-        // --- step 2 - end - ambil saldo user
+        // --- step 2 - ambil saldo user - end ---
 
         return ['status' => 'success', 'saldoTotal' => $saldoTotal, 'saldoIncome' => $saldoIncome, 'saldoRefund' => $saldoRefund];
     }
@@ -54,13 +54,13 @@ class SaldoService
      */
     public function getSaldoHistory(string $user_id, string $start_date, string $end_date, array $saldo_history_current_ids = []): array
     {
-        // --- step 1 - start - validasi input
+        // --- step 1 - validasi input - start ---
         if (empty($user_id) || trim($user_id) == '') {
             return ['status' => 'error', 'message' => 'user id cannot be empty'];
         }
-        // --- step 1 - end - validasi input
+        // --- step 1 - validasi input - end ---
 
-        // --- step 2 - start - ambil riwayat saldo
+        // --- step 2 - ambil riwayat saldo - start ---
         $saldoHistory = SaldoHistory::from('saldo_histories as sh')
             ->select(
                 'sh.*',
@@ -123,7 +123,7 @@ class SaldoService
                     'description' => $description,
                 ];
             });
-        // --- step 2 - end - ambil riwayat saldo
+        // --- step 2 - ambil riwayat saldo - end ---
 
         return ['status' => 'success', 'saldoHistory' => $saldoHistory];
     }
@@ -140,11 +140,11 @@ class SaldoService
      */
     public function getSaldoById(string $id): array
     {
-        // --- step 1 - start - validasi input
+        // --- step 1 - validasi input - start ---
         if (empty($id) || trim($id) == '') {
             return ['status' => 'error', 'message' => 'user id cannot be empty'];
         }
-        // --- step 1 - end - validasi input
+        // --- step 1 - validasi input - end ---
 
         $saldoHistory = SaldoHistory::from('saldo_histories as sh')
             ->select(
@@ -214,23 +214,23 @@ class SaldoService
      */
     public function saveSaldoAfterDisbursement(?string $user_id = null, ?string $payment_user_id = null, int $price = 0): array
     {
-        // --- step 1 - start - ambil data user
+        // --- step 1 - ambil data user - start ---
         $userExists = User::where('id', $user_id)
             ->exists();
         if (! $userExists) {
             return ['status' => 'error', 'message' => 'user not found'];
         }
-        // --- step 1 - end - ambil data user
+        // --- step 1 - ambil data user - end ---
 
-        // --- step 2 - start - ambil saldo user
+        // --- step 2 - ambil saldo user - start ---
         $saldoUser = SaldoUser::where('user_id', $user_id)
             ->first();
         $saldoRefund = (int) ($saldoUser->saldo_refund ?? 0);
         $saldoIncome = (int) ($saldoUser->saldo_income ?? 0);
         $saldoBefore = $saldoRefund + $saldoIncome;
-        // --- step 2 - end - ambil saldo user
+        // --- step 2 - ambil saldo user - end ---
 
-        // --- step 3 - start - kurangi saldo
+        // --- step 3 - kurangi saldo - start ---
         if ($saldoRefund >= $price) {
             $saldoRefund -= $price;
             $saldoUser->saldo_refund = $saldoRefund;
@@ -252,9 +252,9 @@ class SaldoService
         $saldoRefund = (int) ($saldoUser->saldo_refund ?? 0);
         $saldoIncome = (int) ($saldoUser->saldo_income ?? 0);
         $saldoAfter = $saldoRefund + $saldoIncome;
-        // --- step 3 - end - kurangi saldo
+        // --- step 3 - kurangi saldo - end ---
 
-        // --- step 4 - start - buat riwayat saldo
+        // --- step 4 - buat riwayat saldo - start ---
         $saldoHistory = SaldoHistory::create([
             'user_id' => $user_id,
             'transaction_user_id' => null,
@@ -265,7 +265,7 @@ class SaldoService
             'saldo_after' => $saldoAfter,
         ]);
         $saldoHistoryId = $saldoHistory->id;
-        // --- step 4 - end - buat riwayat saldo
+        // --- step 4 - buat riwayat saldo - end ---
 
         return ['status' => 'success', 'saldoHistoryId' => $saldoHistoryId];
     }

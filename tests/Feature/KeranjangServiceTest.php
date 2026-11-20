@@ -61,7 +61,7 @@ class KeranjangServiceTest extends TestCase
      */
     public function test_checkProductSoldOutByIds(): void
     {
-        // --- step 1 - start - siapkan produk dengan setiap kondisi availability
+        // --- step 1 - siapkan produk dengan setiap kondisi availability - start ---
         $seller = User::factory()->create();
         $this->createVerifiedSellerAddress($seller);
         $unverifiedSeller = User::factory()->create();
@@ -72,9 +72,9 @@ class KeranjangServiceTest extends TestCase
         $unverified = $this->createProduct($unverifiedSeller, 'Lokasi belum valid');
         $missingId = (string) Str::uuid();
         $productIds = [$available->id, $deleted->id, $outOfStock->id, $unverified->id, $missingId, $deleted->id, ''];
-        // --- step 1 - end - siapkan produk dengan setiap kondisi availability
+        // --- step 1 - siapkan produk dengan setiap kondisi availability - end ---
 
-        // --- step 2 - start - bandingkan kontrak pemeriksaan dan alias kompatibilitas
+        // --- step 2 - bandingkan kontrak pemeriksaan dan alias kompatibilitas - start ---
         $expected = [
             'ids' => [$deleted->id, $outOfStock->id, $unverified->id, $missingId],
             'reasons' => [
@@ -94,7 +94,7 @@ class KeranjangServiceTest extends TestCase
         $this->assertSame($expected, $this->keranjangService->checkProductUnavailableByIds($keyedProductIds));
         $this->assertSame($expected, $this->keranjangService->checkProductSoldOutByIds($keyedProductIds));
         $this->assertSame(['ids' => [], 'reasons' => []], $this->keranjangService->checkProductUnavailableByIds());
-        // --- step 2 - end - bandingkan kontrak pemeriksaan dan alias kompatibilitas
+        // --- step 2 - bandingkan kontrak pemeriksaan dan alias kompatibilitas - end ---
     }
 
     /**
@@ -106,7 +106,7 @@ class KeranjangServiceTest extends TestCase
      */
     public function test_cart_projection_preserves_grouping_totals_and_ownership(): void
     {
-        // --- step 1 - start - siapkan cart multi-seller dan cart buyer lain
+        // --- step 1 - siapkan cart multi-seller dan cart buyer lain - start ---
         $buyer = User::factory()->create();
         $otherBuyer = User::factory()->create();
         $seller = User::factory()->create(['name' => 'Nama akun seller']);
@@ -122,9 +122,9 @@ class KeranjangServiceTest extends TestCase
         $unchecked = $this->createCart($buyer, $product, quantity: 2, checked: false, checkout: false);
         $fallbackCart = $this->createCart($buyer, $fallbackProduct, quantity: 2);
         $otherCart = $this->createCart($otherBuyer, $product, quantity: 9);
-        // --- step 1 - end - siapkan cart multi-seller dan cart buyer lain
+        // --- step 1 - siapkan cart multi-seller dan cart buyer lain - end ---
 
-        // --- step 2 - start - periksa query batch dan hasil proyeksi
+        // --- step 2 - periksa query batch dan hasil proyeksi - start ---
         DB::enableQueryLog();
         DB::flushQueryLog();
         $state = $this->keranjangService->getKeranjangs($buyer->id);
@@ -160,9 +160,9 @@ class KeranjangServiceTest extends TestCase
         $this->assertSame([], $state['stockIssues']);
         $this->assertSame([], $state['unavailableSelectedItemIds']);
         $this->assertSame([], $state['unavailableCheckoutItemIds']);
-        // --- step 2 - end - periksa query batch dan hasil proyeksi
+        // --- step 2 - periksa query batch dan hasil proyeksi - end ---
 
-        // --- step 3 - start - pastikan pembacaan cart valid tidak mengubah quantity atau pilihan
+        // --- step 3 - pastikan pembacaan cart valid tidak mengubah quantity atau pilihan - start ---
         foreach ([$checked, $fallbackCart, $otherCart] as $cart) {
             $this->assertDatabaseHas('keranjangs', [
                 'id' => $cart->id,
@@ -171,7 +171,7 @@ class KeranjangServiceTest extends TestCase
                 'checkout' => true,
             ]);
         }
-        // --- step 3 - end - pastikan pembacaan cart valid tidak mengubah quantity atau pilihan
+        // --- step 3 - pastikan pembacaan cart valid tidak mengubah quantity atau pilihan - end ---
     }
 
     /**
@@ -183,7 +183,7 @@ class KeranjangServiceTest extends TestCase
      */
     public function test_read_repair_preserves_initial_selection_issues_and_quantities(): void
     {
-        // --- step 1 - start - siapkan item valid, stok berubah, dan produk dihapus
+        // --- step 1 - siapkan item valid, stok berubah, dan produk dihapus - start ---
         $buyer = User::factory()->create();
         $otherBuyer = User::factory()->create();
         $seller = User::factory()->create(['name' => 'Seller issue']);
@@ -198,9 +198,9 @@ class KeranjangServiceTest extends TestCase
         $outOfStockCart = $this->createCart($buyer, $outOfStock, quantity: 4, checked: false);
         $validCart = $this->createCart($buyer, $valid, quantity: 2);
         $otherCart = $this->createCart($otherBuyer, $limited, quantity: 5);
-        // --- step 1 - end - siapkan item valid, stok berubah, dan produk dihapus
+        // --- step 1 - siapkan item valid, stok berubah, dan produk dihapus - end ---
 
-        // --- step 2 - start - periksa issue dan alasan sebelum pilihan dinetralkan
+        // --- step 2 - periksa issue dan alasan sebelum pilihan dinetralkan - start ---
         $state = $this->keranjangService->getKeranjangs($buyer->id);
         $items = collect($state['keranjangs'])->flatten(1)->keyBy('k_id');
         $expectedIssue = [
@@ -228,9 +228,9 @@ class KeranjangServiceTest extends TestCase
         $this->assertSame(ProductAvailabilityService::OUT_OF_STOCK, $state['unavailableCheckoutReasons'][$outOfStockCart->id]);
         $this->assertNotNull($items->get($deletedCart->id)['p_deleted_at']);
         $this->assertEqualsWithDelta(200.5, $state['totalPrice'], 0.00001);
-        // --- step 2 - end - periksa issue dan alasan sebelum pilihan dinetralkan
+        // --- step 2 - periksa issue dan alasan sebelum pilihan dinetralkan - end ---
 
-        // --- step 3 - start - periksa read-repair tanpa mereset quantity atau cart lain
+        // --- step 3 - periksa read-repair tanpa mereset quantity atau cart lain - start ---
         foreach ([$limitedCart, $deletedCart, $outOfStockCart] as $cart) {
             $this->assertSame(0, $items->get($cart->id)['k_checked']);
             $this->assertSame(0, $items->get($cart->id)['k_checkout']);
@@ -250,7 +250,7 @@ class KeranjangServiceTest extends TestCase
                 'checkout' => true,
             ]);
         }
-        // --- step 3 - end - periksa read-repair tanpa mereset quantity atau cart lain
+        // --- step 3 - periksa read-repair tanpa mereset quantity atau cart lain - end ---
     }
 
     /**
