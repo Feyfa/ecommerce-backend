@@ -35,86 +35,50 @@ across the document does not leave lower-numbered IDs after higher-numbered IDs.
 
 ## Released Task Content Consistency
 
-Every production-bound task must deliver the same task changes to staging and
-production, including code, tests, Markdown, agent instructions, lockfiles, and
-every other Git-tracked file. Documentation-only changes have no exemption.
-
-- Complete the task changes on its main Jira task branch. Integrate and deploy
-  those changes to staging before promoting the same changes to production.
-- Any additional tracked change after staging verification must follow that
-  staging integration/deployment flow before production, even one Markdown line.
-- Compare task content, not only file names or merge commit SHAs. Different
-  merge history is allowed; missing, changed, or overwritten task content is not.
-- Staging may include other tasks that have not reached production. Attribute
-  every remaining content difference to those tasks; do not require whole-branch
-  equality or promote unfinished work merely to make a diff empty.
-- If another pending task changes the same file, inspect the relevant hunks and
-  integration behavior. Its presence does not excuse losing or changing the
-  released task's changes. Resolve an unclear difference before promotion.
-- Preserve staging-only work. Never reset staging to main or merge staging or a
-  task staging branch into main to establish consistency.
-- Before reporting completion or Jira Done, verify the task's tracked changes
-  in both application branches and the source revisions actually active on both
-  servers. Local pulls and merged PRs alone are not runtime evidence.
-- If tracked content is packaged into an image, deploy the image containing the
-  final content to both environments. For deploy repository changes, verify
-  the same released deploy revision on both VMs.
-- Record content comparisons, pending-task exceptions, deployment revisions,
-  and health evidence in Jira/PR/Actions. Keep the task open when consistency
-  or a required deployment is unverified.
+- Finish every tracked change for a production-bound task on its main Jira task branch.
+  Integrate and deploy that task content to staging before production, including tests,
+  Markdown, agent instructions, lockfiles, and configuration. Any tracked edit after
+  staging verification goes through staging integration and deployment again.
+- Compare task content and overlapping hunks across the application branches. Attribute
+  other differences to pending tasks and preserve their staging changes. Merge SHAs may
+  differ. Resolve any unclear loss or change in the released task before promotion.
+  Never reset staging to main, merge staging into main, or promote pending work to
+  force whole-branch equality.
+- Verify the source revisions active on both servers as well as the branch content.
+  If tracked content is packaged into an image, deploy the final image to both
+  environments. For deploy changes, verify the same released deploy revision on both VMs.
+- Record content comparisons, pending-task exceptions, active revisions, and health
+  evidence in Jira, PRs, or Actions. Keep release completion pending until the required
+  deployment and consistency checks are verified.
 
 ## Local QA Documentation Boundary
 
-Application `backend/docs/qa/` and `frontend/docs/qa/` documents describe local
-verification only: scenarios, expected results, executed local tests, static
-analysis, formatting, builds, code review, and local coverage limitations.
+Keep application `frontend/docs/qa/` and `backend/docs/qa/` for local QA. Record scenarios,
+expected results, actual tests or review, and local coverage limitations before commit.
+Label pending local checks as local and preserve unrelated historical QA.
 
-Finalize that evidence with the implementation before commit. Do not add
-checklist rows or update tracked QA documents for post-commit CI, push, PR,
-merge, staging/production smoke, deployment, runtime health, image revisions,
-or Jira completion. Keep those results in Jira, PRs, and GitHub Actions instead.
-CI and deployed verification remain required; their evidence location changes.
-A local check that is still pending must be described honestly as local.
-Do not mass-rewrite historical QA outside the task's authorized scope.
+Record post-commit CI, push, PR, merge, smoke tests, deployment, runtime health, image or
+source revisions, and Jira completion in Jira, PRs, or Actions. These release checks
+remain required.
 
 ## Manual QA Guidance And Evidence Reuse
 
-Guide manual QA with the fewest useful actions while preserving the required
-coverage and strength of evidence. Adapt the next step to what has already
-been proven, rather than following a fixed checklist order.
-
-- Define the affected behavior, relevant regression risks, required scenarios,
-  and pass criteria from the task changes before asking for manual checks.
-  Review existing tests, screenshots, logs, and prior results first.
-- Keep a concise scenario-to-evidence record of verified, pending, failed, or
-  blocked checks, including the environment and relevant deployed revision when
-  known. Reuse existing revision evidence; do not ask the user to collect it
-  again. Keep deployed QA results in Jira/PR/Actions, not local QA documents.
-- Combine related checks into a natural sequence when one action or capture can
-  prove several scenarios. Give manageable steps with the exact action,
-  expected result, and minimum screenshot, response, or log needed. Avoid
-  unnecessary navigation, resets, and duplicate screenshots.
-- After every user result, evaluate all scenarios it actually proves, including
-  those outside the current requested step. Update every supported result and
-  ask only for the remaining evidence gaps.
-- Reuse valid evidence for the same behavior, environment, and relevant task
-  content. A refresh showing preserved quantity, selection, and total can prove
-  those persistence checks together; do not request separate refreshes.
-- Do not repeat a passed check solely because it was not performed in the
-  original order. Repeat only when evidence is ambiguous or incomplete, a
-  failure needs investigation, relevant code/configuration/data changed, or the
-  evidence no longer applies. Explain the reason and retest only the affected
-  scenarios and necessary regressions.
-- Match each conclusion to the evidence: an HTTP 200 alone does not prove
-  correct business behavior, a screenshot does not prove unseen persistence,
-  and automated/local results do not replace required deployed manual checks.
-  Distinguish observed facts, supported inferences, and unresolved assumptions.
-- Stop requesting manual actions once all required scenarios have sufficient
-  valid evidence. Report the covered scope and any remaining limitations; add
-  checks only for a concrete task risk or new finding, not an unrelated flow.
-- Respect browser authorization and the approved QA scope. Guiding user-run
-  checks does not authorize opening a browser or performing real payments,
-  destructive actions, or other unapproved state changes.
+- Map affected behavior and regression risks to pass criteria. Review existing tests,
+  screenshots, and logs first. Track each scenario's evidence and status with its
+  environment and relevant revision when known.
+- Group related checks into a short sequence with the exact action, expected result,
+  and minimum capture. Say which open scenarios each result proves and request only
+  the evidence still missing.
+- Reuse proof for the same behavior, environment, and relevant task content. Repeat only
+  the checks affected by unclear evidence, a failure, a relevant change, or stale
+  evidence. Explain the reason for the repeat.
+- Match conclusions to what was observed. A screenshot of a refreshed cart can prove
+  the visible quantity, selection, and total together. An HTTP 200 alone cannot prove
+  business behavior. Required deployed manual checks still need deployed evidence.
+- Follow the agreed QA scope. Obtain authorization before opening a browser,
+  making real payments, or taking destructive or other state-changing actions while
+  guiding QA. Stop asking for checks once required scenarios are proven, and report any
+  remaining coverage limitations.
 
 ## Incremental Change Batches
 
@@ -204,113 +168,69 @@ and a branch that follows the shared release flow in
 
 ### Working Branch End State And Release Completion
 
-- When a Jira task branch participates in staging preparation, return to the
-  main Jira task branch after validating and pushing its `*-staging` branch. Do
-  not leave the repository on the staging integration branch.
-- When an operation involves only `main` and `staging` without a Jira task
-  branch, finish on `main`, not `staging`.
-- After every successful staging or production deployment and its required
-  health checks, first confirm each working tree is safe to switch. Refresh
-  local application `staging` and `main` and deploy `main` with `--ff-only`.
-  Synchronization and the final local checkout are separate decisions.
-- After staging, while the task still needs QA, fixes, or production promotion,
-  return each participating application repository to its main Jira task
-  branch, never its `*-staging` branch. If deploy has a branch for that active
-  task, return it to that task branch too. Repositories without a branch for
-  the task finish on `main`; do not create a task branch merely for checkout.
-- After production deployment and all required validation succeed, or the task
-  has completed its declared scope, finish the affected repositories on `main`.
-  A production-bound task remains active after staging; merging its PR into
-  `main` alone does not establish production completion.
-- These end states govern local working copies, not deployment sources.
-  Application staging uses `staging`, production uses `main`, and deploy
-  workflows and VMs use deploy `main`. Preserve local changes and task branches;
-  never force a switch, reset a branch, or delete work to reach an end state.
-- Before reporting completion, run `git branch --show-current` and verify the
-  expected final branch. Report any failed pull or branch check instead of
-  claiming synchronization succeeded.
-- If a matching Jira issue exists, record relevant release evidence and move it
-  to `Done` only after every deployment required by its scope has succeeded and
-  been validated. Keep it in its current status while any required CI, merge,
-  deployment, health check, or local synchronization remains incomplete or
-  failed.
-- After the `Done` transition, move the card to the top of the Done column when
-  a supported ranking operation is available. Treat ranking as best effort,
-  report an unavailable or failed ranking operation, and never guess or directly
-  overwrite an opaque Jira rank value.
+- After staging branch preparation, leave each participating application on its main Jira
+  task branch after validating and pushing `*-staging`. Return deploy to its task branch
+  after temporary inspection or refresh of `main`. Operations involving only long-lived
+  branches finish on `main`.
+- After each successful staging or production deployment and its health checks, confirm
+  the working trees are safe to switch. Refresh local application `staging` and `main` and deploy
+  `main` with `--ff-only`. Preserve local changes and task branches.
+- While QA, fixes, or production promotion remain, finish on the main Jira task branch
+  for each participating repo that has one. Use `main` when a repo has no task branch or
+  the task's declared scope is complete. Production-bound completion requires production
+  validation. Never force a switch, reset, or delete work to reach a checkout state.
+- The runtime sources are application `staging` for staging, application `main` for
+  production, and deploy `main` for workflows and VMs. Verify the final local checkout
+  with `git branch --show-current` in every affected repo. Report failed pulls or checks.
+- For a matching Jira issue, record release evidence. Move it to `Done` only after all
+  required CI, merges, deployments, health checks, content checks, and local sync pass.
+  Then rank it first in Done if a supported operation is available. Report a failed or
+  unavailable ranking operation and leave opaque rank values to Jira.
 
 ## PHP Documentation and Comments
 
-Every named PHP function or method that is added or changed must have a PHPDoc block, even when its name, native parameter types, or native return type appear self-explanatory. New classes, interfaces, traits, and enums must also have PHPDoc that explains their primary responsibility.
-
-Anonymous functions, closures, and arrow functions do not require PHPDoc unless they contain important context, behavior, or a non-obvious contract.
+Add PHPDoc to every new or changed named PHP function or method. Document the primary
+responsibility of new classes, interfaces, traits, and enums. Document anonymous
+functions and closures when they contain important behavior or a non-obvious contract.
 
 ### PHPDoc Description Quality
 
-PHPDoc descriptions must explain the function's purpose and contract without requiring the reader to infer them from the function name. Documentation must be proportional to complexity and, when relevant, explain:
-
-- the data, actor, or context being processed
-- validation and business rules
-- state changes, persistence, external calls, and other side effects
-- invariants, constraints, edge cases, race conditions, or regressions being prevented
-- the meaning of the result and important failure behavior
-
-Simple functions may use a concise description when their behavior is genuinely straightforward. Multi-stage or non-obvious functions must use multiple sentences or paragraphs when necessary. Never invent behavior, side effects, exceptions, or constraints that cannot be verified from the implementation and project context.
+Explain the purpose and contract in proportion to complexity. Cover relevant actors,
+validation, business rules, side effects, failure behavior, and constraints such as race
+conditions or compatibility. Document only information verified in the implementation
+or project context.
 
 ### PHPDoc Tag Order and Spacing
 
-Use this order consistently:
+Order the blocks as description, `@param`, `@return`, `@throws`, and other tags when needed.
+Use one blank PHPDoc line after the description and between tag groups. Keep `@param`
+tags adjacent. With no parameters, place `@return` after the description's blank line.
 
-1. primary description
-2. additional explanation when needed
-3. all `@param` tags
-4. the `@return` tag
-5. all relevant `@throws` tags
-6. other tags only when necessary
-
-Use one blank PHPDoc line between the description and the first tag. Keep all `@param` tags adjacent with no blank lines between them. Use exactly one blank PHPDoc line between the final `@param` and `@return`, and one blank PHPDoc line between `@return` and `@throws` when `@throws` is present. When a function has no parameters, place `@return` directly after the description's single separating blank line.
-
-Every signature parameter must have exactly one `@param` tag. Parameter names and order must exactly match the signature, types must remain compatible with the implementation, and each tag must explain the parameter's meaning or use rather than merely repeat its name.
-
-Every named function or method with a native return type must have an accurate `@return` tag, including `void` and `never`. The tag must explain the meaning, structure, or behavior of the returned value. Use a more specific PHPDoc type, such as an array shape or generic collection, when it adds verified information that the native type cannot express.
-
-Document relevant caller-facing exceptions with `@throws`. Constructors and destructors do not use native return type declarations and do not need a forced `@return` tag.
+Use exactly one `@param` for each signature parameter, in order, and explain its use.
+Use `@return` to explain every native return type, including `void` and `never`.
+Use array shapes or generics when they add verified information. Document caller-facing
+exceptions with `@throws`. Constructors and destructors can omit `@return` and have no
+native return type.
 
 ### Native Types and Imports
 
-Every new named function or method must declare an accurate native return type when the supported PHP version and inherited contract allow it. Determine the type from every return path, caller, interface, parent class, trait, framework contract, and related test before adding it. Do not use `mixed` merely to satisfy this rule when a more accurate type can be proven.
+Give new named functions and methods accurate native return types where PHP and
+inherited contracts allow them. Verify return paths, callers, inherited and framework
+contracts, and relevant tests first. Add a missing native type to an existing function
+only when safe and in scope. Use a precise type whenever the implementation supports one.
 
-Do not force a return type when PHP forbids it or when it would break an inherited or framework contract. When changing an existing function without a native return type, add one only when it can be determined safely and the change remains within task scope.
-
-Import class types with `use` statements and use their short names in signatures and PHPDoc. Avoid fully qualified class names such as `\Illuminate\Database\Eloquent\Relations\BelongsTo` in the function declaration when `BelongsTo` can be imported without ambiguity. Use an explicit alias when two imported classes share the same short name.
-
-Keep PHPDoc, native parameter types, native return types, default values, exceptions, and implementation behavior synchronized. Update or remove stale descriptions and tags whenever a function's signature or responsibility changes.
+Import class types with `use` and use short names in signatures and PHPDoc. Alias
+conflicting names. Keep native types, documentation, default values, and exceptions
+consistent with the implementation.
 
 ### Multi-step Logic
 
-Functions with multiple distinct stages must use paired `step start/end` comments. Number steps consistently, keep every start and end marker paired, and describe the responsibility of each stage in concise, specific language.
-
-```php
-/**
- * Validates and processes an operation in distinct stages.
- *
- * @return void The operation applies its side effects directly.
- */
-public function process(): void
-{
-    // --- step 1 - start - validate the operation input
-    // ...
-    // --- step 1 - end - validate the operation input
-
-    // --- step 2 - start - persist the validated state
-    // ...
-    // --- step 2 - end - persist the validated state
-}
-```
-
-Do not force step comments into a simple function that has no meaningful internal stages. Preserve existing step comments that remain accurate and update their descriptions or numbering when behavior changes.
-
-Add contextual comments when they explain intent, business rules, state relationships, side effects, compatibility constraints, edge cases, race conditions, or regressions that are not obvious from the code. Prefer comments that explain why the logic exists and avoid comments that merely translate syntax.
+Use paired `// --- step N - <stage name> - start ---` and
+`// --- step N - <stage name> - end ---` when PHP logic has distinct stages.
+Group related statements under one concrete stage. Put the reason below its start marker
+and separate stages with a blank line. Place the closing marker before `return` and
+leave one blank line between them. A single-stage function gets a short intent comment.
+Update existing step names or numbering when their behavior changes.
 
 ## Static Analysis
 
@@ -326,116 +246,65 @@ Do not silently baseline a finding that indicates a plausible security vulnerabi
 
 ## Command And Approval Readability
 
-- Keep simple commands on one line when they remain easy to read and review.
-- Format PHP, SQL, shell, or other complex commands across multiple lines with
-  clear indentation so the approval dialog remains easy to understand before
-  the command is approved.
-- Split complex operations into smaller commands with one clear purpose per
-  execution when that separation is safe and preserves the required atomicity.
-- Avoid placing complex scripts, especially `php -r` or long SQL statements,
-  on one dense line that is difficult to review.
-- When a temporary script is the safer approach, show or explain its contents
-  first, then use a short and specific command to execute it.
-- State explicitly in each approval question whether the command only reads
-  data or changes state.
+Use one command per terminal invocation and wait for each Git or SSH command to finish.
+Use the tool's working-directory option. Break long commands into one option or path per
+line and keep complex logic in a small, reviewable script. Explain a temporary script
+before running it.
+
+Keep approval requests explicit about reads and writes. Explain what a destructive
+action or remote write will do and why, then run it on its own. Never join operations
+with shell separators, command substitution, or a multiline block.
 
 ## Git and Commit Workflow
 
-Before proposing or creating a commit:
+Before proposing or creating a commit, confirm this repo and inspect its Git status.
 
-1. Confirm that Git operations are being performed in this repository.
-2. Inspect `git status` and use the staged diff as the primary source when files are staged. Review `git diff --cached --stat` and `git diff --cached`, not only the changed file names.
-3. If nothing is staged and the requested scope is the working tree, inspect the explicitly scoped actual diff and relevant untracked content. State when the prospective commit scope cannot yet be determined precisely.
-4. Understand the API contract, business rules, persistence effects, transaction boundaries, security impact, configuration, migrations, documentation, and validation represented by that diff.
-5. Keep unrelated changes out of the commit and never include changes from another repository. Recommend splitting the scope when the diff contains independently reviewable purposes.
-6. Do not switch branches, create branches, commit, push, or open a pull request unless the user explicitly requests that action.
+Review the staged diff as the commit scope. If asked for a message from the working
+tree before staging, inspect the scoped diff and relevant untracked files. Report any
+uncertainty about the prospective scope. Switch or create branches, commit, push, or
+open a PR only on explicit request.
 
-When staging a commit, add only the explicitly reviewed files with exact paths.
-Use `git add -- <file>` for each intended file, or list several exact paths in
-one command. Never use `git add -A`, `git add .`, `git add --all`, or broad
-globs. After staging, inspect `git diff --cached --name-status`,
-`git diff --cached --stat`, and `git diff --cached` so the approval clearly
-shows which files will be committed.
-
-When one Git command contains multiple explicit file paths, format it across
-multiple lines with one path per line and shell line continuations. Keep it as
-one Git operation while making every staged path easy to review in the
-approval dialog.
+Stage exact reviewed paths with `git add -- <path>`. For several paths, use one Git
+command with continuations and one path per line. Avoid broad globs and whole-tree
+staging. Check `git diff --cached --name-status`, `git diff --cached --stat`, and
+`git diff --cached` as separate commands before committing.
 
 ### Commit Scope and Atomicity
 
-A branch does not define a single commit scope. If a branch or working tree contains changes for multiple tasks, tickets, or independently reviewable purposes, inspect and stage each scope separately and generate one commit message from that scope's staged diff. Changes for one task must not absorb an unrelated feature, fix, refactor, configuration update, migration, test, or documentation change merely because they exist on the same branch.
-
-A detailed commit message is not a substitute for an atomic commit. Recommend separate commits when the available changes do not form one cohesive purpose. Keep changes together only when they implement one inseparable behavior or when splitting them would create an invalid or materially misleading intermediate state; describe that dependency when it is not obvious.
-
-The commit message must describe only content included in its verified scope. Exclude unstaged changes outside that scope, changes from another repository, unfinished implementation, future plans, and claims inferred only from task names, documentation, or earlier conversation.
-
-Use English with correct grammar for commit messages. Follow the Conventional Commits style already used by this repository, including an appropriate type and scope when applicable. Inspect recent Git history when the established type, scope, or wording convention is unclear.
-
-The summary must describe the actual high-level behavior change and remain specific enough for code review, Git history, debugging, deployment analysis, and revert operations. Choose the type and scope from the purpose of the change rather than a directory name. Do not derive the summary only from file names, branch names, task labels, or earlier conversation.
-
-Use imperative mood for the summary when it matches the repository convention. For a complex change, follow the summary with a concise context or motivation paragraph that explains the problem, purpose, or high-level approach without repeating the summary.
-
-Match commit-message detail to the staged scope:
-
-- A small, single-purpose change may use only a precise summary.
-- A medium change should normally include a short context paragraph and the main related behaviors.
-- A complex or cross-cutting change must include a summary, concise context, and a body grouped by behavior or subsystem. Represent every major area included in the commit instead of compressing several API, persistence, security, or configuration changes into a generic bullet.
-
-For complex backend commits, group details using headings derived from the actual diff, such as API contracts, business rules, database, transactions, queues, integrations, configuration, security, compatibility, migrations, or documentation. Explain request and response changes, status or error contracts, ownership and validation boundaries, schema and rollback implications, concurrency controls, runtime variables, and operational requirements when relevant. Group by behavior rather than listing every controller, service, model, migration, or test file.
-
-Mention a file name only when its identity has operational or reviewer significance, such as a specific migration, workflow, environment template, or configuration file. Never include secret or credential values in a commit message.
+Keep each commit within one repository and one reviewable purpose. Put related code,
+tests, and docs together when they deliver the same behavior. Split independent changes
+even if they share a branch. Describe inseparable changes when the dependency matters.
 
 ### Commit Message Structure
 
-Use this structure as an adaptive framework for medium and complex commits:
+Use clear English and a Conventional Commits subject `<type>(<scope>): <summary>`.
+Choose type and scope from the staged behavior. Use an imperative summary and limit the
+whole subject to 72 characters. Wrap body prose at 72 characters and preserve commands,
+URLs, paths, hashes, identifiers, and trailers. Reserve subject-only messages for
+trivial changes.
 
-```text
-<type>(<scope>): <summary>
+Describe the motivation, changed behavior, and material decisions from the staged diff.
+Group the body by behavior. Add API, migration, configuration, or release details when
+relevant. Use `Validation:` for checks actually run, with their commands and results.
+Include material gaps in `Limitations:` and keep credentials out of the message.
+Use a `BREAKING CHANGE:` footer only for a breaking contract and explain the impact
+and action consumers or operators need to take.
 
-<optional context or motivation paragraph>
+For backend changes, describe affected API contracts, security, persistence, transactions,
+queues, migrations, and operational effects when relevant.
 
-<backend behavior or subsystem group>:
-- <major behavior change>
-- <major behavior change>
+Use exactly one Codex co-author trailer when Codex materially contributed to the
+staged content. Use `Co-authored-by: Codex (<model>, <reasoning effort>) <noreply@openai.com>`
+when both details are verified. Omit the effort if only the model is verified. Use
+`Co-authored-by: Codex <noreply@openai.com>` when metadata is unavailable or ambiguous.
+Preserve valid trailers and place the Codex trailer last, after the body, footers, and
+issue references, with a blank line before the trailer block.
 
-<another relevant behavior or subsystem group>:
-- <major behavior change>
+### Commit Message Execution
 
-<optional technical or impact sections>
-
-Validation:
-- <actual automated test or manual verification>
-
-Limitations:
-- <verified limitation or unvalidated area>
-
-<optional breaking-change and issue footers>
-
-<optional attribution trailers>
-```
-
-Do not apply this framework rigidly. Omit empty or irrelevant sections, derive group names from the actual diff, and allow a small single-purpose commit to contain only a precise summary.
-
-Use conditional sections such as `Technical details:`, `Database:`, `API:`, `Configuration:`, `Deployment:`, `Compatibility:`, `Security:`, `Documentation:`, `Validation:`, and `Limitations:` only when the staged change supports them. Do not add empty or ceremonial sections. Include a limitation when an important database engine, queue worker, integration credential, migration path, deployment step, or production-only behavior remains unverified.
-
-Add a `Validation:` section only when the listed checks were actually executed. State the exact relevant commands or checks, do not claim that a full suite passed when only part of it ran, and report limitations honestly.
-
-Distinguish automated tests from manual API or operational verification. Do not present a failed command, an unavailable check, or an inferred result as successful validation. Add `Limitations:` when an important database engine, queue worker, integration credential, migration or rollback path, environment, risk, assumption, or intentionally excluded scope remains unverified; do not add the section ceremonially.
-
-Use a `BREAKING CHANGE:` footer only when the commit introduces a genuinely non-backward-compatible contract or behavior. Explain the previous contract, the new contract, and any action consumers must take; do not use the footer merely to emphasize a large change.
-
-Add exactly one Codex co-author trailer only when Codex materially analyzed, wrote, or changed content included in the commit. Do not add it merely because Codex generated or refined the commit message. When the active model and reasoning effort are verified by authoritative session metadata, use `Co-authored-by: Codex (<model>, <reasoning effort>) <noreply@openai.com>`; when only the model is verified, omit the reasoning effort. Never infer or guess either value. If the metadata is unavailable or ambiguous, use `Co-authored-by: Codex <noreply@openai.com>`.
-
-Preserve other valid trailers and do not add a duplicate Codex trailer. Separate trailers from preceding content with a blank line, do not format them as bullets, and place the Codex trailer at the end of the commit message after the body, conditional sections, `BREAKING CHANGE:` footer, and issue references.
-
-Before presenting or creating the commit message, verify that the repository and staged scope are correct, every major API or subsystem behavior in scope is represented, each claim is supported by the diff or executed validation, English grammar is sound, no empty section remains, relevant limitations are disclosed, and footers and trailers are correctly ordered.
-
-Every commit must read its message from standard input using `git commit -F -`
-with a quoted `'EOF'` heredoc delimiter. This applies to subject-only commits,
-multi-line messages, and amendments that replace a commit message. Do not use
-`git commit -m`, multiple `-m` arguments, or literal `\n` sequences in place of
-real line breaks.
+Use the Ecommerce runbook's heredoc rule for commit input, including subject-only
+messages and amendments that replace the message. Pass real newlines through a quoted
+`'EOF'` delimiter with `git commit -F -`.
 
 ```bash
 git commit -F - <<'EOF'
@@ -443,136 +312,69 @@ docs(workflow): describe the verified change
 EOF
 ```
 
-Hard-wrap commit-message prose at 72 characters per line. Keep the subject at
-72 characters or fewer. Do not wrap commands, URLs, paths, hashes, code
-identifiers, or trailers because their exact text must remain easy to copy.
-
-After creating a commit, run:
-
-```bash
-git log -1 --format=full
-```
-
-Verify that the commit is in the correct repository, the summary and body are accurate, sections and bullet points have the intended line breaks, no literal `\n` text was stored, and validation claims match checks that were actually run. If the message is malformed and the commit has not been pushed, correct it when doing so is safe.
+After committing, run `git log -1 --format=full` separately. Verify the repo, saved
+message, line breaks, claims, and trailers.
 
 ## GitHub Tool Selection
 
-Before performing any GitHub operation, identify the repository and whether the
-requested operation concerns a pull request or GitHub Actions. Tool selection is
-mandatory and must follow the rules below; do not choose a different tool merely
-because it is available.
+Identify the repository and whether the operation is a pull request or GitHub Actions.
+Use the tool specified for that operation.
 
 ### GitHub CLI Authentication Checks
 
-In this local workspace, sandboxed `gh auth status` has reported invalid
-credentials while the same check succeeded outside the sandbox using the
-host keyring. Do not treat that sandbox-only result as proof of invalid
-credentials.
+Use standalone, read-only `gh auth status` when CLI authentication needs verification.
+On the affected macOS host, a sandboxed check can miss the host keyring. Use the host
+check directly when needed and the approval flow supports it. Explain that it is
+read-only and scope any reusable approval to `["gh", "auth", "status"]`.
 
-- When a task requires GitHub CLI authentication verification, run the standard
-  `gh auth status` directly outside the sandbox using
-  `sandbox_permissions: "require_escalated"` and the available approval flow.
-  Skip the initial sandbox attempt in this local environment.
-- Keep the command standalone and read-only. State that purpose in the approval
-  question. If a reusable approval is appropriate, scope it to
-  `["gh", "auth", "status"]`, not all `gh` commands.
-- Do not use `--show-token`, `gh auth token`, credential extraction, or token
-  values in output or documentation. Do not automatically log in, log out,
-  switch accounts, refresh tokens, or modify authentication configuration.
-- If escalation is unavailable or denied, report that the host authentication
-  check could not be completed; do not declare credentials invalid or bypass
-  the restriction. If the permitted host check fails, report its actual output
-  and distinguish authentication failure from network or environment errors.
-- Verify the active account and relevant scopes from the successful result.
-  Authentication alone does not prove access to a particular repository or
-  permission to perform a requested operation.
-- This exception applies only to the authentication status check. It does not
-  disable sandboxing or authorize other `gh` commands, pushes, PR changes, or
-  deployments. Preserve the PR connector-first and Actions CLI rules below.
+Report an unavailable host check and distinguish authentication failures from network
+or environment errors. A sandbox-only failure leaves host auth unverified. Confirm the
+active account, scopes, and required repo permissions. Keep tokens out of output and
+documentation. Leave login state and settings alone during the check, and apply the usual
+approvals to other commands.
 
 ### GitHub Pull Requests
 
-Use `[TOK-X-staging] <description>` for application PRs targeting staging and
-`[TOK-X] <description>` for application PRs targeting main. Use the actual Jira
-key and the same concise description for the paired PRs. Deploy PRs target main
-and use `[TOK-X] <description>`; deploy has no task staging PR.
-Do not add a redundant `PR-` prefix or change branch naming/commit-message
-conventions. Push-triggered Action titles may still show commit subjects.
+Use `[TOK-X-staging] <description>` for application staging PRs and
+`[TOK-X] <description>` for main PRs. Use the actual Jira key and the same description
+for paired PRs. Deploy PRs target `main`.
 
-When the user asks to inspect, create, open, update, review, merge, or otherwise
-operate a pull request, use the connected GitHub integration first so the action
-is displayed through the structured Codex action UI. Do not use `gh`, Chrome,
-browser automation, or the GitHub web UI while the connected integration can
-perform the requested backend pull request operation.
+Use the connected GitHub integration first. If unavailable or unsuccessful, explain
+the limitation and use `gh pr`. Use `gh api` when a standard subcommand cannot perform
+the operation. Browser interaction requires an explicit request.
 
-If the connected GitHub integration is unavailable or fails, explain that
-limitation before using the GitHub CLI as a fallback. Prefer the dedicated
-`gh pr` commands and use `gh api` only when the required operation is not
-available through a standard `gh` subcommand. Use browser-based interaction only
-when the user explicitly requests it.
-
-Before any pull request operation that changes remote state, confirm the
-repository, pull request number when applicable, source branch, and target
-branch. After the operation, verify the resulting pull request state through the
-connected integration or the explained fallback tool.
-
-### CI And Deployment Monitoring
-
-Reduce repeated model/tool interaction while preserving every release gate.
-Prefer one CLI watcher per workflow run; subagents are not the default for
-routine waiting.
-
-- Identify the repository, run ID, workflow/event, source SHA, and attempt.
-  Use `gh run list` for discovery, not as a parallel polling loop after the
-  run has been identified. Keep a concise run-to-evidence record.
-- For a queued or running run, prefer
-  `gh run watch <run-id> --repo <owner/repo> --exit-status --compact --interval 30`.
-  Let the CLI perform its refreshes. Do not add a model-driven
-  `sleep -> gh run view/list` loop while that watcher is healthy.
-- Run long watchers in one resumable command session. Redirect recurring
-  output to a task/run-specific temporary log outside the repository when
-  practical. Resume the existing session with waits of at most 60 seconds;
-  do not start a new watcher after each tool yield or stream every refresh
-  into model context. Read only a small relevant tail when needed.
-- Keep user updates within the required communication cadence. Report known
-  changes or the last observed state briefly, without inventing progress or
-  repeatedly rereading status solely to produce an update.
-- Additional status reads are appropriate for run discovery, the final
-  checkpoint, or a concrete interruption, timeout, ambiguous result, failure
-  indication, or user status request. Explain recovery checks. If the watcher
-  disconnects or is unsupported by the installed CLI/authentication method,
-  check the run once and resume one watcher when possible; otherwise use
-  bounded, compact CLI polling without duplicate monitors.
-- A watcher exit code alone is not deployment proof. A nonzero exit can be a
-  monitor/network/authentication error. Confirm terminal `status`,
-  `conclusion`, source SHA, and attempt through `gh run view` before deciding
-  success or failure. A timeout does not itself cancel or fail the remote run.
-- On workflow failure, start with `gh run view <run-id> --log-failed` and
-  return only the relevant error and rollback/health evidence. On success,
-  inspect only the log sections needed to prove active revisions and health;
-  do not dump full build logs by default. Never rerun or dispatch another
-  deployment merely because the watcher stopped.
-- Reuse valid checks for unchanged content and the same verification context.
-  A changed commit/target, different required push/PR check, new attempt,
-  stale evidence, or concrete regression risk may require fresh verification.
-  Do not skip required PR CI by substituting a successful push CI result.
-- Required CI before merge, task-content parity, actual deployed revisions,
-  service/HTTP health, local synchronization/end branches, Jira evidence,
-  production authorization, and existing tool/permission rules still apply.
-  Keep post-commit evidence outside tracked local QA documents.
-- Use subagents only when explicitly authorized and useful for distinct
-  analysis; do not delegate routine waiting or duplicate monitoring merely to
-  claim usage savings. No reduction in plan usage is guaranteed.
+Before a PR write, confirm the repo, PR number when applicable, and source and target
+branches. For deploy PR writes, verify the GitHub account and repository permissions.
+Verify the result through the integration or the stated fallback.
 
 ### GitHub Actions
 
-When the user explicitly asks to inspect, run, dispatch, monitor, rerun, or
-otherwise operate a GitHub Actions workflow, use the GitHub CLI (`gh`) only. Do
-not use the connected GitHub integration, Chrome, browser automation, or the
-GitHub web UI for backend GitHub Actions operations unless the user explicitly
-requests browser-based work.
+Use the GitHub CLI for Actions. Run manual workflows with `gh workflow run` and
+inspect runs with `gh run list`, `gh run view`, or `gh run watch`.
+Before an operation that changes remote state, verify the GitHub account and its
+repository and workflow permissions. If `gh` is unavailable or authentication fails,
+report the limitation and stop the affected operation.
+Browser work on application Actions requires an explicit request.
 
-Before an Actions operation that changes remote state, verify that `gh` is
-authenticated with the correct GitHub account and has the required repository
-and workflow permissions. If `gh` is unavailable or authentication fails, stop
-and report the limitation; do not silently switch to another tool.
+### CI And Deployment Monitoring
+
+- Discover a run with `gh run list` and record its repo, run ID, workflow/event, source SHA,
+  and attempt. For a queued or running run, prefer one watcher.
+  `gh run watch <run-id> --repo <owner/repo> --exit-status --compact --interval 30`
+- Keep the watcher in one resumable session with waits of at most 60 seconds. Use a
+  task/run-specific log outside the repo when practical. Read a small relevant tail and
+  give updates from known state. Leave polling to the healthy watcher.
+- Recheck on discovery, final confirmation, interruption, ambiguous results, failure,
+  or a user status request. On a disconnected or unsupported watcher, check the run
+  once and resume one watcher if possible. Use bounded, compact CLI polling as the fallback.
+- Confirm terminal status, conclusion, source SHA, and attempt with `gh run view`.
+  A watcher exit or timeout does not establish the remote result or justify a retry.
+  On failure inspect `gh run view <run-id> --log-failed` for the error and rollback or
+  health evidence. On success read the logs needed for active revisions, images, and
+  service/HTTP health.
+- Reuse valid evidence for unchanged content and the same verification context.
+  Keep push and PR CI separate. Record post-commit evidence in Jira, PRs, or Actions.
+  Monitoring grants no permission to merge, retry, dispatch, or promote a release.
+- Use subagents only with explicit authorization for distinct work.
+
+See `../deploy/docs/release-flow.md` for release monitoring examples when available.
