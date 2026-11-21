@@ -15,7 +15,7 @@ use Illuminate\Support\Collection;
  *     type: string|null,
  *     title: string,
  *     date: string,
- *     price: float|null,
+ *     price: float|numeric-string|null,
  *     description: string
  * }
  */
@@ -133,6 +133,8 @@ class SaldoService
         // --- step 4 - kecualikan riwayat yang sudah tampil - end ---
 
         // --- step 5 - bentuk halaman riwayat - start ---
+        // Inferensi map() memperlebar numeric-string dari hasil formatter menjadi string.
+        /** @var Collection<int, SaldoHistoryRow> $rows */
         $rows = $saldoHistory->orderBy('sh.created_at', 'desc')
             ->limit(self::HISTORY_PAGE_SIZE)
             ->get()

@@ -20,6 +20,10 @@ seven PHPStan findings in the balance history list and detail.
   stale ignore patterns. The baseline went from 67 to 64 entries and from
   82 to 75 findings. Direct analysis confirmed seven removed findings and
   zero new findings.
+- **TOK-77-BE-06 Numeric strings.** Passed. A test connection configured to
+  fetch numbers as strings returned `"450000"` in the authenticated history
+  JSON. The detail retained the same value and formatted the description as
+  `Rp450.000`. The PDO setting was restored after the test.
 
 ## Local checks
 
@@ -31,6 +35,9 @@ seven PHPStan findings in the balance history list and detail.
 - The combined saldo history, saldo read, and withdrawal compatibility tests
   passed with 11 tests and 114 assertions.
 - `composer analyse` and `composer format:check` passed.
+- After documenting the numeric-string contract, the history and read
+  controller suites passed with 11 tests and 112 assertions. The full backend
+  suite passed with 308 tests and 4,562 assertions, with the same SQLite skip.
 
 Local verification uses SQLite in memory and synthetic history rows. It covers
 the read paths and the withdrawal response contract exercised by the existing
