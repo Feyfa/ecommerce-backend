@@ -102,15 +102,134 @@ class SaldoHistoryTest extends TestCase
     }
 
     /**
+     * Menjaga agar jenis mutasi lama tidak menyembunyikan baris valid dalam daftar yang sama.
+     *
+     * @return void Kedua pembaca memakai label netral sambil mempertahankan jenis mutasi asli.
+     */
+    public function test_unknown_types_keep_valid_history_visible(): void
+    {
+        // --- step 1 - siapkan mutasi valid - start ---
+        $owner = User::factory()->create();
+        $incoming = SaldoHistory::create([
+            'user_id' => $owner->id,
+            'type' => 'incoming',
+            'price' => self::HISTORY_PRICE,
+        ]);
+        // --- step 1 - siapkan mutasi valid - end ---
+
+        // --- step 2 - siapkan mutasi dengan jenis lama - start ---
+        $legacyRows = [];
+
+        foreach (['legacy_adjustment', null] as $type) {
+            $legacyRows[] = SaldoHistory::create([
+                'user_id' => $owner->id,
+                'type' => $type,
+                'price' => self::HISTORY_PRICE,
+            ]);
+        }
+        // --- step 2 - siapkan mutasi dengan jenis lama - end ---
+
+        // --- step 3 - periksa daftar riwayat - start ---
+        $service = app(SaldoService::class);
+        $result = $service->getSaldoHistory($owner->id, '', '');
+
+        $this->assertSame('success', $result['status']);
+
+        $rows = $result['saldoHistory']->keyBy('id');
+
+        $this->assertCount(count($legacyRows) + 1, $rows);
+        $this->assertSame('Pemasukan Saldo', $rows[$incoming->id]['title']);
+        // --- step 3 - periksa daftar riwayat - end ---
+
+        // --- step 4 - periksa fallback untuk jenis lama - start ---
+        foreach ($legacyRows as $legacyRow) {
+            $row = $rows[$legacyRow->id];
+            $detail = $service->getSaldoById($legacyRow->id);
+
+            $this->assertSame($legacyRow->type, $row['type']);
+            $this->assertSame('Mutasi Saldo', $row['title']);
+            $this->assertSame('Jenis mutasi saldo tidak dikenali.', $row['description']);
+            $this->assertEquals(self::HISTORY_PRICE, $row['price']);
+            $this->assertSame('success', $detail['status']);
+            $this->assertSame($row, $detail['saldoHistory']);
+        }
+        // --- step 4 - periksa fallback untuk jenis lama - end ---
+    }
+
+    /**
+     * Membedakan nominal riwayat yang tidak tercatat dari penarikan bernilai nol.
+     *
+     * @return void Tampilan nominal berubah sesuai nilai yang tersimpan.
+     */
+    public function test_withdrawal_description_distinguishes_null_price_from_zero(): void
+    {
+        // --- step 1 - siapkan penarikan tanpa nominal - start ---
+        $owner = User::factory()->create();
+        $history = SaldoHistory::create([
+            'user_id' => $owner->id,
+            'type' => 'withdrawal',
+            'price' => null,
+        ]);
+        // --- step 1 - siapkan penarikan tanpa nominal - end ---
+
+        // --- step 2 - periksa penanda nominal kosong - start ---
+        $row = $this->assertHistoryDescription(
+            $history,
+            'Penarikan Saldo Sebesar — Ke Bank   ()',
+        );
+
+        $this->assertNull($row['price']);
+        // --- step 2 - periksa penanda nominal kosong - end ---
+
+        // --- step 3 - periksa pemformatan nominal nol - start ---
+        $history->update(['price' => 0]);
+
+        $row = $this->assertHistoryDescription(
+            $history,
+            'Penarikan Saldo Sebesar Rp0 Ke Bank   ()',
+        );
+
+        $this->assertEquals(0, $row['price']);
+        // --- step 3 - periksa pemformatan nominal nol - end ---
+    }
+
+    /**
+     * Menjaga bentuk detail saat ID kosong atau tidak punya baris riwayat.
+     *
+     * @return void Kedua kondisi memakai respons yang sudah dipakai pemanggil.
+     */
+    public function test_history_detail_keeps_missing_id_responses(): void
+    {
+        // --- step 1 - siapkan ID tanpa riwayat - start ---
+        // ID user menyediakan UUID valid tanpa membuat baris riwayat.
+        $owner = User::factory()->create();
+        $service = app(SaldoService::class);
+        // --- step 1 - siapkan ID tanpa riwayat - end ---
+
+        // --- step 2 - periksa respons detail kosong - start ---
+        $this->assertSame(
+            ['status' => 'error', 'message' => 'user id cannot be empty'],
+            $service->getSaldoById(''),
+        );
+        $this->assertSame(
+            ['status' => 'success', 'saldoHistory' => []],
+            $service->getSaldoById($owner->id),
+        );
+        // --- step 2 - periksa respons detail kosong - end ---
+    }
+
+    /**
      * Memeriksa deskripsi riwayat melalui kedua jalur baca untuk fixture yang sama.
      *
      * @param  SaldoHistory  $history  Satu-satunya riwayat milik pengguna uji.
      * @param  string  $expectedDescription  Teks yang perlu dipertahankan persis.
      *
-     * @return void Memverifikasi isi daftar dan detail riwayat.
+     * @return array<string, mixed> Baris terverifikasi untuk pemeriksaan lanjutan.
      */
-    private function assertHistoryDescription(SaldoHistory $history, string $expectedDescription): void
-    {
+    private function assertHistoryDescription(
+        SaldoHistory $history,
+        string $expectedDescription,
+    ): array {
         // --- step 1 - ambil riwayat dari service - start ---
         $service = app(SaldoService::class);
         $listedHistory = $service->getSaldoHistory($history->user_id, '', '');
@@ -126,5 +245,7 @@ class SaldoHistoryTest extends TestCase
         $this->assertSame($expectedDescription, $row['description']);
         $this->assertSame($row, $detailedHistory['saldoHistory']);
         // --- step 2 - bandingkan deskripsi riwayat - end ---
+
+        return $row;
     }
 }

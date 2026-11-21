@@ -69,6 +69,10 @@ Description rules:
 - `{invoice_id}` should come from `transaction_invoices.id` so it matches the invoice displayed in the seller transaction detail modal.
 - If `transaction_invoices.id` cannot be resolved, `SaldoService` falls back to `transaction_users.transaction_number`.
 - Withdrawal balance rows include the formatted withdrawal amount, payment slug, account number, and account holder name.
+- If a withdrawal has no recorded amount, its description uses `—`
+  and the response keeps `price: null`.
+- An unrecognized or null type uses the title `Mutasi Saldo` and the description
+  `Jenis mutasi saldo tidak dikenali.` The response keeps the stored type and price.
 
 Success response:
 
@@ -105,6 +109,8 @@ Side effects:
 - Deducts balance after successful disbursement.
 - Creates a withdrawal balance history row.
 - Returns the new balance history item.
+
+The returned history item uses the same description rules as the history list.
 
 Success response:
 

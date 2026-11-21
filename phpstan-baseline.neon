@@ -291,23 +291,8 @@ parameters:
 			path: app/Services/SaldoService.php
 
 		-
-			message: "#^Match expression does not handle remaining values\\: string\\|null$#"
-			count: 4
-			path: app/Services/SaldoService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\SaldoService\\:\\:getSaldoById\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/SaldoService.php
-
-		-
 			message: "#^Method App\\\\Services\\\\SaldoService\\:\\:saveSaldoAfterDisbursement\\(\\) return type has no value type specified in iterable type array\\.$#"
 			count: 1
-			path: app/Services/SaldoService.php
-
-		-
-			message: "#^Parameter \\#1 \\$num of function number_format expects float, float\\|null given\\.$#"
-			count: 2
 			path: app/Services/SaldoService.php
 
 		-
