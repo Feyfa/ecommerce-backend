@@ -7,18 +7,23 @@ use App\Models\SaldoUser;
 use App\Models\User;
 use Carbon\Carbon;
 use DB;
+use Illuminate\Support\Collection;
 
 class SaldoService
 {
     /**
      * Mengambil saldo milik user berdasarkan ID.
      *
-     * Saldo income dan refund dimuat untuk user tertentu dan dinormalisasi menjadi struktur response.
-     * User tanpa row saldo memperoleh hasil terkontrol sesuai kontrak service.
+     * User tanpa row saldo tetap mendapat nilai nol untuk income, refund, dan total.
      *
-     * @param  string  $user_id  ID user yang menjadi scope data atau mutasi.
+     * @param  string  $user_id  ID pemilik saldo yang dibaca.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{status: 'error', message: string}|array{
+     *     status: 'success',
+     *     saldoTotal: int|float,
+     *     saldoIncome: int,
+     *     saldoRefund: int
+     * }
      */
     public function getSaldo(string $user_id): array
     {
@@ -35,25 +40,44 @@ class SaldoService
         $saldoTotal = $saldoIncome + $saldoRefund;
         // --- step 2 - ambil saldo user - end ---
 
-        return ['status' => 'success', 'saldoTotal' => $saldoTotal, 'saldoIncome' => $saldoIncome, 'saldoRefund' => $saldoRefund];
+        return [
+            'status' => 'success',
+            'saldoTotal' => $saldoTotal,
+            'saldoIncome' => $saldoIncome,
+            'saldoRefund' => $saldoRefund,
+        ];
     }
 
     /**
      * Mengambil riwayat mutasi saldo user dengan filter tanggal.
      *
-     * Query selalu dibatasi ke user pemilik saldo, kemudian filter tanggal dan cursor diterapkan.
-     * Setiap mutasi disusun bersama saldo sebelum-sesudah dan sumber transaksinya untuk kebutuhan
-     * riwayat.
+     * Query dibatasi ke pemilik saldo. Daftar ID mengecualikan baris yang sudah tampil di client.
      *
-     * @param  string  $user_id  ID user yang menjadi scope data atau mutasi.
+     * @param  string  $user_id  ID pemilik riwayat saldo.
      * @param  string  $start_date  Tanggal awal filter riwayat saldo.
      * @param  string  $end_date  Tanggal akhir filter riwayat saldo.
-     * @param  array  $saldo_history_current_ids  Nilai saldo history current ids yang diperlukan untuk menjalankan proses ini.
+     * @param  list<string>  $saldo_history_current_ids  UUID riwayat yang sudah ditampilkan.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{status: 'error', message: string}|array{
+     *     status: 'success',
+     *     saldoHistory: Collection<int, array{
+     *         id: string,
+     *         type: string|null,
+     *         title: string,
+     *         date: string,
+     *         price: float|null,
+     *         description: string
+     *     }>
+     * }
+     *
+     * @throws \Carbon\Exceptions\InvalidFormatException Jika filter tanggal tidak bisa diproses.
      */
-    public function getSaldoHistory(string $user_id, string $start_date, string $end_date, array $saldo_history_current_ids = []): array
-    {
+    public function getSaldoHistory(
+        string $user_id,
+        string $start_date,
+        string $end_date,
+        array $saldo_history_current_ids = [],
+    ): array {
         // --- step 1 - validasi input - start ---
         if (empty($user_id) || trim($user_id) == '') {
             return ['status' => 'error', 'message' => 'user id cannot be empty'];

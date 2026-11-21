@@ -8,6 +8,7 @@ use App\Services\SaldoService;
 use App\Services\XenditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class SaldoController extends Controller
 {
@@ -29,75 +30,168 @@ class SaldoController extends Controller
     /**
      * Menampilkan saldo pengguna yang terautentikasi.
      *
-     * Identitas user diverifikasi sebelum service membaca saldo income dan refund. Kegagalan pembacaan
-     * diterjemahkan menjadi response error tanpa mengekspos detail internal service.
+     * Hanya user lokal yang masih terdaftar dapat membaca saldo income dan refund miliknya.
      *
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      *
-     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Ringkasan saldo atau respons error.
      */
     public function getSaldo(Request $request): JsonResponse
     {
         // --- step 1 - validasi user - start ---
-        $user_id = optional(auth()->user())->id;
-        $userExists = User::where('id', $user_id)->exists();
+        // Resolver middleware membawa model user. Cek database tetap diperlukan
+        // agar identitas yang sudah terhapus tidak dapat membaca saldo.
+        $user = $request->user();
 
-        if (! $userExists) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
+        if (! $user instanceof User || ! User::where('id', $user->id)->exists()) {
+            return response()->json(
+                ['status' => 'error', 'message' => 'Unauthorized'],
+                JsonResponse::HTTP_UNAUTHORIZED,
+            );
         }
+
+        $user_id = $user->id;
         // --- step 1 - validasi user - end ---
 
         // --- step 2 - ambil saldo - start ---
         $getSaldo = $this->saldoService->getSaldo($user_id);
-        $status = $getSaldo['status'] ?? '';
+
+        $status = $getSaldo['status'];
         $saldoIncome = $getSaldo['saldoIncome'] ?? 0;
         $saldoRefund = $getSaldo['saldoRefund'] ?? 0;
         $saldoTotal = $getSaldo['saldoTotal'] ?? 0;
+
         if ($status == 'error') {
-            return response()->json(['status' => 'error', 'message' => ($getSaldo['message'] ?? 'Sepertinya Ada Yang Salah')]);
+            return response()->json([
+                'status' => 'error',
+                'message' => $getSaldo['message'] ?? 'Sepertinya Ada Yang Salah',
+            ]);
         }
         // --- step 2 - ambil saldo - end ---
 
-        return response()->json(['status' => 'success', 'saldoIncome' => $saldoIncome, 'saldoRefund' => $saldoRefund, 'saldoTotal' => $saldoTotal]);
+        return response()->json([
+            'status' => 'success',
+            'saldoIncome' => $saldoIncome,
+            'saldoRefund' => $saldoRefund,
+            'saldoTotal' => $saldoTotal,
+        ]);
     }
 
     /**
      * Menampilkan riwayat mutasi saldo pengguna.
      *
-     * Filter riwayat diteruskan hanya setelah user terautentikasi teridentifikasi. Service menyusun
-     * mutasi saldo milik user dan controller menormalisasi hasilnya menjadi kontrak JSON.
+     * Identitas diverifikasi sebelum filter diperiksa dan query riwayat dijalankan.
      *
      * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
      *
-     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Riwayat saldo milik user atau respons error autentikasi atau filter.
      */
     public function getSaldoHistory(Request $request): JsonResponse
     {
         // --- step 1 - validasi user - start ---
-        $user_id = optional(auth()->user())->id;
-        $userExists = User::where('id', $user_id)->exists();
+        // Verifikasi identitas sebelum memproses filter untuk mempertahankan
+        // urutan 401 bagi user yang tidak terautentikasi atau sudah terhapus.
+        $user = $request->user();
 
-        if (! $userExists) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
+        if (! $user instanceof User || ! User::where('id', $user->id)->exists()) {
+            return response()->json(
+                ['status' => 'error', 'message' => 'Unauthorized'],
+                JsonResponse::HTTP_UNAUTHORIZED,
+            );
         }
+
+        $user_id = $user->id;
         // --- step 1 - validasi user - end ---
 
-        // --- step 2 - siapkan variabel proses - start ---
-        $startDate = $request->startDate ?? '';
-        $endDate = $request->endDate ?? '';
-        $saldo_history_current_ids = ! empty($request->saldo_history_current_ids) ? json_decode($request->saldo_history_current_ids, true) : [];
-        // --- step 2 - siapkan variabel proses - end ---
+        // --- step 2 - validasi tipe filter tanggal - start ---
+        $startDate = $request->input('startDate') ?? '';
+        $endDate = $request->input('endDate') ?? '';
 
-        // --- step 3 - ambil riwayat saldo - start ---
-        $getSaldoHistory = $this->saldoService->getSaldoHistory($user_id, $startDate, $endDate, $saldo_history_current_ids);
-        $status = $getSaldoHistory['status'] ?? '';
-        $saldoHistory = $getSaldoHistory['saldoHistory'] ?? [];
-        if ($status == 'error') {
-            return response()->json(['status' => 'error', 'message' => ($getSaldoHistory['message'] ?? 'Sepertinya Ada Yang Salah')]);
+        if (! is_string($startDate) || ! is_string($endDate)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'startDate dan endDate harus berupa teks.',
+            ], JsonResponse::HTTP_UNPROCESSABLE_ENTITY);
         }
-        // --- step 3 - ambil riwayat saldo - end ---
+        // --- step 2 - validasi tipe filter tanggal - end ---
+
+        // --- step 3 - validasi daftar ID riwayat - start ---
+        $saldoHistoryCurrentIds = $this->parseSaldoHistoryIds(
+            $request->input('saldo_history_current_ids'),
+        );
+
+        if ($saldoHistoryCurrentIds === null) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'saldo_history_current_ids harus berupa daftar UUID dalam JSON.',
+            ], JsonResponse::HTTP_UNPROCESSABLE_ENTITY);
+        }
+        // --- step 3 - validasi daftar ID riwayat - end ---
+
+        // --- step 4 - ambil riwayat saldo - start ---
+        $getSaldoHistory = $this->saldoService->getSaldoHistory(
+            $user_id,
+            $startDate,
+            $endDate,
+            $saldoHistoryCurrentIds,
+        );
+
+        $status = $getSaldoHistory['status'];
+        $saldoHistory = $getSaldoHistory['saldoHistory'] ?? [];
+
+        if ($status == 'error') {
+            return response()->json([
+                'status' => 'error',
+                'message' => $getSaldoHistory['message'] ?? 'Sepertinya Ada Yang Salah',
+            ]);
+        }
+        // --- step 4 - ambil riwayat saldo - end ---
 
         return response()->json(['status' => 'success', 'saldoHistory' => $saldoHistory]);
+    }
+
+    /**
+     * Membaca ID riwayat yang sudah ditampilkan oleh client.
+     *
+     * @param  mixed  $input  Filter opsional dari request sebelum validasi.
+     *
+     * @return list<string>|null Daftar UUID atau null jika bentuk atau nilainya tidak valid.
+     */
+    private function parseSaldoHistoryIds(mixed $input): ?array
+    {
+        // Filter opsional. Client yang belum memuat riwayat bisa mengosongkannya.
+        if ($input === null || $input === '') {
+            return [];
+        }
+
+        // --- step 1 - dekode JSON riwayat - start ---
+        // Dekode tanpa mode asosiatif agar objek JSON tidak dianggap daftar ID.
+        if (! is_string($input)) {
+            return null;
+        }
+
+        $decodedIds = json_decode($input);
+
+        if (! is_array($decodedIds)) {
+            return null;
+        }
+        // --- step 1 - dekode JSON riwayat - end ---
+
+        // --- step 2 - validasi UUID riwayat - start ---
+        // PostgreSQL membandingkan ID dengan kolom UUID. Tolak string yang
+        // tidak valid di sini agar filter dari client tidak menggagalkan query.
+        $ids = [];
+
+        foreach ($decodedIds as $id) {
+            if (! is_string($id) || ! Str::isUuid($id)) {
+                return null;
+            }
+
+            $ids[] = $id;
+        }
+        // --- step 2 - validasi UUID riwayat - end ---
+
+        return $ids;
     }
 
     /**
