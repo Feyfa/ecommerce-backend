@@ -294,28 +294,3 @@ parameters:
 			message: "#^Method App\\\\Services\\\\SaldoService\\:\\:saveSaldoAfterDisbursement\\(\\) return type has no value type specified in iterable type array\\.$#"
 			count: 1
 			path: app/Services/SaldoService.php
-
-		-
-			message: "#^Cannot access offset 'message' on mixed\\.$#"
-			count: 4
-			path: app/Services/XenditService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\XenditService\\:\\:createVirtualAccount\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/XenditService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\XenditService\\:\\:disbursement\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/XenditService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\XenditService\\:\\:simulateVirtualAccountFixed\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/XenditService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\XenditService\\:\\:simulateVirtualAccountPool\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/XenditService.php

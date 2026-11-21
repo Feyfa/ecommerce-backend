@@ -678,6 +678,8 @@ class CheckoutService
      * Invoice buyer, transaksi per seller, snapshot alamat, serta baris produk dibuat dalam satu
      * transaksi database. Nilai yang disimpan berasal dari snapshot tervalidasi dan respons pembayaran
      * agar pesanan parsial tidak tersisa ketika salah satu tahap gagal.
+     * Respons tanpa nomor VA atau referensi pembayaran yang dapat dipakai ditolak sebelum invoice
+     * dibuat, sehingga controller tidak menghapus keranjang atau mengurangi stok.
      *
      * @param  string  $user_id_buyer  ID buyer pemilik cart, alamat, atau transaksi.
      * @param  array  $checkouts  Kumpulan item checkout yang telah dimuat dan divalidasi.
@@ -696,8 +698,20 @@ class CheckoutService
      *               invoice dikembalikan agar pemanggil dapat menandai transaksi hasil checkout tanpa
      *               menebak data terbaru buyer. Satu invoice mencakup seluruh seller pada checkout ini.
      */
-    public function saveCheckoutToDatabase(string $user_id_buyer = '', array $checkouts = [], array $kurirs = [], array $noteds = [], ?Alamat $alamat_buyer = null, string $payment_method = '', string $payment_slug = '', string $payment_name = '', string $expired_at = '', int $price = 0, string $checkout_key = '', array $dataXendit = []): array
-    {
+    public function saveCheckoutToDatabase(
+        string $user_id_buyer = '',
+        array $checkouts = [],
+        array $kurirs = [],
+        array $noteds = [],
+        ?Alamat $alamat_buyer = null,
+        string $payment_method = '',
+        string $payment_slug = '',
+        string $payment_name = '',
+        string $expired_at = '',
+        int $price = 0,
+        string $checkout_key = '',
+        array $dataXendit = [],
+    ): array {
         // --- step 1 - validasi data transaksi checkout - start ---
         $requirements = [
             [$user_id_buyer !== '', 'Data User Id buyer Empty'],
@@ -724,7 +738,24 @@ class CheckoutService
         }
         // --- step 1 - validasi data transaksi checkout - end ---
 
-        // --- step 2 - simpan invoice dan snapshot alamat buyer - start ---
+        // --- step 2 - validasi data pembayaran virtual account - start ---
+        // Tolak respons yang tidak menyertakan kedua field agar buyer tidak menerima invoice
+        // tanpa nomor bayar setelah keranjang dihapus. Pertahankan nol di depan nomor VA.
+        $paymentAccount = $dataXendit['account_number'] ?? null;
+        $paymentReference = $dataXendit['external_id'] ?? null;
+
+        $hasPaymentAccount = is_string($paymentAccount) && trim($paymentAccount) !== '';
+        $hasPaymentReference = is_string($paymentReference) && trim($paymentReference) !== '';
+        // --- step 2 - validasi data pembayaran virtual account - end ---
+
+        if (! $hasPaymentAccount || ! $hasPaymentReference) {
+            return [
+                'status' => 'error',
+                'message' => 'Payment creation failed',
+            ];
+        }
+
+        // --- step 3 - simpan invoice checkout - start ---
         // Salin nilai lokasi agar riwayat transaksi tetap akurat meskipun buyer
         // mengubah atau menghapus alamat utama setelah checkout.
         $transactionInvoice = TransactionInvoice::create([
@@ -737,14 +768,14 @@ class CheckoutService
             'payment_method' => $payment_method,
             'payment_slug' => $payment_slug,
             'payment_name' => $payment_name,
-            'payment_account' => $dataXendit['account_number'] ?? '',
-            'payment_reference' => $dataXendit['external_id'] ?? '',
+            'payment_account' => $paymentAccount,
+            'payment_reference' => $paymentReference,
             'price' => $price,
             'expired_at' => $expired_at,
         ]);
-        // --- step 2 - simpan invoice dan snapshot alamat buyer - end ---
+        // --- step 3 - simpan invoice checkout - end ---
 
-        // --- step 3 - simpan transaksi dan produk per seller - start ---
+        // --- step 4 - simpan transaksi per seller - start ---
         foreach ($checkouts as $checkout) {
             $alamatSeller = Alamat::where('user_id', ($checkout['user_id_seller'] ?? ''))
                 ->where('type', 'seller')
@@ -803,7 +834,7 @@ class CheckoutService
             $transactionUser->product_price = $totalPriceKeranjang;
             $transactionUser->save();
         }
-        // --- step 3 - simpan transaksi dan produk per seller - end ---
+        // --- step 4 - simpan transaksi per seller - end ---
 
         return [
             'status' => 'success',
