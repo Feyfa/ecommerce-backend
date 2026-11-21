@@ -38,16 +38,16 @@ class SaldoController extends Controller
      */
     public function getSaldo(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi user
+        // --- step 1 - validasi user - start ---
         $user_id = optional(auth()->user())->id;
         $userExists = User::where('id', $user_id)->exists();
 
         if (! $userExists) {
             return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
         }
-        // --- step 1 - end - validasi user
+        // --- step 1 - validasi user - end ---
 
-        // --- step 2 - start - ambil saldo
+        // --- step 2 - ambil saldo - start ---
         $getSaldo = $this->saldoService->getSaldo($user_id);
         $status = $getSaldo['status'] ?? '';
         $saldoIncome = $getSaldo['saldoIncome'] ?? 0;
@@ -56,7 +56,7 @@ class SaldoController extends Controller
         if ($status == 'error') {
             return response()->json(['status' => 'error', 'message' => ($getSaldo['message'] ?? 'Sepertinya Ada Yang Salah')]);
         }
-        // --- step 2 - end - ambil saldo
+        // --- step 2 - ambil saldo - end ---
 
         return response()->json(['status' => 'success', 'saldoIncome' => $saldoIncome, 'saldoRefund' => $saldoRefund, 'saldoTotal' => $saldoTotal]);
     }
@@ -73,29 +73,29 @@ class SaldoController extends Controller
      */
     public function getSaldoHistory(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi user
+        // --- step 1 - validasi user - start ---
         $user_id = optional(auth()->user())->id;
         $userExists = User::where('id', $user_id)->exists();
 
         if (! $userExists) {
             return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
         }
-        // --- step 1 - end - validasi user
+        // --- step 1 - validasi user - end ---
 
-        // --- step 2 - start - siapkan variabel proses
+        // --- step 2 - siapkan variabel proses - start ---
         $startDate = $request->startDate ?? '';
         $endDate = $request->endDate ?? '';
         $saldo_history_current_ids = ! empty($request->saldo_history_current_ids) ? json_decode($request->saldo_history_current_ids, true) : [];
-        // --- step 2 - end - siapkan variabel proses
+        // --- step 2 - siapkan variabel proses - end ---
 
-        // --- step 3 - start - ambil riwayat saldo
+        // --- step 3 - ambil riwayat saldo - start ---
         $getSaldoHistory = $this->saldoService->getSaldoHistory($user_id, $startDate, $endDate, $saldo_history_current_ids);
         $status = $getSaldoHistory['status'] ?? '';
         $saldoHistory = $getSaldoHistory['saldoHistory'] ?? [];
         if ($status == 'error') {
             return response()->json(['status' => 'error', 'message' => ($getSaldoHistory['message'] ?? 'Sepertinya Ada Yang Salah')]);
         }
-        // --- step 3 - end - ambil riwayat saldo
+        // --- step 3 - ambil riwayat saldo - end ---
 
         return response()->json(['status' => 'success', 'saldoHistory' => $saldoHistory]);
     }
@@ -114,16 +114,16 @@ class SaldoController extends Controller
      */
     public function withdrawSaldo(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi user
+        // --- step 1 - validasi user - start ---
         $user_id = optional(auth()->user())->id;
         $userExists = User::where('id', $user_id)->exists();
 
         if (! $userExists) {
             return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
         }
-        // --- step 1 - end - validasi user
+        // --- step 1 - validasi user - end ---
 
-        // --- step 2 - start - validasi request
+        // --- step 2 - validasi request - start ---
         $wihtdrawMaximum = 1000000;
         $wihtdrawMaximumString = number_format($wihtdrawMaximum, 0, ',', '.');
 
@@ -143,9 +143,9 @@ class SaldoController extends Controller
         }
 
         $wihtdrawPriceString = number_format($wihtdrawPrice, 0, ',', '.');
-        // --- step 2 - end - validasi request
+        // --- step 2 - validasi request - end ---
 
-        // --- step 3 - start - ambil data payment
+        // --- step 3 - ambil data payment - start ---
         $getPayment = $this->paymentService->getWithdrawalPayment($user_id, $paymentAccount);
         $status = $getPayment['status'];
         $message = $getPayment['message'] ?? '';
@@ -156,9 +156,9 @@ class SaldoController extends Controller
         if ($status == 'error') {
             return response()->json(['status' => 'error', 'message' => $message], 400);
         }
-        // --- step 3 - end - ambil data payment
+        // --- step 3 - ambil data payment - end ---
 
-        // --- step 4 - start - ambil saldo user
+        // --- step 4 - ambil saldo user - start ---
         $getSaldo = $this->saldoService->getSaldo($user_id);
         $saldoTotal = $getSaldo['saldoTotal'] ?? 0;
         $saldoTotalString = number_format($saldoTotal, 0, ',', '.');
@@ -168,9 +168,9 @@ class SaldoController extends Controller
         if ($saldoTotal < $wihtdrawPrice) {
             return response()->json(['status' => 'error', 'message' => "Saldo Anda Hanya Rp$saldoTotalString, Tidak Bisa Tarik Saldo Sebesar $wihtdrawPriceString"], 400);
         }
-        // --- step 4 - end - ambil saldo user
+        // --- step 4 - ambil saldo user - end ---
 
-        // --- step 5 - start - proses penarikan saldo
+        // --- step 5 - proses penarikan saldo - start ---
         $disbursement = $this->xenditService->disbursement(
             external_id: "dis-$paymentSlug-".uniqid(),
             amount: $wihtdrawPrice,
@@ -184,17 +184,17 @@ class SaldoController extends Controller
         if ($status == 'error') {
             return response()->json(['status' => 'error', 'message' => $message], 400);
         }
-        // --- step 5 - end - proses penarikan saldo
+        // --- step 5 - proses penarikan saldo - end ---
 
-        // --- step 6 - start - simpan saldo setelah disbursement
+        // --- step 6 - simpan saldo setelah disbursement - start ---
         $saveSaldoAfterDisbursement = $this->saldoService->saveSaldoAfterDisbursement($user_id, $paymentUserId, $wihtdrawPrice);
         $saldoHistoryId = $saveSaldoAfterDisbursement['saldoHistoryId'] ?? null;
-        // --- step 6 - end - simpan saldo setelah disbursement
+        // --- step 6 - simpan saldo setelah disbursement - end ---
 
-        // --- step 7 - start - ambil satu riwayat saldo
+        // --- step 7 - ambil satu riwayat saldo - start ---
         $getSaldoById = $this->saldoService->getSaldoById($saldoHistoryId);
         $saldoHistory = $getSaldoById['saldoHistory'] ?? [];
-        // --- step 7 - end - ambil satu riwayat saldo
+        // --- step 7 - ambil satu riwayat saldo - end ---
 
         return response()->json(['status' => 'success', 'saldoHistory' => $saldoHistory]);
     }

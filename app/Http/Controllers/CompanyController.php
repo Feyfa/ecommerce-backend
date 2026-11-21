@@ -45,19 +45,19 @@ class CompanyController extends Controller
      */
     public function show(): JsonResponse
     {
-        // --- step 1 - start - validasi user
+        // --- step 1 - validasi user - start ---
         $user = auth()->user();
 
         if (! $user instanceof User || ! User::where('id', $user->id)->exists()) {
             return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
         }
         $user_id = $user->id;
-        // --- step 1 - end - validasi user
+        // --- step 1 - validasi user - end ---
 
-        // --- step 2 - start - ambil profil toko
+        // --- step 2 - ambil profil toko - start ---
         $getCompany = $this->companyService->getCompany($user_id);
         $company = $getCompany['company'];
-        // --- step 2 - end - ambil profil toko
+        // --- step 2 - ambil profil toko - end ---
 
         return response()->json(['status' => 'success', 'company' => $company]);
     }
@@ -75,16 +75,16 @@ class CompanyController extends Controller
      */
     public function updateCompany(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi user
+        // --- step 1 - validasi user - start ---
         $user = $request->user();
 
         if (! $user instanceof User || ! User::where('id', $user->id)->exists()) {
             return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
         }
         $user_id = $user->id;
-        // --- step 1 - end - validasi user
+        // --- step 1 - validasi user - end ---
 
-        // --- step 2 - start - validasi request dan ambil data
+        // --- step 2 - validasi request dan ambil data - start ---
         $validator = Validator::make(
             [
                 'name' => $request->name,
@@ -134,14 +134,14 @@ class CompanyController extends Controller
         if ($validator->fails()) {
             return response()->json(['status' => 'error', 'message' => $validator->messages()], 422);
         }
-        // --- step 2 - end - validasi request dan ambil data
+        // --- step 2 - validasi request dan ambil data - end ---
 
         // Verifikasi pinpoint sebelum mengubah profil agar kegagalan provider
         // tidak menghasilkan pembaruan data toko yang hanya tersimpan sebagian.
         $locationAttributes = $this->alamatService->locationAttributes($request);
         $beforeValues = $this->currentCompanySnapshot((string) $user_id);
 
-        // --- step 3 - start - perbarui profil dan alamat toko bersama audit secara atomik
+        // --- step 3 - perbarui profil dan alamat toko bersama audit secara atomik - start ---
         DB::transaction(function () use ($user, $user_id, $request, $locationAttributes, $beforeValues): void {
             User::where('id', $user_id)->lockForUpdate()->first();
 
@@ -179,12 +179,12 @@ class CompanyController extends Controller
                 OutboxRecorderService::SOURCE_COMPANY_UPDATED,
             );
         });
-        // --- step 3 - end - perbarui profil dan alamat toko bersama audit secara atomik
+        // --- step 3 - perbarui profil dan alamat toko bersama audit secara atomik - end ---
 
-        // --- step 4 - start - ambil profil toko
+        // --- step 4 - ambil profil toko - start ---
         $getCompany = $this->companyService->getCompany($user_id);
         $company = $getCompany['company'];
-        // --- step 4 - end - ambil profil toko
+        // --- step 4 - ambil profil toko - end ---
 
         return response()->json(['status' => 'success', 'message' => 'Company Update Successfully', 'company' => $company], 200);
     }
@@ -204,16 +204,16 @@ class CompanyController extends Controller
      */
     public function uploadImage(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi user
+        // --- step 1 - validasi user - start ---
         $user = $request->user();
 
         if (! $user instanceof User || ! User::where('id', $user->id)->exists()) {
             return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
         }
         $user_id = $user->id;
-        // --- step 1 - end - validasi user
+        // --- step 1 - validasi user - end ---
 
-        // --- step 2 - start - validasi request
+        // --- step 2 - validasi request - start ---
         $validator = Validator::make(
             $request->all(),
             [
@@ -237,18 +237,18 @@ class CompanyController extends Controller
 
             return response()->json(['status' => 'error', 'message' => $validator->messages()], 422);
         }
-        // --- step 2 - end - validasi request
+        // --- step 2 - validasi request - end ---
 
-        // --- step 3 - start - unggah file baru sebelum mengganti referensi toko
+        // --- step 3 - unggah file baru sebelum mengganti referensi toko - start ---
         $previousImage = Company::where('user_id', $user_id)->value('img');
         // A new uploaded file gets its own random path, keeping cleanup away from the active image.
         $path = $file->store('company-imgs', 'public');
         if ($path === false) {
             throw new RuntimeException('Company image could not be stored.');
         }
-        // --- step 3 - end - unggah file baru sebelum mengganti referensi toko
+        // --- step 3 - unggah file baru sebelum mengganti referensi toko - end ---
 
-        // --- step 4 - start - ganti referensi gambar dan catat audit secara atomik
+        // --- step 4 - ganti referensi gambar dan catat audit secara atomik - start ---
         try {
             DB::transaction(function () use ($user, $user_id, $path, $request): void {
                 $company = Company::updateOrCreate(
@@ -275,18 +275,18 @@ class CompanyController extends Controller
 
             throw $exception;
         }
-        // --- step 4 - end - ganti referensi gambar dan catat audit secara atomik
+        // --- step 4 - ganti referensi gambar dan catat audit secara atomik - end ---
 
-        // --- step 5 - start - bersihkan file sebelumnya setelah transaksi berhasil
+        // --- step 5 - bersihkan file sebelumnya setelah transaksi berhasil - start ---
         if (is_string($previousImage) && $previousImage !== '' && $previousImage !== $path && Storage::disk('public')->exists($previousImage)) {
             Storage::disk('public')->delete($previousImage);
         }
-        // --- step 5 - end - bersihkan file sebelumnya setelah transaksi berhasil
+        // --- step 5 - bersihkan file sebelumnya setelah transaksi berhasil - end ---
 
-        // --- step 6 - start - ambil profil toko
+        // --- step 6 - ambil profil toko - start ---
         $getCompany = $this->companyService->getCompany($user_id);
         $company = $getCompany['company'];
-        // --- step 6 - end - ambil profil toko
+        // --- step 6 - ambil profil toko - end ---
 
         return response()->json(['status' => 'success', 'message' => 'Foto toko berhasil diunggah.', 'company' => $company], 200);
     }
@@ -304,31 +304,31 @@ class CompanyController extends Controller
      */
     public function deleteImage(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi user
+        // --- step 1 - validasi user - start ---
         $user = $request->user();
 
         if (! $user instanceof User || ! User::where('id', $user->id)->exists()) {
             return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
         }
         $user_id = $user->id;
-        // --- step 1 - end - validasi user
+        // --- step 1 - validasi user - end ---
 
-        // --- step 2 - start - ambil profil toko
+        // --- step 2 - ambil profil toko - start ---
         $company = Company::where('user_id', $user_id)
             ->first();
         if (! $company) {
             return response()->json(['status' => 'error', 'message' => 'Company Is Empty'], 400);
         }
-        // --- step 2 - end - ambil profil toko
+        // --- step 2 - ambil profil toko - end ---
 
-        // --- step 3 - start - pastikan file aktif tersedia sebelum mengubah profil toko
+        // --- step 3 - pastikan file aktif tersedia sebelum mengubah profil toko - start ---
         $previousImage = $company->img;
         if (! $previousImage || ! Storage::disk('public')->exists($previousImage)) {
             return response()->json(['status' => 'error', 'message' => 'File foto toko tidak ditemukan.'], 400);
         }
-        // --- step 3 - end - pastikan file aktif tersedia sebelum mengubah profil toko
+        // --- step 3 - pastikan file aktif tersedia sebelum mengubah profil toko - end ---
 
-        // --- step 4 - start - hapus referensi gambar dan catat audit secara atomik
+        // --- step 4 - hapus referensi gambar dan catat audit secara atomik - start ---
         DB::transaction(function () use ($user, $company, $request): void {
             $company->img = null;
             $company->save();
@@ -346,11 +346,11 @@ class CompanyController extends Controller
                 $sellerAddress,
             );
         });
-        // --- step 4 - end - hapus referensi gambar dan catat audit secara atomik
+        // --- step 4 - hapus referensi gambar dan catat audit secara atomik - end ---
 
-        // --- step 5 - start - hapus file setelah perubahan database dan audit berhasil
+        // --- step 5 - hapus file setelah perubahan database dan audit berhasil - start ---
         Storage::disk('public')->delete($previousImage);
-        // --- step 5 - end - hapus file setelah perubahan database dan audit berhasil
+        // --- step 5 - hapus file setelah perubahan database dan audit berhasil - end ---
 
         return response()->json(['status' => 'success', 'message' => 'Foto toko berhasil dihapus.', 'company' => $company], 200);
     }
@@ -369,7 +369,7 @@ class CompanyController extends Controller
      */
     private function companyChanges(array $beforeValues, Company $company, ?Alamat $sellerAddress): array
     {
-        // --- step 1 - start - siapkan snapshot sesudah perubahan dan label field yang diaudit
+        // --- step 1 - siapkan snapshot sesudah perubahan dan label field yang diaudit - start ---
         $afterValues = $this->auditLogService->companySnapshot($company, $sellerAddress);
         $labels = [
             'name' => 'Nama Toko',
@@ -380,9 +380,9 @@ class CompanyController extends Controller
             'address_detail' => 'Detail Alamat',
         ];
         $changes = [];
-        // --- step 1 - end - siapkan snapshot sesudah perubahan dan label field yang diaudit
+        // --- step 1 - siapkan snapshot sesudah perubahan dan label field yang diaudit - end ---
 
-        // --- step 2 - start - kumpulkan hanya nilai before dan after yang berbeda
+        // --- step 2 - kumpulkan hanya nilai before dan after yang berbeda - start ---
         foreach ($labels as $field => $label) {
             if ($beforeValues[$field] === $afterValues[$field]) {
                 continue;
@@ -395,7 +395,7 @@ class CompanyController extends Controller
                 'after' => $afterValues[$field],
             ];
         }
-        // --- step 2 - end - kumpulkan hanya nilai before dan after yang berbeda
+        // --- step 2 - kumpulkan hanya nilai before dan after yang berbeda - end ---
 
         return $changes;
     }

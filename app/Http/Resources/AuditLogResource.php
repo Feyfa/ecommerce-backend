@@ -29,12 +29,12 @@ class AuditLogResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        // --- step 1 - start - normalisasi enum dan context sebelum membentuk contract response
+        // --- step 1 - normalisasi enum dan context sebelum membentuk contract response - start ---
         $event = $this->resolveAuditEvent($this->event);
         $context = is_array($this->context) ? $this->context : [];
-        // --- step 1 - end - normalisasi enum dan context sebelum membentuk contract response
+        // --- step 1 - normalisasi enum dan context sebelum membentuk contract response - end ---
 
-        // --- step 2 - start - full IP hanya boleh keluar pada route detail yang sudah owner-scoped
+        // --- step 2 - full IP hanya boleh keluar pada route detail yang sudah owner-scoped - start ---
         $data = [
             'id' => $this->id,
             'event' => $event->value,
@@ -63,7 +63,7 @@ class AuditLogResource extends JsonResource
             'company' => $this->companyPayload($context, $request),
             default => [],
         };
-        // --- step 2 - end - full IP hanya boleh keluar pada route detail yang sudah owner-scoped
+        // --- step 2 - full IP hanya boleh keluar pada route detail yang sudah owner-scoped - end ---
 
         return $data;
     }
@@ -103,14 +103,14 @@ class AuditLogResource extends JsonResource
      */
     private function addressPayload(array $context, Request $request): array
     {
-        // --- step 1 - start - tentukan mode detail sebelum menyamarkan data alamat
+        // --- step 1 - tentukan mode detail sebelum menyamarkan data alamat - start ---
         $isDetailRoute = $request->routeIs('audit-logs.show');
         $snapshot = $context['address_snapshot'] ?? null;
         /** @var array<int, array<string, mixed>> $changes */
         $changes = $context['changes'] ?? [];
-        // --- step 1 - end - tentukan mode detail sebelum menyamarkan data alamat
+        // --- step 1 - tentukan mode detail sebelum menyamarkan data alamat - end ---
 
-        // --- step 2 - start - susun payload alamat sesuai mode response
+        // --- step 2 - susun payload alamat sesuai mode response - start ---
         return [
             'subject' => [
                 'type' => $this->subject_type,
@@ -127,7 +127,7 @@ class AuditLogResource extends JsonResource
             'previous_address' => $this->presentAddressReference($context['previous_address'] ?? null, $isDetailRoute),
             'replacement_address' => $this->presentAddressReference($context['replacement_address'] ?? null, $isDetailRoute),
         ];
-        // --- step 2 - end - susun payload alamat sesuai mode response
+        // --- step 2 - susun payload alamat sesuai mode response - end ---
     }
 
     /**

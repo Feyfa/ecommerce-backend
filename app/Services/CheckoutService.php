@@ -170,12 +170,12 @@ class CheckoutService
      */
     public function getAlamatBuyer(string $user_id_buyer = ''): array
     {
-        // --- step 1 - start - ambil alamat aktif buyer
+        // --- step 1 - ambil alamat aktif buyer - start ---
         $alamat = Alamat::where('user_id', $user_id_buyer)
             ->where('type', 'buyer')
             ->where('enable', 1)
             ->first();
-        // --- step 1 - end - ambil alamat aktif buyer
+        // --- step 1 - ambil alamat aktif buyer - end ---
 
         return [
             'alamat' => $alamat,
@@ -194,7 +194,7 @@ class CheckoutService
      */
     public function getKeranjangCheckout(string $user_id_buyer = ''): array
     {
-        // --- step 1 - start - ambil dan kelompokkan item checkout buyer
+        // --- step 1 - ambil dan kelompokkan item checkout buyer - start ---
         $keranjangs = Keranjang::selectRaw('
                 keranjangs.id as k_id,
                 keranjangs.user_id_seller as k_user_id_seller,
@@ -218,16 +218,16 @@ class CheckoutService
 
         $groupKeranjangs = $keranjangs->groupBy('k_user_id_seller')
             ->toArray();
-        // --- step 1 - end - ambil dan kelompokkan item checkout buyer
+        // --- step 1 - ambil dan kelompokkan item checkout buyer - end ---
 
-        // --- step 2 - start - hitung total harga produk
+        // --- step 2 - hitung total harga produk - start ---
         $totalPrice = 0;
         foreach ($keranjangs as $keranjang) {
             $totalPrice += $keranjang->k_total_price;
         }
-        // --- step 2 - end - hitung total harga produk
+        // --- step 2 - hitung total harga produk - end ---
 
-        // --- step 3 - start - bentuk paket checkout per seller
+        // --- step 3 - bentuk paket checkout per seller - start ---
         $checkouts = [];
         foreach ($groupKeranjangs as $keranjangs) {
             $generateFormatKeranjangs = $this->generateFormatKeranjangs($keranjangs);
@@ -243,7 +243,7 @@ class CheckoutService
                 'kurirs' => $kurirs,
             ];
         }
-        // --- step 3 - end - bentuk paket checkout per seller
+        // --- step 3 - bentuk paket checkout per seller - end ---
 
         return [
             'checkouts' => $checkouts,
@@ -293,7 +293,7 @@ class CheckoutService
      */
     private function generateFormatKurirs(): array
     {
-        // --- step 1 - start - siapkan waktu dan daftar kurir
+        // --- step 1 - siapkan waktu dan daftar kurir - start ---
         Carbon::setLocale('id');
         $now = Carbon::now('Asia/Jakarta');
         $startDate = $now->translatedFormat('d F Y');
@@ -304,9 +304,9 @@ class CheckoutService
             ['name' => 'Anter Aja', 'day' => 2],
             ['name' => 'Si Cepat Halu', 'day' => 3],
         ];
-        // --- step 1 - end - siapkan waktu dan daftar kurir
+        // --- step 1 - siapkan waktu dan daftar kurir - end ---
 
-        // --- step 2 - start - bentuk harga dan estimasi setiap kurir
+        // --- step 2 - bentuk harga dan estimasi setiap kurir - start ---
         foreach ($kurirslists as $kurir) {
             $day = $kurir['day'];
             $endDate = $now->copy()->addDays($day)->translatedFormat('d F Y');
@@ -318,7 +318,7 @@ class CheckoutService
                 'estimation' => "{$startDate} - {$endDate}",
             ];
         }
-        // --- step 2 - end - bentuk harga dan estimasi setiap kurir
+        // --- step 2 - bentuk harga dan estimasi setiap kurir - end ---
 
         return [
             'kurirs' => $kurirsFormat,
@@ -341,7 +341,7 @@ class CheckoutService
      */
     public function buildCheckoutSnapshot(string $user_id_buyer = '', array $shippingOptions = [], array $noteds = [], string $paymentSlug = ''): array
     {
-        // --- step 1 - start - sinkronkan availability produk checkout
+        // --- step 1 - sinkronkan availability produk checkout - start ---
         $cartState = $this->reconcileCheckoutCart($user_id_buyer);
 
         $availabilityError = $this->checkoutAvailabilityError($cartState);
@@ -352,9 +352,9 @@ class CheckoutService
                 ...$availabilityError,
             ];
         }
-        // --- step 1 - end - sinkronkan availability produk checkout
+        // --- step 1 - sinkronkan availability produk checkout - end ---
 
-        // --- step 2 - start - validasi alamat aktif buyer
+        // --- step 2 - validasi alamat aktif buyer - start ---
         $getAlamatBuyer = $this->getAlamatBuyer($user_id_buyer);
         $alamat = $getAlamatBuyer['alamat'];
 
@@ -373,9 +373,9 @@ class CheckoutService
                 'message' => 'Alamat pengiriman perlu diverifikasi dengan pinpoint sebelum melanjutkan checkout.',
             ];
         }
-        // --- step 2 - end - validasi alamat aktif buyer
+        // --- step 2 - validasi alamat aktif buyer - end ---
 
-        // --- step 3 - start - ambil dan validasi paket checkout
+        // --- step 3 - ambil dan validasi paket checkout - start ---
         $getKeranjangCheckout = $this->getKeranjangCheckout($user_id_buyer);
         $checkouts = $getKeranjangCheckout['checkouts'];
 
@@ -394,9 +394,9 @@ class CheckoutService
                 'message' => 'Lokasi toko penjual belum diverifikasi. Checkout belum dapat dilanjutkan.',
             ];
         }
-        // --- step 3 - end - ambil dan validasi paket checkout
+        // --- step 3 - ambil dan validasi paket checkout - end ---
 
-        // --- step 4 - start - validasi quantity dan status produk checkout
+        // --- step 4 - validasi quantity dan status produk checkout - start ---
         $invalidCheckoutKeranjangExists = Keranjang::leftJoin('products', 'keranjangs.product_id', '=', 'products.id')
             ->where('keranjangs.user_id_buyer', $user_id_buyer)
             ->where('keranjangs.checkout', 1)
@@ -415,9 +415,9 @@ class CheckoutService
                 'message' => 'Keranjang berubah, silakan cek ulang',
             ];
         }
-        // --- step 4 - end - validasi quantity dan status produk checkout
+        // --- step 4 - validasi quantity dan status produk checkout - end ---
 
-        // --- step 5 - start - validasi metode pembayaran
+        // --- step 5 - validasi metode pembayaran - start ---
         $payment = PaymentList::select('slug', 'method', 'name')
             ->where('type', 'incoming')
             ->where('method', 'va')
@@ -437,9 +437,9 @@ class CheckoutService
                 'message' => 'Pembayaran Harus Menggunakan BCA Virtual Account',
             ];
         }
-        // --- step 5 - end - validasi metode pembayaran
+        // --- step 5 - validasi metode pembayaran - end ---
 
-        // --- step 6 - start - indeks pilihan kurir dan catatan per seller
+        // --- step 6 - indeks pilihan kurir dan catatan per seller - start ---
         $shippingOptionsBySeller = [];
         foreach ($shippingOptions as $shippingOption) {
             $sellerId = $shippingOption['user_id_seller'] ?? '';
@@ -455,9 +455,9 @@ class CheckoutService
                 $notedsBySeller[$sellerId] = $noted['noted'] ?? '';
             }
         }
-        // --- step 6 - end - indeks pilihan kurir dan catatan per seller
+        // --- step 6 - indeks pilihan kurir dan catatan per seller - end ---
 
-        // --- step 7 - start - hitung snapshot paket dan total checkout
+        // --- step 7 - hitung snapshot paket dan total checkout - start ---
         $totalProduct = 0;
         $totalShipping = 0;
         $selectedKurirs = [];
@@ -510,9 +510,9 @@ class CheckoutService
         }
 
         sort($cartItemIds);
-        // --- step 7 - end - hitung snapshot paket dan total checkout
+        // --- step 7 - hitung snapshot paket dan total checkout - end ---
 
-        // --- step 8 - start - bentuk snapshot backend dan data pembanding frontend
+        // --- step 8 - bentuk snapshot backend dan data pembanding frontend - start ---
         $snapshot = [
             'status' => 'success',
             'data' => [
@@ -540,7 +540,7 @@ class CheckoutService
                 'total_all' => $totalProduct + $totalShipping,
             ],
         ];
-        // --- step 8 - end - bentuk snapshot backend dan data pembanding frontend
+        // --- step 8 - bentuk snapshot backend dan data pembanding frontend - end ---
 
         return $snapshot;
     }
@@ -698,7 +698,7 @@ class CheckoutService
      */
     public function saveCheckoutToDatabase(string $user_id_buyer = '', array $checkouts = [], array $kurirs = [], array $noteds = [], ?Alamat $alamat_buyer = null, string $payment_method = '', string $payment_slug = '', string $payment_name = '', string $expired_at = '', int $price = 0, string $checkout_key = '', array $dataXendit = []): array
     {
-        // --- step 1 - start - validasi data transaksi checkout
+        // --- step 1 - validasi data transaksi checkout - start ---
         $requirements = [
             [$user_id_buyer !== '', 'Data User Id buyer Empty'],
             [$checkouts !== [], 'Data Checkout Empty'],
@@ -722,9 +722,9 @@ class CheckoutService
                 ];
             }
         }
-        // --- step 1 - end - validasi data transaksi checkout
+        // --- step 1 - validasi data transaksi checkout - end ---
 
-        // --- step 2 - start - simpan invoice dan snapshot alamat buyer
+        // --- step 2 - simpan invoice dan snapshot alamat buyer - start ---
         // Salin nilai lokasi agar riwayat transaksi tetap akurat meskipun buyer
         // mengubah atau menghapus alamat utama setelah checkout.
         $transactionInvoice = TransactionInvoice::create([
@@ -742,9 +742,9 @@ class CheckoutService
             'price' => $price,
             'expired_at' => $expired_at,
         ]);
-        // --- step 2 - end - simpan invoice dan snapshot alamat buyer
+        // --- step 2 - simpan invoice dan snapshot alamat buyer - end ---
 
-        // --- step 3 - start - simpan transaksi dan produk per seller
+        // --- step 3 - simpan transaksi dan produk per seller - start ---
         foreach ($checkouts as $checkout) {
             $alamatSeller = Alamat::where('user_id', ($checkout['user_id_seller'] ?? ''))
                 ->where('type', 'seller')
@@ -803,7 +803,7 @@ class CheckoutService
             $transactionUser->product_price = $totalPriceKeranjang;
             $transactionUser->save();
         }
-        // --- step 3 - end - simpan transaksi dan produk per seller
+        // --- step 3 - simpan transaksi dan produk per seller - end ---
 
         return [
             'status' => 'success',
@@ -825,16 +825,16 @@ class CheckoutService
      */
     public function deleteKeranjangAfterCheckoutForBuyer(string $user_id_buyer = '', array $checkouts = []): array
     {
-        // --- step 1 - start - validasi buyer dan data checkout
+        // --- step 1 - validasi buyer dan data checkout - start ---
         if (! $user_id_buyer || ! $checkouts) {
             return [
                 'status' => 'error',
                 'message' => ! $user_id_buyer ? 'Data User Id buyer Empty' : 'Data Checkout Empty',
             ];
         }
-        // --- step 1 - end - validasi buyer dan data checkout
+        // --- step 1 - validasi buyer dan data checkout - end ---
 
-        // --- step 2 - start - kumpulkan dan hapus cart yang sudah diproses
+        // --- step 2 - kumpulkan dan hapus cart yang sudah diproses - start ---
         $keranjangIds = [];
         foreach ($checkouts as $checkout) {
             foreach (($checkout['keranjangs'] ?? []) as $keranjang) {
@@ -847,7 +847,7 @@ class CheckoutService
                 ->whereIn('id', $keranjangIds)
                 ->delete();
         }
-        // --- step 2 - end - kumpulkan dan hapus cart yang sudah diproses
+        // --- step 2 - kumpulkan dan hapus cart yang sudah diproses - end ---
 
         return [
             'status' => 'success',
@@ -868,16 +868,16 @@ class CheckoutService
      */
     public function changeStockProductAfterCheckout(array $checkouts = []): array
     {
-        // --- step 1 - start - validasi data checkout
+        // --- step 1 - validasi data checkout - start ---
         if (! $checkouts) {
             return [
                 'status' => 'error',
                 'message' => 'Data Checkout Empty',
             ];
         }
-        // --- step 1 - end - validasi data checkout
+        // --- step 1 - validasi data checkout - end ---
 
-        // --- step 2 - start - kurangi stok setiap produk secara aman
+        // --- step 2 - kurangi stok setiap produk secara aman - start ---
         foreach ($checkouts as $checkout) {
             foreach (($checkout['keranjangs'] ?? []) as $keranjang) {
                 $productId = $keranjang['p_id'] ?? '';
@@ -902,7 +902,7 @@ class CheckoutService
                 }
             }
         }
-        // --- step 2 - end - kurangi stok setiap produk secara aman
+        // --- step 2 - kurangi stok setiap produk secara aman - end ---
 
         return [
             'status' => 'success',
@@ -928,7 +928,7 @@ class CheckoutService
      */
     public function lockAndValidateCheckoutItems(string $buyerId, array $checkoutSnapshot): void
     {
-        // --- step 1 - start - indeks nilai cart yang menjadi dasar checkout snapshot
+        // --- step 1 - indeks nilai cart yang menjadi dasar checkout snapshot - start ---
         $checkouts = $checkoutSnapshot['data']['checkouts'] ?? [];
         $expectedCartItems = [];
         $expectedCartIds = [];
@@ -947,9 +947,9 @@ class CheckoutService
             }
         }
         $expectedCartIds = array_values(array_unique($expectedCartIds));
-        // --- step 1 - end - indeks nilai cart yang menjadi dasar checkout snapshot
+        // --- step 1 - indeks nilai cart yang menjadi dasar checkout snapshot - end ---
 
-        // --- step 2 - start - lock row cart dan seluruh produk terkait
+        // --- step 2 - lock row cart dan seluruh produk terkait - start ---
         $cartItems = Keranjang::where('user_id_buyer', $buyerId)
             ->whereIn('id', $expectedCartIds)
             ->lockForUpdate()
@@ -978,9 +978,9 @@ class CheckoutService
             ->where('enable', 1)
             ->lockForUpdate()
             ->first();
-        // --- step 2 - end - lock row cart dan seluruh produk terkait
+        // --- step 2 - lock row cart dan seluruh produk terkait - end ---
 
-        // --- step 3 - start - validasi snapshot terhadap state yang sudah dikunci
+        // --- step 3 - validasi snapshot terhadap state yang sudah dikunci - start ---
         $lockedCartIds = $cartItems->pluck('id')->all();
         $invalidCartIds = array_values(array_diff($expectedCartIds, $lockedCartIds));
         $snapshotChanged = count($lockedCartIds) !== count($expectedCartIds);
@@ -1036,6 +1036,6 @@ class CheckoutService
         if ($snapshotChanged) {
             throw new CheckoutChangedException();
         }
-        // --- step 3 - end - validasi snapshot terhadap state yang sudah dikunci
+        // --- step 3 - validasi snapshot terhadap state yang sudah dikunci - end ---
     }
 }

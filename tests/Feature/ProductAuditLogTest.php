@@ -245,7 +245,7 @@ class ProductAuditLogTest extends TestCase
      */
     public function changing_the_product_event_filter_after_pagination_starts_a_fresh_collection(): void
     {
-        // --- step 1 - start - prepare more than one page of mixed product activity
+        // --- step 1 - prepare more than one page of mixed product activity - start ---
         $occurredAt = CarbonImmutable::parse('2026-07-20 12:00:00');
 
         foreach (range(1, 22) as $index) {
@@ -263,9 +263,9 @@ class ProductAuditLogTest extends TestCase
                 "created-{$index}"
             );
         }
-        // --- step 1 - end - prepare more than one page of mixed product activity
+        // --- step 1 - prepare more than one page of mixed product activity - end ---
 
-        // --- step 2 - start - load and append the second unfiltered page
+        // --- step 2 - load and append the second unfiltered page - start ---
         $firstPage = $this->getJson('/api/audit-logs?per_page=20')
             ->assertOk()
             ->assertJsonCount(20, 'data')
@@ -276,9 +276,9 @@ class ProductAuditLogTest extends TestCase
             ->assertOk()
             ->assertJsonCount(5, 'data')
             ->assertJsonPath('meta.has_more', false);
-        // --- step 2 - end - load and append the second unfiltered page
+        // --- step 2 - load and append the second unfiltered page - end ---
 
-        // --- step 3 - start - switch filter without reusing the previous collection cursor
+        // --- step 3 - switch filter without reusing the previous collection cursor - start ---
         $filteredPage = $this->getJson('/api/audit-logs?per_page=20&event=product.created')
             ->assertOk()
             ->assertJsonCount(3, 'data')
@@ -299,7 +299,7 @@ class ProductAuditLogTest extends TestCase
             array_column($firstPage->json('data'), 'id'),
             array_column($secondPage->json('data'), 'id')
         )));
-        // --- step 3 - end - switch filter without reusing the previous collection cursor
+        // --- step 3 - switch filter without reusing the previous collection cursor - end ---
     }
 
     /**
@@ -315,14 +315,14 @@ class ProductAuditLogTest extends TestCase
      */
     public function failed_validation_and_foreign_product_writes_do_not_create_audit_rows(): void
     {
-        // --- step 1 - start - reject invalid create data
+        // --- step 1 - reject invalid create data - start ---
         $this->post('/api/product', [
             'user_id_seller' => $this->seller->id,
             'name' => 'No',
         ])->assertUnprocessable();
-        // --- step 1 - end - reject invalid create data
+        // --- step 1 - reject invalid create data - end ---
 
-        // --- step 2 - start - prepare a product owned by another seller
+        // --- step 2 - prepare a product owned by another seller - start ---
         $otherSeller = User::factory()->create();
         $otherProduct = Product::create([
             'user_id_seller' => $otherSeller->id,
@@ -336,9 +336,9 @@ class ProductAuditLogTest extends TestCase
             'position' => 1,
         ]);
         Storage::disk('public')->put($otherImage->path, 'other-seller-image');
-        // --- step 2 - end - prepare a product owned by another seller
+        // --- step 2 - prepare a product owned by another seller - end ---
 
-        // --- step 3 - start - reject create, update, and delete attempts from this seller
+        // --- step 3 - reject create, update, and delete attempts from this seller - start ---
         $payload = $this->createPayload();
         $payload['user_id_seller'] = $otherSeller->id;
         $this->post('/api/product', $payload)->assertForbidden();
@@ -353,9 +353,9 @@ class ProductAuditLogTest extends TestCase
 
         $this->delete("/api/product/{$otherSeller->id}/{$otherProduct->id}")
             ->assertForbidden();
-        // --- step 3 - end - reject create, update, and delete attempts from this seller
+        // --- step 3 - reject create, update, and delete attempts from this seller - end ---
 
-        // --- step 4 - start - verify ownership data and audit history remain unchanged
+        // --- step 4 - verify ownership data and audit history remain unchanged - start ---
         $this->assertDatabaseHas('products', [
             'id' => $otherProduct->id,
             'user_id_seller' => $otherSeller->id,
@@ -372,7 +372,7 @@ class ProductAuditLogTest extends TestCase
         $this->assertDatabaseCount('audit_logs', 0);
         $this->assertDatabaseCount('outbox_messages', 0);
         Queue::assertNothingPushed();
-        // --- step 4 - end - verify ownership data and audit history remain unchanged
+        // --- step 4 - verify ownership data and audit history remain unchanged - end ---
     }
 
     /**
@@ -388,7 +388,7 @@ class ProductAuditLogTest extends TestCase
      */
     public function failed_update_and_missing_product_do_not_mutate_data_or_create_audit_rows(): void
     {
-        // --- step 1 - start - reject invalid update data without changing the product
+        // --- step 1 - reject invalid update data without changing the product - start ---
         $product = $this->productWithImages(1);
 
         $this->post("/api/product/{$product->id}", [
@@ -404,9 +404,9 @@ class ProductAuditLogTest extends TestCase
         $this->assertSame(12500, (int) $product->price);
         $this->assertSame(4, $product->stock);
         $this->assertCount(1, $product->images);
-        // --- step 1 - end - reject invalid update data without changing the product
+        // --- step 1 - reject invalid update data without changing the product - end ---
 
-        // --- step 2 - start - reject a valid but nonexistent product UUID
+        // --- step 2 - reject a valid but nonexistent product UUID - start ---
         $missingProductId = (string) Str::uuid();
 
         $this->getJson("/api/product/{$this->seller->id}/{$missingProductId}")
@@ -414,7 +414,7 @@ class ProductAuditLogTest extends TestCase
             ->assertJsonPath('status', 404)
             ->assertJsonPath('message', 'Product Not Found')
             ->assertJsonMissingPath('product');
-        // --- step 2 - end - reject a valid but nonexistent product UUID
+        // --- step 2 - reject a valid but nonexistent product UUID - end ---
 
         // Failed requests do not represent successful domain operations and must not be audited.
         $this->assertDatabaseCount('audit_logs', 0);

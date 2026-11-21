@@ -60,7 +60,7 @@ class OutboxPublisherService
         $retryBase = max(1, $this->integerConfig('outbox.retry_base_seconds'));
         $retryMaximum = max($retryBase, $this->integerConfig('outbox.retry_max_seconds'));
 
-        // --- step 1 - start - proses batch due secara bounded
+        // --- step 1 - proses batch due secara bounded - start ---
         for ($batch = 0; $batch < $maxBatches; $batch++) {
             $messages = $this->claimBatch($batchSize, $lockTimeout);
 
@@ -79,7 +79,7 @@ class OutboxPublisherService
                 break;
             }
         }
-        // --- step 1 - end - proses batch due secara bounded
+        // --- step 1 - proses batch due secara bounded - end ---
 
         return $summary;
     }

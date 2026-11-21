@@ -63,20 +63,20 @@ class SellerDashboardService
      */
     public function getDashboard(string $user_id): array
     {
-        // --- step 1 - start - tentukan rentang tanggal
+        // --- step 1 - tentukan rentang tanggal - start ---
         $now = Carbon::now('Asia/Jakarta');
         $startOfMonth = $now->copy()->startOfMonth()->timezone('UTC');
         $endOfMonth = $now->copy()->endOfMonth()->timezone('UTC');
-        // --- step 1 - end - tentukan rentang tanggal
+        // --- step 1 - tentukan rentang tanggal - end ---
 
-        // --- step 2 - start - ambil seluruh data dashboard
+        // --- step 2 - ambil seluruh data dashboard - start ---
         $dashboard = [
             'summary' => $this->getSummary($user_id, $startOfMonth, $endOfMonth),
             'performance' => $this->getPerformance($user_id),
             'recent_transactions' => $this->getRecentTransactions($user_id),
             'product_snapshot' => $this->getProductSnapshot($user_id),
         ];
-        // --- step 2 - end - ambil seluruh data dashboard
+        // --- step 2 - ambil seluruh data dashboard - end ---
 
         return $dashboard;
     }
@@ -96,11 +96,11 @@ class SellerDashboardService
      */
     private function getSummary(string $user_id, Carbon $startOfMonth, Carbon $endOfMonth): array
     {
-        // --- step 1 - start - siapkan query dasar
+        // --- step 1 - siapkan query dasar - start ---
         $doneTransactions = $this->doneTransactionQuery($user_id);
-        // --- step 1 - end - siapkan query dasar
+        // --- step 1 - siapkan query dasar - end ---
 
-        // --- step 2 - start - ambil ringkasan dashboard
+        // --- step 2 - ambil ringkasan dashboard - start ---
         $summary = [
             'total_products' => Product::where('user_id_seller', $user_id)->count(),
             'new_orders' => $this->newOrderQuery($user_id)->count(),
@@ -111,7 +111,7 @@ class SellerDashboardService
                 ->whereBetween('transaction_users.created_at', [$startOfMonth, $endOfMonth])
                 ->sum('transaction_users.product_price'),
         ];
-        // --- step 2 - end - ambil ringkasan dashboard
+        // --- step 2 - ambil ringkasan dashboard - end ---
 
         return $summary;
     }
@@ -128,12 +128,12 @@ class SellerDashboardService
      */
     private function getPerformance(string $user_id): array
     {
-        // --- step 1 - start - tentukan rentang tanggal
+        // --- step 1 - tentukan rentang tanggal - start ---
         $startDate = Carbon::now('Asia/Jakarta')->subDays(29)->startOfDay();
         $endDate = Carbon::now('Asia/Jakarta')->endOfDay();
-        // --- step 1 - end - tentukan rentang tanggal
+        // --- step 1 - tentukan rentang tanggal - end ---
 
-        // --- step 2 - start - ambil data performa
+        // --- step 2 - ambil data performa - start ---
         $rows = $this->doneTransactionQuery($user_id)
             ->whereBetween('transaction_users.created_at', [
                 $startDate->copy()->timezone('UTC'),
@@ -147,9 +147,9 @@ class SellerDashboardService
             ->orderBy('transaction_date')
             ->get()
             ->keyBy('transaction_date');
-        // --- step 2 - end - ambil data performa
+        // --- step 2 - ambil data performa - end ---
 
-        // --- step 3 - start - format data performa
+        // --- step 3 - format data performa - start ---
         $labels = [];
         $sales = [];
         $revenue = [];
@@ -162,9 +162,9 @@ class SellerDashboardService
             $sales[] = (int) ($row->sales ?? 0);
             $revenue[] = (float) ($row->revenue ?? 0);
         }
-        // --- step 3 - end - format data performa
+        // --- step 3 - format data performa - end ---
 
-        // --- step 4 - start - bentuk response
+        // --- step 4 - bentuk response - start ---
         $performance = [
             'period' => '30_days',
             'labels' => $labels,
@@ -173,7 +173,7 @@ class SellerDashboardService
             'total_sold' => array_sum($sales),
             'total_revenue' => array_sum($revenue),
         ];
-        // --- step 4 - end - bentuk response
+        // --- step 4 - bentuk response - end ---
 
         return $performance;
     }
@@ -190,7 +190,7 @@ class SellerDashboardService
      */
     private function getRecentTransactions(string $user_id): array
     {
-        // --- step 1 - start - ambil transaksi terbaru
+        // --- step 1 - ambil transaksi terbaru - start ---
         $recentTransactions = TransactionUser::query()
             ->join('transaction_invoices', 'transaction_invoices.id', '=', 'transaction_users.transaction_invoice_id')
             ->join('users as buyer_users', 'buyer_users.id', '=', 'transaction_users.user_id_buyer')
@@ -215,13 +215,13 @@ class SellerDashboardService
                 /** @var string|null $invoiceStatus */
                 $invoiceStatus = $transaction->getAttribute('invoice_status');
 
-                // --- step 2 - start - ambil nama produk
+                // --- step 2 - ambil nama produk - start ---
                 $products = TransactionProduct::query()
                     ->join('products', 'products.id', '=', 'transaction_products.product_id')
                     ->where('transaction_products.transaction_user_id', $transaction->id)
                     ->orderBy('products.name')
                     ->pluck('products.name');
-                // --- step 2 - end - ambil nama produk
+                // --- step 2 - ambil nama produk - end ---
 
                 return [
                     'id' => $transaction->id,
@@ -237,7 +237,7 @@ class SellerDashboardService
                 ];
             })
             ->all();
-        // --- step 1 - end - ambil transaksi terbaru
+        // --- step 1 - ambil transaksi terbaru - end ---
 
         return $recentTransactions;
     }
@@ -255,18 +255,18 @@ class SellerDashboardService
      */
     private function getProductSnapshot(string $user_id): array
     {
-        // --- step 1 - start - tentukan rentang tanggal
+        // --- step 1 - tentukan rentang tanggal - start ---
         $newProductStart = Carbon::now('Asia/Jakarta')->subDays(30)->startOfDay()->timezone('UTC');
-        // --- step 1 - end - tentukan rentang tanggal
+        // --- step 1 - tentukan rentang tanggal - end ---
 
-        // --- step 2 - start - ambil snapshot produk
+        // --- step 2 - ambil snapshot produk - start ---
         $snapshot = [
             'active_products' => Product::where('user_id_seller', $user_id)->where('stock', '>', 0)->count(),
             'low_stock_products' => Product::where('user_id_seller', $user_id)->whereBetween('stock', [1, 5])->count(),
             'empty_stock_products' => Product::where('user_id_seller', $user_id)->where('stock', '<=', 0)->count(),
             'new_products' => Product::where('user_id_seller', $user_id)->where('created_at', '>=', $newProductStart)->count(),
         ];
-        // --- step 2 - end - ambil snapshot produk
+        // --- step 2 - ambil snapshot produk - end ---
 
         return $snapshot;
     }

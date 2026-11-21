@@ -36,7 +36,7 @@ class SecurityController extends Controller
      */
     public function summary(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi user Clerk terautentikasi
+        // --- step 1 - validasi user Clerk terautentikasi - start ---
         $clerkUserId = $this->resolveClerkUserId($request);
 
         if ($clerkUserId === '') {
@@ -45,12 +45,12 @@ class SecurityController extends Controller
                 'message' => 'Unauthorized',
             ], 401);
         }
-        // --- step 1 - end - validasi user Clerk terautentikasi
+        // --- step 1 - validasi user Clerk terautentikasi - end ---
 
         try {
-            // --- step 2 - start - ambil ringkasan keamanan akun
+            // --- step 2 - ambil ringkasan keamanan akun - start ---
             $securitySummary = $this->clerkSecurityService->getSummary($clerkUserId);
-            // --- step 2 - end - ambil ringkasan keamanan akun
+            // --- step 2 - ambil ringkasan keamanan akun - end ---
 
             return response()->json([
                 'status' => 200,
@@ -79,7 +79,7 @@ class SecurityController extends Controller
      */
     public function sessions(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi user dan session Clerk terautentikasi
+        // --- step 1 - validasi user dan session Clerk terautentikasi - start ---
         $clerkUserId = $this->resolveClerkUserId($request);
         $currentSessionId = $this->resolveClerkSessionId($request);
 
@@ -89,12 +89,12 @@ class SecurityController extends Controller
                 'message' => 'Unauthorized',
             ], 401);
         }
-        // --- step 1 - end - validasi user dan session Clerk terautentikasi
+        // --- step 1 - validasi user dan session Clerk terautentikasi - end ---
 
         try {
-            // --- step 2 - start - ambil daftar session aktif
+            // --- step 2 - ambil daftar session aktif - start ---
             $sessionData = $this->clerkSecurityService->getActiveSessions($clerkUserId, $currentSessionId);
-            // --- step 2 - end - ambil daftar session aktif
+            // --- step 2 - ambil daftar session aktif - end ---
 
             return response()->json([
                 'status' => 200,
@@ -124,7 +124,7 @@ class SecurityController extends Controller
      */
     public function revokeSession(Request $request, string $sessionId): JsonResponse
     {
-        // --- step 1 - start - validasi user dan session Clerk terautentikasi
+        // --- step 1 - validasi user dan session Clerk terautentikasi - start ---
         $clerkUserId = $this->resolveClerkUserId($request);
         $currentSessionId = $this->resolveClerkSessionId($request);
 
@@ -134,12 +134,12 @@ class SecurityController extends Controller
                 'message' => 'Unauthorized',
             ], 401);
         }
-        // --- step 1 - end - validasi user dan session Clerk terautentikasi
+        // --- step 1 - validasi user dan session Clerk terautentikasi - end ---
 
         try {
-            // --- step 2 - start - cabut session perangkat terpilih
+            // --- step 2 - cabut session perangkat terpilih - start ---
             $result = $this->clerkSecurityService->revokeSession($clerkUserId, $currentSessionId, $sessionId);
-            // --- step 2 - end - cabut session perangkat terpilih
+            // --- step 2 - cabut session perangkat terpilih - end ---
 
             return response()->json([
                 'status' => 200,
@@ -167,7 +167,7 @@ class SecurityController extends Controller
      */
     public function revokeOtherSessions(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi user dan session Clerk terautentikasi
+        // --- step 1 - validasi user dan session Clerk terautentikasi - start ---
         $clerkUserId = $this->resolveClerkUserId($request);
         $currentSessionId = $this->resolveClerkSessionId($request);
 
@@ -177,12 +177,12 @@ class SecurityController extends Controller
                 'message' => 'Unauthorized',
             ], 401);
         }
-        // --- step 1 - end - validasi user dan session Clerk terautentikasi
+        // --- step 1 - validasi user dan session Clerk terautentikasi - end ---
 
         try {
-            // --- step 2 - start - cabut seluruh session perangkat lain
+            // --- step 2 - cabut seluruh session perangkat lain - start ---
             $result = $this->clerkSecurityService->revokeOtherSessions($clerkUserId, $currentSessionId);
-            // --- step 2 - end - cabut seluruh session perangkat lain
+            // --- step 2 - cabut seluruh session perangkat lain - end ---
 
             return response()->json([
                 'status' => 200,
@@ -211,7 +211,7 @@ class SecurityController extends Controller
      */
     public function validateGoogleLink(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi user Clerk dan user lokal
+        // --- step 1 - validasi user Clerk dan user lokal - start ---
         $clerkUserId = $this->resolveClerkUserId($request);
         $user = $request->user();
 
@@ -221,12 +221,12 @@ class SecurityController extends Controller
                 'message' => 'Unauthorized',
             ], 401);
         }
-        // --- step 1 - end - validasi user Clerk dan user lokal
+        // --- step 1 - validasi user Clerk dan user lokal - end ---
 
         try {
-            // --- step 2 - start - validasi akun Google yang baru dihubungkan
+            // --- step 2 - validasi akun Google yang baru dihubungkan - start ---
             $google = $this->clerkSecurityService->validateGoogleAccountLink($clerkUserId, $user);
-            // --- step 2 - end - validasi akun Google yang baru dihubungkan
+            // --- step 2 - validasi akun Google yang baru dihubungkan - end ---
 
             return response()->json([
                 'status' => 200,
@@ -260,7 +260,7 @@ class SecurityController extends Controller
      */
     public function cleanupGoogleLink(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi user Clerk terautentikasi
+        // --- step 1 - validasi user Clerk terautentikasi - start ---
         $clerkUserId = $this->resolveClerkUserId($request);
 
         if ($clerkUserId === '') {
@@ -269,12 +269,12 @@ class SecurityController extends Controller
                 'message' => 'Unauthorized',
             ], 401);
         }
-        // --- step 1 - end - validasi user Clerk terautentikasi
+        // --- step 1 - validasi user Clerk terautentikasi - end ---
 
         try {
-            // --- step 2 - start - bersihkan akun Google yang gagal dihubungkan
+            // --- step 2 - bersihkan akun Google yang gagal dihubungkan - start ---
             $google = $this->clerkSecurityService->cleanupFailedGoogleAccountLinks($clerkUserId);
-            // --- step 2 - end - bersihkan akun Google yang gagal dihubungkan
+            // --- step 2 - bersihkan akun Google yang gagal dihubungkan - end ---
 
             return response()->json([
                 'status' => 200,

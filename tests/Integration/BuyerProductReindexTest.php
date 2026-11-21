@@ -39,22 +39,22 @@ class BuyerProductReindexTest extends TestCase
     {
         parent::setUp();
 
-        // --- step 1 - start - buat identitas index integration yang terisolasi
+        // --- step 1 - buat identitas index integration yang terisolasi - start ---
         $testingIndex = (string) config('buyer_product_search.index');
         $this->assertStringContainsString('testing', $testingIndex);
 
         $this->indexName = $testingIndex.'_reindex_'.bin2hex(random_bytes(6));
         config(['buyer_product_search.index' => $this->indexName]);
-        // --- step 1 - end - buat identitas index integration yang terisolasi
+        // --- step 1 - buat identitas index integration yang terisolasi - end ---
 
-        // --- step 2 - start - buat index nyata untuk fixture stale-document
+        // --- step 2 - buat index nyata untuk fixture stale-document - start ---
         $this->client = $this->app->make(Client::class);
         $createTask = $this->client->createIndex($this->indexName, ['primaryKey' => 'id']);
         $this->client->waitForTask($createTask['taskUid'], 10_000);
         $this->indexCreated = true;
 
         $this->searchService = $this->app->make(BuyerProductSearchService::class);
-        // --- step 2 - end - buat index nyata untuk fixture stale-document
+        // --- step 2 - buat index nyata untuk fixture stale-document - end ---
     }
 
     /**
@@ -80,7 +80,7 @@ class BuyerProductReindexTest extends TestCase
      */
     public function test_full_reindex_rebuilds_the_eligible_catalog_from_disposable_database_state(): void
     {
-        // --- step 1 - start - siapkan seller dan produk dengan variasi availability
+        // --- step 1 - siapkan seller dan produk dengan variasi availability - start ---
         $verifiedSeller = User::factory()->create(['name' => 'Verified Seller']);
         $unverifiedSeller = User::factory()->create(['name' => 'Unverified Seller']);
 
@@ -131,9 +131,9 @@ class BuyerProductReindexTest extends TestCase
             'stock' => 2,
         ]);
         $deletedProduct->delete();
-        // --- step 1 - end - siapkan seller dan produk dengan variasi availability
+        // --- step 1 - siapkan seller dan produk dengan variasi availability - end ---
 
-        // --- step 2 - start - masukkan dokumen basi sebelum full reindex
+        // --- step 2 - masukkan dokumen basi sebelum full reindex - start ---
         $staleTask = $this->client->index($this->indexName)->addDocuments([
             [
                 'id' => 'stale-reindex-document',
@@ -142,9 +142,9 @@ class BuyerProductReindexTest extends TestCase
             ],
         ], 'id');
         $this->client->waitForTask($staleTask['taskUid'], 10_000);
-        // --- step 2 - end - masukkan dokumen basi sebelum full reindex
+        // --- step 2 - masukkan dokumen basi sebelum full reindex - end ---
 
-        // --- step 3 - start - jalankan command dan verifikasi seluruh product ID dikirim
+        // --- step 3 - jalankan command dan verifikasi seluruh product ID dikirim - start ---
         $this->artisan('buyer-search:reindex', ['--chunk' => 2])
             ->expectsOutput('Buyer product index configured and synchronization jobs dispatched.')
             ->assertSuccessful();
@@ -165,15 +165,15 @@ class BuyerProductReindexTest extends TestCase
             $deletedProduct->id,
             $unverifiedSellerProduct->id,
         ])->sort()->values()->all(), $queuedProductIds);
-        // --- step 3 - end - jalankan command dan verifikasi seluruh product ID dikirim
+        // --- step 3 - jalankan command dan verifikasi seluruh product ID dikirim - end ---
 
-        // --- step 4 - start - proses job tertangkap terhadap index integration nyata
+        // --- step 4 - proses job tertangkap terhadap index integration nyata - start ---
         $queuedJobs->each(function (SyncBuyerProductSearchJob $job): void {
             $job->handle($this->searchService);
         });
-        // --- step 4 - end - proses job tertangkap terhadap index integration nyata
+        // --- step 4 - proses job tertangkap terhadap index integration nyata - end ---
 
-        // --- step 5 - start - verifikasi settings dan hasil akhir proyeksi
+        // --- step 5 - verifikasi settings dan hasil akhir proyeksi - start ---
         $settings = $this->client->index($this->indexName)->getSettings();
         $documents = $this->client->index($this->indexName)->search('', ['limit' => 20])->getHits();
 
@@ -182,6 +182,6 @@ class BuyerProductReindexTest extends TestCase
         $this->assertSame('Verified Store', $documents[0]['u_name']);
         $this->assertSame(4, $documents[0]['p_stock']);
         $this->assertNotContains('stale-reindex-document', array_column($documents, 'id'));
-        // --- step 5 - end - verifikasi settings dan hasil akhir proyeksi
+        // --- step 5 - verifikasi settings dan hasil akhir proyeksi - end ---
     }
 }

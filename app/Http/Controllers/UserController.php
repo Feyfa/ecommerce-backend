@@ -40,7 +40,7 @@ class UserController extends Controller
      */
     public function deleteImage(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi request dan ambil data
+        // --- step 1 - validasi request dan ambil data - start ---
         $validator = Validator::make($request->all(), [
             'img' => ['required', 'string'],
         ]);
@@ -50,9 +50,9 @@ class UserController extends Controller
         }
 
         $validate = $validator->validate();
-        // --- step 1 - end - validasi request dan ambil data
+        // --- step 1 - validasi request dan ambil data - end ---
 
-        // --- step 2 - start - validasi user terautentikasi
+        // --- step 2 - validasi user terautentikasi - start ---
         $user = $request->user();
 
         if (! $user) {
@@ -62,11 +62,11 @@ class UserController extends Controller
         if ($user->img !== $validate['img']) {
             return response()->json(['status' => 403, 'message' => 'Forbidden'], 403);
         }
-        // --- step 2 - end - validasi user terautentikasi
+        // --- step 2 - validasi user terautentikasi - end ---
 
-        // --- step 3 - start - pastikan file aktif tersedia sebelum mengubah profil
+        // --- step 3 - pastikan file aktif tersedia sebelum mengubah profil - start ---
         if ($validate['img'] && Storage::disk('public')->exists($validate['img'])) {
-            // --- step 4 - start - hapus referensi gambar dan catat audit secara atomik
+            // --- step 4 - hapus referensi gambar dan catat audit secara atomik - start ---
             DB::transaction(function () use ($user, $request): void {
                 $user->img = null;
                 $user->save();
@@ -77,15 +77,15 @@ class UserController extends Controller
                     AuditEvent::PROFILE_IMAGE_DELETED,
                 );
             });
-            // --- step 4 - end - hapus referensi gambar dan catat audit secara atomik
+            // --- step 4 - hapus referensi gambar dan catat audit secara atomik - end ---
 
-            // --- step 5 - start - hapus file setelah perubahan database dan audit berhasil
+            // --- step 5 - hapus file setelah perubahan database dan audit berhasil - start ---
             Storage::disk('public')->delete($validate['img']);
-            // --- step 5 - end - hapus file setelah perubahan database dan audit berhasil
+            // --- step 5 - hapus file setelah perubahan database dan audit berhasil - end ---
 
             return response()->json(['status' => 200, 'message' => 'Foto profil berhasil dihapus.', 'user' => $user], 200);
         }
-        // --- step 3 - end - pastikan file aktif tersedia sebelum mengubah profil
+        // --- step 3 - pastikan file aktif tersedia sebelum mengubah profil - end ---
 
         return response()->json(['status' => 404, 'message' => 'File foto profil tidak ditemukan.'], 404);
     }
@@ -105,7 +105,7 @@ class UserController extends Controller
      */
     public function uploadImage(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi request
+        // --- step 1 - validasi request - start ---
         $validator = Validator::make(
             $request->all(),
             [
@@ -125,9 +125,9 @@ class UserController extends Controller
         }
 
         $validate = $validator->validate();
-        // --- step 1 - end - validasi request
+        // --- step 1 - validasi request - end ---
 
-        // --- step 2 - start - validasi user terautentikasi
+        // --- step 2 - validasi user terautentikasi - start ---
         $user = $request->user();
 
         if (! $user instanceof User) {
@@ -137,9 +137,9 @@ class UserController extends Controller
         if ((string) $user->id !== (string) $validate['id']) {
             return response()->json(['status' => 403, 'message' => 'Forbidden'], 403);
         }
-        // --- step 2 - end - validasi user terautentikasi
+        // --- step 2 - validasi user terautentikasi - end ---
 
-        // --- step 3 - start - unggah file baru sebelum mengganti referensi profil
+        // --- step 3 - unggah file baru sebelum mengganti referensi profil - start ---
         $file = $request->file('file');
         if (! $file instanceof UploadedFile) {
             $validator->errors()->add('file', 'File harus berupa gambar.');
@@ -153,9 +153,9 @@ class UserController extends Controller
         if ($path === false) {
             throw new RuntimeException('Profile image could not be stored.');
         }
-        // --- step 3 - end - unggah file baru sebelum mengganti referensi profil
+        // --- step 3 - unggah file baru sebelum mengganti referensi profil - end ---
 
-        // --- step 4 - start - ganti referensi gambar dan catat audit secara atomik
+        // --- step 4 - ganti referensi gambar dan catat audit secara atomik - start ---
         try {
             DB::transaction(function () use ($user, $path, $request): void {
                 $user->img = $path;
@@ -174,13 +174,13 @@ class UserController extends Controller
 
             throw $exception;
         }
-        // --- step 4 - end - ganti referensi gambar dan catat audit secara atomik
+        // --- step 4 - ganti referensi gambar dan catat audit secara atomik - end ---
 
-        // --- step 5 - start - bersihkan file sebelumnya setelah transaksi berhasil
+        // --- step 5 - bersihkan file sebelumnya setelah transaksi berhasil - start ---
         if ($previousImage && $previousImage !== $path && Storage::disk('public')->exists($previousImage)) {
             Storage::disk('public')->delete($previousImage);
         }
-        // --- step 5 - end - bersihkan file sebelumnya setelah transaksi berhasil
+        // --- step 5 - bersihkan file sebelumnya setelah transaksi berhasil - end ---
 
         return response()->json(['status' => 200, 'message' => 'Foto profil berhasil diunggah.', 'user' => $user], 200);
     }
@@ -220,7 +220,7 @@ class UserController extends Controller
      */
     public function updateUser(Request $request, string $id): JsonResponse
     {
-        // --- step 1 - start - validasi id route
+        // --- step 1 - validasi id route - start ---
         $routeIdValidator = Validator::make(['id' => $id], [
             'id' => ['required', 'uuid'],
         ]);
@@ -230,9 +230,9 @@ class UserController extends Controller
         }
 
         $validatedRouteId = $routeIdValidator->validated()['id'];
-        // --- step 1 - end - validasi id route
+        // --- step 1 - validasi id route - end ---
 
-        // --- step 2 - start - validasi user terautentikasi
+        // --- step 2 - validasi user terautentikasi - start ---
         $user = $request->user();
 
         if (! $user) {
@@ -242,9 +242,9 @@ class UserController extends Controller
         if ((string) $user->id !== (string) $validatedRouteId) {
             return response()->json(['status' => 403, 'message' => 'Forbidden'], 403);
         }
-        // --- step 2 - end - validasi user terautentikasi
+        // --- step 2 - validasi user terautentikasi - end ---
 
-        // --- step 3 - start - validasi request dan ambil data
+        // --- step 3 - validasi request dan ambil data - start ---
         $gender = $request->input('jenis_kelamin');
         $birthDate = $request->input('tanggal_lahir');
 
@@ -268,9 +268,9 @@ class UserController extends Controller
 
         /** @var array{phone: string, jenis_kelamin: string|null, tanggal_lahir: string|null} $validate */
         $validate = $validator->validated();
-        // --- step 3 - end - validasi request dan ambil data
+        // --- step 3 - validasi request dan ambil data - end ---
 
-        // --- step 4 - start - perbarui Pengaturan Pengguna bersama audit secara atomik
+        // --- step 4 - perbarui Pengaturan Pengguna bersama audit secara atomik - start ---
         $beforeValues = $this->auditLogService->profileSnapshot($user);
 
         DB::transaction(function () use ($user, $request, $validate, $beforeValues): void {
@@ -285,7 +285,7 @@ class UserController extends Controller
                 $this->profileChanges($beforeValues, $user),
             );
         });
-        // --- step 4 - end - perbarui Pengaturan Pengguna bersama audit secara atomik
+        // --- step 4 - perbarui Pengaturan Pengguna bersama audit secara atomik - end ---
 
         return response()->json(['status' => 200, 'message' => 'User Update Successfully', 'user' => $user], 200);
     }
@@ -304,7 +304,7 @@ class UserController extends Controller
      */
     private function profileChanges(array $beforeValues, User $user): array
     {
-        // --- step 1 - start - siapkan snapshot sesudah perubahan dan label field yang diaudit
+        // --- step 1 - siapkan snapshot sesudah perubahan dan label field yang diaudit - start ---
         $afterValues = $this->auditLogService->profileSnapshot($user);
         $labels = [
             'phone' => 'Nomor Telepon',
@@ -312,9 +312,9 @@ class UserController extends Controller
             'jenis_kelamin' => 'Jenis Kelamin',
         ];
         $changes = [];
-        // --- step 1 - end - siapkan snapshot sesudah perubahan dan label field yang diaudit
+        // --- step 1 - siapkan snapshot sesudah perubahan dan label field yang diaudit - end ---
 
-        // --- step 2 - start - kumpulkan hanya nilai before dan after yang berbeda
+        // --- step 2 - kumpulkan hanya nilai before dan after yang berbeda - start ---
         foreach ($labels as $field => $label) {
             if ($beforeValues[$field] === $afterValues[$field]) {
                 continue;
@@ -327,7 +327,7 @@ class UserController extends Controller
                 'after' => $afterValues[$field],
             ];
         }
-        // --- step 2 - end - kumpulkan hanya nilai before dan after yang berbeda
+        // --- step 2 - kumpulkan hanya nilai before dan after yang berbeda - end ---
 
         return $changes;
     }

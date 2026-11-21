@@ -105,14 +105,14 @@ class ClerkUserSyncService
             $displayName,
             $afterSync,
         ): array {
-            // --- step 1 - start - cari user lokal berdasarkan clerk_user_id
+            // --- step 1 - cari user lokal berdasarkan clerk_user_id - start ---
             $user = User::query()
                 ->where('clerk_user_id', $clerkUser->id)
                 ->lockForUpdate()
                 ->first();
-            // --- step 1 - end - cari user lokal berdasarkan clerk_user_id
+            // --- step 1 - cari user lokal berdasarkan clerk_user_id - end ---
 
-            // --- step 2 - start - jika belum ada coba attach ke email lokal yang sama
+            // --- step 2 - jika belum ada coba attach ke email lokal yang sama - start ---
             if (! $user) {
                 $user = User::query()
                     ->whereNull('clerk_user_id')
@@ -120,17 +120,17 @@ class ClerkUserSyncService
                     ->lockForUpdate()
                     ->first();
             }
-            // --- step 2 - end - jika belum ada coba attach ke email lokal yang sama
+            // --- step 2 - jika belum ada coba attach ke email lokal yang sama - end ---
 
-            // --- step 3 - start - jika tetap belum ada buat row user lokal baru
+            // --- step 3 - jika tetap belum ada buat row user lokal baru - start ---
             if (! $user) {
                 $user = new User();
             }
 
             $wasCreated = ! $user->exists;
-            // --- step 3 - end - jika tetap belum ada buat row user lokal baru
+            // --- step 3 - jika tetap belum ada buat row user lokal baru - end ---
 
-            // --- step 4 - start - sinkronkan identity utama dari Clerk
+            // --- step 4 - sinkronkan identity utama dari Clerk - start ---
             $user->clerk_user_id = $clerkUser->id;
             $user->email = $primaryEmail;
 
@@ -165,7 +165,7 @@ class ClerkUserSyncService
                 'user' => $syncedUser,
                 'was_created' => $wasCreated,
             ];
-            // --- step 4 - end - sinkronkan identity utama dari Clerk
+            // --- step 4 - sinkronkan identity utama dari Clerk - end ---
 
             return $syncResult;
         });

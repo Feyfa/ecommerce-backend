@@ -29,7 +29,7 @@ class GeoapifyService
      */
     public function verifyIndonesiaLocation(float $latitude, float $longitude): array
     {
-        // --- step 1 - start - validasi konfigurasi server
+        // --- step 1 - validasi konfigurasi server - start ---
         $configuredKey = config('services.geoapify.key');
         if ($configuredKey !== null && ! is_scalar($configuredKey)) {
             $this->throwUnavailable();
@@ -48,9 +48,9 @@ class GeoapifyService
             || ($configuredUrl !== null && ! is_scalar($configuredUrl))) {
             $this->throwUnavailable();
         }
-        // --- step 1 - end - validasi konfigurasi server
+        // --- step 1 - validasi konfigurasi server - end ---
 
-        // --- step 2 - start - verifikasi koordinat melalui provider tepercaya
+        // --- step 2 - verifikasi koordinat melalui provider tepercaya - start ---
         try {
             $response = Http::acceptJson()
                 ->timeout((int) $configuredTimeout)
@@ -69,9 +69,9 @@ class GeoapifyService
         if (! $response->successful()) {
             $this->throwUnavailable();
         }
-        // --- step 2 - end - verifikasi koordinat melalui provider tepercaya
+        // --- step 2 - verifikasi koordinat melalui provider tepercaya - end ---
 
-        // --- step 3 - start - validasi wilayah Indonesia dan normalisasi data alamat
+        // --- step 3 - validasi wilayah Indonesia dan normalisasi data alamat - start ---
         $result = $response->json('results.0');
         if (! is_array($result) || empty($result['formatted'])) {
             throw ValidationException::withMessages([
@@ -91,7 +91,7 @@ class GeoapifyService
             'geoapify_place_id' => ! empty($result['place_id']) ? (string) $result['place_id'] : null,
             'formatted_address' => trim((string) $result['formatted']),
         ];
-        // --- step 3 - end - validasi wilayah Indonesia dan normalisasi data alamat
+        // --- step 3 - validasi wilayah Indonesia dan normalisasi data alamat - end ---
 
         return $location;
     }

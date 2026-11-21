@@ -47,7 +47,7 @@ class XenditService
     public function createVirtualAccount(string $external_id = '', string $bank_code = '', string $name = '', string $country = 'ID', string $currency = 'IDR', bool $is_single_use = false, bool $is_closed = false, int $expected_amount = 0, string $expiration_date = ''): array
     {
         try {
-            // --- step 1 - start - siapkan request pembuatan virtual account
+            // --- step 1 - siapkan request pembuatan virtual account - start ---
             $url = 'https://api.xendit.co/callback_virtual_accounts';
             $json = [
                 'external_id' => $external_id,
@@ -67,12 +67,12 @@ class XenditService
                 'json' => $json,
                 'headers' => $headers,
             ];
-            // --- step 1 - end - siapkan request pembuatan virtual account
+            // --- step 1 - siapkan request pembuatan virtual account - end ---
 
-            // --- step 2 - start - kirim request dan baca response Xendit
+            // --- step 2 - kirim request dan baca response Xendit - start ---
             $response = $this->client->post($url, $paramater);
             $response = json_decode($response->getBody(), true);
-            // --- step 2 - end - kirim request dan baca response Xendit
+            // --- step 2 - kirim request dan baca response Xendit - end ---
 
             return [
                 'status' => 'suceess',
@@ -113,7 +113,7 @@ class XenditService
     public function simulateVirtualAccountPool(string $bank_code = '', string $bank_account_number = '', int $transfer_amount = 0): array
     {
         try {
-            // --- step 1 - start - siapkan request simulasi pembayaran pool
+            // --- step 1 - siapkan request simulasi pembayaran pool - start ---
             $url = 'https://api.xendit.co/pool_virtual_accounts/simulate_payment';
             $json = [
                 'bank_code' => $bank_code,
@@ -127,12 +127,12 @@ class XenditService
                 'json' => $json,
                 'headers' => $headers,
             ];
-            // --- step 1 - end - siapkan request simulasi pembayaran pool
+            // --- step 1 - siapkan request simulasi pembayaran pool - end ---
 
-            // --- step 2 - start - kirim request dan baca response Xendit
+            // --- step 2 - kirim request dan baca response Xendit - start ---
             $response = $this->client->post($url, $paramater);
             $response = json_decode($response->getBody(), true);
-            // --- step 2 - end - kirim request dan baca response Xendit
+            // --- step 2 - kirim request dan baca response Xendit - end ---
 
             return [
                 'status' => 'success',
@@ -171,7 +171,7 @@ class XenditService
     public function simulateVirtualAccountFixed(string $external_id = '', int $amount = 0): array
     {
         try {
-            // --- step 1 - start - siapkan request simulasi pembayaran fixed virtual account
+            // --- step 1 - siapkan request simulasi pembayaran fixed virtual account - start ---
             $url = "https://api.xendit.co/callback_virtual_accounts/external_id={$external_id}/simulate_payment";
             $json = [
                 'amount' => $amount,
@@ -183,12 +183,12 @@ class XenditService
                 'json' => $json,
                 'headers' => $headers,
             ];
-            // --- step 1 - end - siapkan request simulasi pembayaran fixed virtual account
+            // --- step 1 - siapkan request simulasi pembayaran fixed virtual account - end ---
 
-            // --- step 2 - start - kirim request dan baca response Xendit
+            // --- step 2 - kirim request dan baca response Xendit - start ---
             $response = $this->client->post($url, $parameter);
             $response = json_decode($response->getBody(), true);
-            // --- step 2 - end - kirim request dan baca response Xendit
+            // --- step 2 - kirim request dan baca response Xendit - end ---
 
             return [
                 'status' => 'success',
@@ -232,7 +232,7 @@ class XenditService
     public function disbursement(string $external_id = '', int $amount = 0, string $bank_code = '', string $account_holder_name = '', string $account_number = '', string $description = ''): array
     {
         try {
-            // --- step 1 - start - siapkan request disbursement
+            // --- step 1 - siapkan request disbursement - start ---
             $url = 'https://api.xendit.co/disbursements';
             $json = [
                 'external_id' => $external_id,
@@ -249,12 +249,12 @@ class XenditService
                 'json' => $json,
                 'headers' => $headers,
             ];
-            // --- step 1 - end - siapkan request disbursement
+            // --- step 1 - siapkan request disbursement - end ---
 
-            // --- step 2 - start - kirim request dan baca response Xendit
+            // --- step 2 - kirim request dan baca response Xendit - start ---
             $response = $this->client->post($url, $parameter);
             $response = json_decode($response->getBody(), true);
-            // --- step 2 - end - kirim request dan baca response Xendit
+            // --- step 2 - kirim request dan baca response Xendit - end ---
 
             return [
                 'status' => 'success',

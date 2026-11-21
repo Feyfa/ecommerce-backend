@@ -44,14 +44,14 @@ class AuditLogService
      */
     public function recordRegistration(User $user, Request $request): AuditLog
     {
-        // --- step 1 - start - gunakan session key bersama register/login untuk menekan login pertama yang redundant
+        // --- step 1 - gunakan session key bersama register/login untuk menekan login pertama yang redundant - start ---
         $clerkSessionId = $this->resolveClerkSessionId($request);
         $idempotencySource = $clerkSessionId !== ''
             ? $this->authSessionKey($user, $clerkSessionId)
             : "auth-register|{$user->id}";
-        // --- step 1 - end - gunakan session key bersama register/login untuk menekan login pertama yang redundant
+        // --- step 1 - gunakan session key bersama register/login untuk menekan login pertama yang redundant - end ---
 
-        // --- step 2 - start - simpan event register dengan user sebagai subject utama
+        // --- step 2 - simpan event register dengan user sebagai subject utama - start ---
         $auditLog = $this->record(
             user: $user,
             request: $request,
@@ -60,7 +60,7 @@ class AuditLogService
             subjectType: 'user',
             subjectId: (string) $user->id,
         );
-        // --- step 2 - end - simpan event register dengan user sebagai subject utama
+        // --- step 2 - simpan event register dengan user sebagai subject utama - end ---
 
         return $auditLog;
     }
@@ -80,15 +80,15 @@ class AuditLogService
      */
     public function recordLogin(User $user, Request $request): ?AuditLog
     {
-        // --- step 1 - start - login tanpa session id tidak dicatat karena tidak dapat diduplikasi secara aman
+        // --- step 1 - login tanpa session id tidak dicatat karena tidak dapat diduplikasi secara aman - start ---
         $clerkSessionId = $this->resolveClerkSessionId($request);
-        // --- step 1 - end - login tanpa session id tidak dicatat karena tidak dapat diduplikasi secara aman
+        // --- step 1 - login tanpa session id tidak dicatat karena tidak dapat diduplikasi secara aman - end ---
 
         if ($clerkSessionId === '') {
             return null;
         }
 
-        // --- step 2 - start - gunakan session sebagai subject dan kunci idempotency
+        // --- step 2 - gunakan session sebagai subject dan kunci idempotency - start ---
         $auditLog = $this->record(
             user: $user,
             request: $request,
@@ -97,7 +97,7 @@ class AuditLogService
             subjectType: 'session',
             subjectId: $clerkSessionId,
         );
-        // --- step 2 - end - gunakan session sebagai subject dan kunci idempotency
+        // --- step 2 - gunakan session sebagai subject dan kunci idempotency - end ---
 
         return $auditLog;
     }
@@ -116,15 +116,15 @@ class AuditLogService
      */
     public function recordLogout(User $user, Request $request): ?AuditLog
     {
-        // --- step 1 - start - logout tanpa session id dilewati karena ownership session tidak lengkap
+        // --- step 1 - logout tanpa session id dilewati karena ownership session tidak lengkap - start ---
         $clerkSessionId = $this->resolveClerkSessionId($request);
-        // --- step 1 - end - logout tanpa session id dilewati karena ownership session tidak lengkap
+        // --- step 1 - logout tanpa session id dilewati karena ownership session tidak lengkap - end ---
 
         if ($clerkSessionId === '') {
             return null;
         }
 
-        // --- step 2 - start - simpan alasan eksplisit agar event tidak disamakan dengan session expiry
+        // --- step 2 - simpan alasan eksplisit agar event tidak disamakan dengan session expiry - start ---
         $auditLog = $this->record(
             user: $user,
             request: $request,
@@ -134,7 +134,7 @@ class AuditLogService
             subjectId: $clerkSessionId,
             extraContext: ['reason' => 'user_initiated'],
         );
-        // --- step 2 - end - simpan alasan eksplisit agar event tidak disamakan dengan session expiry
+        // --- step 2 - simpan alasan eksplisit agar event tidak disamakan dengan session expiry - end ---
 
         return $auditLog;
     }
@@ -642,7 +642,7 @@ class AuditLogService
         array $extraContext = [],
         ?string $requestId = null
     ): AuditLog {
-        // --- step 1 - start - susun metadata aman dan identifier untuk insert idempotent
+        // --- step 1 - susun metadata aman dan identifier untuk insert idempotent - start ---
         $idempotencyKey = hash('sha256', $idempotencySource);
         $now = $this->formatDatabaseTimestamp(now());
         $userAgent = (string) $request->userAgent();
@@ -660,9 +660,9 @@ class AuditLogService
         }
 
         $context = array_filter($context, static fn ($value) => $value !== null);
-        // --- step 1 - end - susun metadata aman dan identifier untuk insert idempotent
+        // --- step 1 - susun metadata aman dan identifier untuk insert idempotent - end ---
 
-        // --- step 2 - start - insert atomik dan tangani dua request paralel untuk event yang sama
+        // --- step 2 - insert atomik dan tangani dua request paralel untuk event yang sama - start ---
         AuditLog::query()->insertOrIgnore([
             'id' => (string) Str::uuid(),
             'actor_user_id' => $user->id,
@@ -680,13 +680,13 @@ class AuditLogService
             'occurred_at' => $now,
             'created_at' => $now,
         ]);
-        // --- step 2 - end - insert atomik dan tangani dua request paralel untuk event yang sama
+        // --- step 2 - insert atomik dan tangani dua request paralel untuk event yang sama - end ---
 
-        // --- step 3 - start - ambil row baru atau row existing yang memenangkan race
+        // --- step 3 - ambil row baru atau row existing yang memenangkan race - start ---
         $auditLog = AuditLog::query()
             ->where('idempotency_key', $idempotencyKey)
             ->firstOrFail();
-        // --- step 3 - end - ambil row baru atau row existing yang memenangkan race
+        // --- step 3 - ambil row baru atau row existing yang memenangkan race - end ---
 
         return $auditLog;
     }

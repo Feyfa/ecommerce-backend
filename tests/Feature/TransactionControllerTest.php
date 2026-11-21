@@ -35,14 +35,14 @@ class TransactionControllerTest extends TestCase
      */
     public function test_compound_filters_are_rejected_before_the_service_is_called(): void
     {
-        // --- step 1 - start - authenticate a local user and forbid transaction service calls
+        // --- step 1 - authenticate a local user and forbid transaction service calls - start ---
         $this->actingAs(User::factory()->create());
         $this->mock(TransactionService::class, function (MockInterface $mock): void {
             $mock->shouldNotReceive('getTransaction');
         });
-        // --- step 1 - end - authenticate a local user and forbid transaction service calls
+        // --- step 1 - authenticate a local user and forbid transaction service calls - end ---
 
-        // --- step 2 - start - reject each filter with array and object input
+        // --- step 2 - reject each filter with array and object input - start ---
         foreach (['user_type', 'status_filter', 'search', 'sort', 'page', 'per_page', 'date_from', 'date_to'] as $field) {
             foreach ([['unexpected'], (object) ['unexpected' => 'value']] as $value) {
                 $this->json('GET', '/api/transaction', array_replace(['user_type' => 'buyer'], [$field => $value]))
@@ -51,7 +51,7 @@ class TransactionControllerTest extends TestCase
                     ->assertJsonValidationErrors([$field], 'message');
             }
         }
-        // --- step 2 - end - reject each filter with array and object input
+        // --- step 2 - reject each filter with array and object input - end ---
     }
 
     /**
@@ -61,14 +61,14 @@ class TransactionControllerTest extends TestCase
      */
     public function test_incorrect_scalar_types_are_rejected_before_the_service_is_called(): void
     {
-        // --- step 1 - start - authenticate and forbid service calls for malformed filters
+        // --- step 1 - authenticate and forbid service calls for malformed filters - start ---
         $this->actingAs(User::factory()->create());
         $this->mock(TransactionService::class, function (MockInterface $mock): void {
             $mock->shouldNotReceive('getTransaction');
         });
-        // --- step 1 - end - authenticate and forbid service calls for malformed filters
+        // --- step 1 - authenticate and forbid service calls for malformed filters - end ---
 
-        // --- step 2 - start - reject non-string scalar text filters
+        // --- step 2 - reject non-string scalar text filters - start ---
         foreach (['user_type', 'status_filter', 'search', 'sort', 'date_from', 'date_to'] as $field) {
             foreach ([true, false, 123, 1.5] as $value) {
                 $this->json('GET', '/api/transaction', array_replace(['user_type' => 'buyer'], [$field => $value]))
@@ -76,9 +76,9 @@ class TransactionControllerTest extends TestCase
                     ->assertJsonValidationErrors([$field], 'message');
             }
         }
-        // --- step 2 - end - reject non-string scalar text filters
+        // --- step 2 - reject non-string scalar text filters - end ---
 
-        // --- step 3 - start - reject nonnumeric pagination filters
+        // --- step 3 - reject nonnumeric pagination filters - start ---
         foreach (['page', 'per_page'] as $field) {
             foreach ([true, false, 'not-a-number'] as $value) {
                 $this->json('GET', '/api/transaction', ['user_type' => 'buyer', $field => $value])
@@ -86,7 +86,7 @@ class TransactionControllerTest extends TestCase
                     ->assertJsonValidationErrors([$field], 'message');
             }
         }
-        // --- step 3 - end - reject nonnumeric pagination filters
+        // --- step 3 - reject nonnumeric pagination filters - end ---
     }
 
     /**
@@ -149,7 +149,7 @@ class TransactionControllerTest extends TestCase
      */
     public function test_optional_filters_keep_the_existing_defaults(): void
     {
-        // --- step 1 - start - define the service defaults and expected calls
+        // --- step 1 - define the service defaults and expected calls - start ---
         $user = User::factory()->create();
         $this->actingAs($user);
         $defaults = [
@@ -167,16 +167,16 @@ class TransactionControllerTest extends TestCase
                 ->times(3)
                 ->andReturn(['status' => 'success', 'transactions' => [], 'counts' => [], 'pagination' => []]);
         });
-        // --- step 1 - end - define the service defaults and expected calls
+        // --- step 1 - define the service defaults and expected calls - end ---
 
-        // --- step 2 - start - verify omitted, null, and empty request values
+        // --- step 2 - verify omitted, null, and empty request values - start ---
         $fields = ['status_filter', 'search', 'sort', 'page', 'per_page', 'date_from', 'date_to'];
         foreach ([[], array_fill_keys($fields, null), array_fill_keys($fields, '')] as $filters) {
             $this->json('GET', '/api/transaction', ['user_type' => 'buyer', ...$filters])
                 ->assertOk()
                 ->assertJsonPath('status', 'success');
         }
-        // --- step 2 - end - verify omitted, null, and empty request values
+        // --- step 2 - verify omitted, null, and empty request values - end ---
     }
 
     /**
@@ -186,7 +186,7 @@ class TransactionControllerTest extends TestCase
      */
     public function test_valid_frontend_queries_and_numeric_values_reach_the_service(): void
     {
-        // --- step 1 - start - define the accepted frontend and numeric request contracts
+        // --- step 1 - define the accepted frontend and numeric request contracts - start ---
         $user = User::factory()->create();
         $this->actingAs($user);
         $this->mock(TransactionService::class, function (MockInterface $mock) use ($user): void {
@@ -217,9 +217,9 @@ class TransactionControllerTest extends TestCase
                 ->once()
                 ->andReturn(['status' => 'success']);
         });
-        // --- step 1 - end - define the accepted frontend and numeric request contracts
+        // --- step 1 - define the accepted frontend and numeric request contracts - end ---
 
-        // --- step 2 - start - send actual buyer and seller query strings
+        // --- step 2 - send actual buyer and seller query strings - start ---
         foreach (['buyer', 'seller'] as $perspective) {
             $query = http_build_query([
                 'user_type' => $perspective,
@@ -233,9 +233,9 @@ class TransactionControllerTest extends TestCase
             ]);
             $this->getJson('/api/transaction?'.$query)->assertOk();
         }
-        // --- step 2 - end - send actual buyer and seller query strings
+        // --- step 2 - send actual buyer and seller query strings - end ---
 
-        // --- step 3 - start - retain decimal pagination and unsupported string filter handling
+        // --- step 3 - retain decimal pagination and unsupported string filter handling - start ---
         $this->json('GET', '/api/transaction', [
             'user_type' => 'buyer',
             'status_filter' => 'unknown',
@@ -244,6 +244,6 @@ class TransactionControllerTest extends TestCase
             'per_page' => 30.5,
             'date_from' => 'invalid-date',
         ])->assertOk();
-        // --- step 3 - end - retain decimal pagination and unsupported string filter handling
+        // --- step 3 - retain decimal pagination and unsupported string filter handling - end ---
     }
 }

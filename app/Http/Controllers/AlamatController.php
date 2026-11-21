@@ -39,7 +39,7 @@ class AlamatController extends Controller
      */
     public function getAlamatBuyer(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi user
+        // --- step 1 - validasi user - start ---
         $user = $this->resolveAuthenticatedUser($request);
 
         if ($user === null) {
@@ -47,9 +47,9 @@ class AlamatController extends Controller
         }
 
         $user_id = $user->id;
-        // --- step 1 - end - validasi user
+        // --- step 1 - validasi user - end ---
 
-        // --- step 2 - start - ambil daftar alamat
+        // --- step 2 - ambil daftar alamat - start ---
         $alamats = Alamat::where('user_id', $user_id)
             ->where('type', 'buyer');
 
@@ -59,7 +59,7 @@ class AlamatController extends Controller
             ->orderBy('enable', 'DESC')
             ->limit(5)
             ->get();
-        // --- step 2 - end - ambil daftar alamat
+        // --- step 2 - ambil daftar alamat - end ---
 
         return response()->json(['result' => 'suceess', 'alamats' => $alamats]);
     }
@@ -77,7 +77,7 @@ class AlamatController extends Controller
      */
     public function addAlamatBuyer(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi user
+        // --- step 1 - validasi user - start ---
         $user = $this->resolveAuthenticatedUser($request);
 
         if ($user === null) {
@@ -85,9 +85,9 @@ class AlamatController extends Controller
         }
 
         $user_id = $user->id;
-        // --- step 1 - end - validasi user
+        // --- step 1 - validasi user - end ---
 
-        // --- step 2 - start - validasi parameter request
+        // --- step 2 - validasi parameter request - start ---
         $validator = Validator::make($request->all(), array_merge([
             'place' => ['required', 'string', 'max:50'],
             'name' => ['required', 'string', 'max:100'],
@@ -98,13 +98,13 @@ class AlamatController extends Controller
         if ($validator->fails()) {
             return response()->json(['result' => 'error', 'message' => $validator->messages()], 422);
         }
-        // --- step 2 - end - validasi parameter request
+        // --- step 2 - validasi parameter request - end ---
 
         // Verifikasi lokasi sebelum mengubah alamat aktif agar kegagalan provider
         // tidak membuat buyer kehilangan alamat yang sedang aktif.
         $locationAttributes = $this->alamatService->locationAttributes($request);
 
-        // --- step 3 - start - simpan alamat dan status aktif secara atomik
+        // --- step 3 - simpan alamat dan status aktif secara atomik - start ---
         $addressLimitReached = DB::transaction(function () use ($user, $user_id, $request, $locationAttributes): bool {
             // Lock parent user agar dua request alamat pertama atau keenam tidak dapat
             // melewati invariant hanya karena belum ada row alamat yang bisa dikunci.
@@ -143,9 +143,9 @@ class AlamatController extends Controller
         if ($addressLimitReached) {
             return response()->json(['result' => 'error', 'message' => 'Alamat Tidak Boleh Lebih Dari 5'], 400);
         }
-        // --- step 3 - end - simpan alamat dan status aktif secara atomik
+        // --- step 3 - simpan alamat dan status aktif secara atomik - end ---
 
-        // --- step 4 - start - ambil daftar alamat
+        // --- step 4 - ambil daftar alamat - start ---
         $alamats = Alamat::where('user_id', $user_id)
             ->where('type', 'buyer');
 
@@ -154,7 +154,7 @@ class AlamatController extends Controller
         $alamats = $alamats
             ->orderBy('enable', 'DESC')
             ->get();
-        // --- step 4 - end - ambil daftar alamat
+        // --- step 4 - ambil daftar alamat - end ---
 
         return response()->json(['result' => 'success', 'alamats' => $alamats, 'message' => 'Alamat Berhasil Ditambah']);
     }
@@ -172,7 +172,7 @@ class AlamatController extends Controller
      */
     public function deleteAlamatBuyer(string $id, Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi user
+        // --- step 1 - validasi user - start ---
         $user = $this->resolveAuthenticatedUser($request);
 
         if ($user === null) {
@@ -180,9 +180,9 @@ class AlamatController extends Controller
         }
 
         $user_id = $user->id;
-        // --- step 1 - end - validasi user
+        // --- step 1 - validasi user - end ---
 
-        // --- step 2 - start - hapus alamat dan pilih fallback terverifikasi secara atomik
+        // --- step 2 - hapus alamat dan pilih fallback terverifikasi secara atomik - start ---
         // Batasi pencarian berdasarkan buyer terautentikasi agar UUID yang terekspos
         // tidak dapat digunakan untuk menghapus alamat milik user lain.
         $alamatDeleted = DB::transaction(function () use ($id, $user, $user_id, $request): bool {
@@ -230,9 +230,9 @@ class AlamatController extends Controller
         if (! $alamatDeleted) {
             return response()->json(['result' => 'error', 'message' => 'Alamat Tidak Ditemukan'], 400);
         }
-        // --- step 2 - end - hapus alamat dan pilih fallback terverifikasi secara atomik
+        // --- step 2 - hapus alamat dan pilih fallback terverifikasi secara atomik - end ---
 
-        // --- step 3 - start - ambil daftar alamat
+        // --- step 3 - ambil daftar alamat - start ---
         $alamats = Alamat::where('user_id', $user_id)
             ->where('type', 'buyer');
 
@@ -241,7 +241,7 @@ class AlamatController extends Controller
         $alamats = $alamats
             ->orderBy('enable', 'DESC')
             ->get();
-        // --- step 3 - end - ambil daftar alamat
+        // --- step 3 - ambil daftar alamat - end ---
 
         return response()->json(['result' => 'success', 'alamats' => $alamats, 'message' => 'Alamat Berhasil Dihapus']);
     }
@@ -260,7 +260,7 @@ class AlamatController extends Controller
      */
     public function setEnableAlamatBuyer(string $id, Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi user
+        // --- step 1 - validasi user - start ---
         $user = $this->resolveAuthenticatedUser($request);
 
         if ($user === null) {
@@ -268,9 +268,9 @@ class AlamatController extends Controller
         }
 
         $user_id = $user->id;
-        // --- step 1 - end - validasi user
+        // --- step 1 - validasi user - end ---
 
-        // --- step 2 - start - pilih alamat terverifikasi secara atomik
+        // --- step 2 - pilih alamat terverifikasi secara atomik - start ---
         $selectionResult = DB::transaction(function () use ($user, $user_id, $id, $request): string {
             User::where('id', $user_id)->lockForUpdate()->first();
             $buyerAddresses = Alamat::where('user_id', $user_id)
@@ -318,9 +318,9 @@ class AlamatController extends Controller
                 'message' => 'Verifikasi alamat dengan pinpoint sebelum memilihnya.',
             ], 409);
         }
-        // --- step 2 - end - pilih alamat terverifikasi secara atomik
+        // --- step 2 - pilih alamat terverifikasi secara atomik - end ---
 
-        // --- step 3 - start - ambil daftar alamat
+        // --- step 3 - ambil daftar alamat - start ---
         $alamats = Alamat::where('user_id', $user_id)
             ->where('type', 'buyer');
 
@@ -329,14 +329,14 @@ class AlamatController extends Controller
         $alamats = $alamats
             ->orderBy('enable', 'DESC')
             ->get();
-        // --- step 3 - end - ambil daftar alamat
+        // --- step 3 - ambil daftar alamat - end ---
 
-        // --- step 4 - start - ambil alamat aktif
+        // --- step 4 - ambil alamat aktif - start ---
         $currentAlamat = Alamat::where('user_id', $user_id)
             ->where('type', 'buyer')
             ->where('enable', 1)
             ->first();
-        // --- step 4 - end - ambil alamat aktif
+        // --- step 4 - ambil alamat aktif - end ---
 
         return response()->json(['result' => 'success', 'alamats' => $alamats, 'currentAlamat' => $currentAlamat, 'message' => 'Alamat Berhasil Dipilih']);
     }
@@ -355,7 +355,7 @@ class AlamatController extends Controller
      */
     public function updateAlamatBuyer(string $id, Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi user
+        // --- step 1 - validasi user - start ---
         $user = $this->resolveAuthenticatedUser($request);
 
         if ($user === null) {
@@ -363,9 +363,9 @@ class AlamatController extends Controller
         }
 
         $user_id = $user->id;
-        // --- step 1 - end - validasi user
+        // --- step 1 - validasi user - end ---
 
-        // --- step 2 - start - validasi parameter request
+        // --- step 2 - validasi parameter request - start ---
         $validator = Validator::make($request->all(), array_merge([
             'place' => ['required', 'string', 'max:50'],
             'name' => ['required', 'string', 'max:100'],
@@ -375,9 +375,9 @@ class AlamatController extends Controller
         if ($validator->fails()) {
             return response()->json(['result' => 'error', 'message' => $validator->messages()], 422);
         }
-        // --- step 2 - end - validasi parameter request
+        // --- step 2 - validasi parameter request - end ---
 
-        // --- step 3 - start - periksa keberadaan alamat
+        // --- step 3 - periksa keberadaan alamat - start ---
         $alamat = Alamat::where('user_id', $user_id)
             ->where('type', 'buyer')
             ->where('id', $id)
@@ -386,9 +386,9 @@ class AlamatController extends Controller
         if (empty($alamat)) {
             return response()->json(['result' => 'error', 'message' => 'Alamat Tidak Ditemukan'], 400);
         }
-        // --- step 3 - end - periksa keberadaan alamat
+        // --- step 3 - periksa keberadaan alamat - end ---
 
-        // --- step 4 - start - perbarui alamat bersama audit perubahannya secara atomik
+        // --- step 4 - perbarui alamat bersama audit perubahannya secara atomik - start ---
         $locationAttributes = $this->alamatService->locationAttributes($request);
         $beforeValues = $this->auditLogService->addressSnapshot($alamat);
 
@@ -407,9 +407,9 @@ class AlamatController extends Controller
                 $this->addressChanges($beforeValues, $alamat),
             );
         });
-        // --- step 4 - end - perbarui alamat bersama audit perubahannya secara atomik
+        // --- step 4 - perbarui alamat bersama audit perubahannya secara atomik - end ---
 
-        // --- step 5 - start - ambil daftar alamat
+        // --- step 5 - ambil daftar alamat - start ---
         $alamats = Alamat::where('user_id', $user_id)
             ->where('type', 'buyer');
 
@@ -418,7 +418,7 @@ class AlamatController extends Controller
         $alamats = $alamats
             ->orderBy('enable', 'DESC')
             ->get();
-        // --- step 5 - end - ambil daftar alamat
+        // --- step 5 - ambil daftar alamat - end ---
 
         return response()->json(['result' => 'success', 'alamats' => $alamats, 'message' => 'Alamat Berhasil Diubah']);
     }
@@ -504,7 +504,7 @@ class AlamatController extends Controller
      */
     private function addressChanges(array $beforeValues, Alamat $alamat): array
     {
-        // --- step 1 - start - siapkan nilai pembanding dan label audit
+        // --- step 1 - siapkan nilai pembanding dan label audit - start ---
         $afterValues = $this->auditLogService->addressSnapshot($alamat);
         $labels = [
             'place' => 'Label Alamat',
@@ -514,9 +514,9 @@ class AlamatController extends Controller
             'address_detail' => 'Detail Alamat',
         ];
         $changes = [];
-        // --- step 1 - end - siapkan nilai pembanding dan label audit
+        // --- step 1 - siapkan nilai pembanding dan label audit - end ---
 
-        // --- step 2 - start - kumpulkan field alamat yang benar-benar berubah
+        // --- step 2 - kumpulkan field alamat yang benar-benar berubah - start ---
         foreach ($labels as $field => $label) {
             if ($beforeValues[$field] === $afterValues[$field]) {
                 continue;
@@ -529,7 +529,7 @@ class AlamatController extends Controller
                 'after' => $afterValues[$field],
             ];
         }
-        // --- step 2 - end - kumpulkan field alamat yang benar-benar berubah
+        // --- step 2 - kumpulkan field alamat yang benar-benar berubah - end ---
 
         return $changes;
     }
