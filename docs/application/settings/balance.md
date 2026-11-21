@@ -26,6 +26,11 @@ POST /api/saldo-withdraw
 
 Returns the authenticated user's balance summary.
 
+Both balance read endpoints require a local user record for the authenticated
+identity. The `auth.api` middleware can return HTTP 401 with numeric
+`status: 401` before the controller runs. If the controller's local user check
+fails, it returns HTTP 401 with `{"status":"error","message":"Unauthorized"}`.
+
 Success response:
 
 ```json
@@ -43,15 +48,19 @@ Returns balance history rows for the authenticated user.
 
 Optional request fields:
 
-- `startDate`
-- `endDate`
-- `saldo_history_current_ids`
+- `startDate` and `endDate` are strings. A missing, null, or blank value in
+  either field skips the date range filter.
+- `saldo_history_current_ids` is a JSON string containing an array of UUID
+  strings. Missing, null, blank, or `[]` values exclude no IDs.
 
-`saldo_history_current_ids` is expected as JSON and is decoded into an array.
+After authentication, a non-string date field or an invalid JSON UUID list
+returns HTTP 422 with `status: "error"` and a string `message`. The service
+does not run the history query for a rejected filter.
 
 Filtering:
 
-- When date fields are supplied, `SaldoService` filters by `DATE(sh.created_at)` between `startDate` and `endDate`.
+- When both dates are nonempty, `SaldoService` parses them and filters by
+  `DATE(sh.created_at)` between `startDate` and `endDate`.
 - Existing ids in `saldo_history_current_ids` are excluded for incremental loading.
 
 Description rules:

@@ -47,11 +47,6 @@ parameters:
 
 		-
 			message: "#^Cannot access property \\$id on mixed\\.$#"
-			count: 3
-			path: app/Http/Controllers/SaldoController.php
-
-		-
-			message: "#^Parameter \\#1 \\$json of function json_decode expects string, mixed given\\.$#"
 			count: 1
 			path: app/Http/Controllers/SaldoController.php
 
@@ -71,22 +66,7 @@ parameters:
 			path: app/Http/Controllers/SaldoController.php
 
 		-
-			message: "#^Parameter \\#2 \\$start_date of method App\\\\Services\\\\SaldoService\\:\\:getSaldoHistory\\(\\) expects string, mixed given\\.$#"
-			count: 1
-			path: app/Http/Controllers/SaldoController.php
-
-		-
-			message: "#^Parameter \\#3 \\$end_date of method App\\\\Services\\\\SaldoService\\:\\:getSaldoHistory\\(\\) expects string, mixed given\\.$#"
-			count: 1
-			path: app/Http/Controllers/SaldoController.php
-
-		-
 			message: "#^Parameter \\#3 \\$price of method App\\\\Services\\\\SaldoService\\:\\:saveSaldoAfterDisbursement\\(\\) expects int, float\\|int\\<min, \\-1\\>\\|int\\<1, 1000000\\>\\|string given\\.$#"
-			count: 1
-			path: app/Http/Controllers/SaldoController.php
-
-		-
-			message: "#^Parameter \\#4 \\$saldo_history_current_ids of method App\\\\Services\\\\SaldoService\\:\\:getSaldoHistory\\(\\) expects array, mixed given\\.$#"
 			count: 1
 			path: app/Http/Controllers/SaldoController.php
 
@@ -316,22 +296,7 @@ parameters:
 			path: app/Services/SaldoService.php
 
 		-
-			message: "#^Method App\\\\Services\\\\SaldoService\\:\\:getSaldo\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/SaldoService.php
-
-		-
 			message: "#^Method App\\\\Services\\\\SaldoService\\:\\:getSaldoById\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/SaldoService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\SaldoService\\:\\:getSaldoHistory\\(\\) has parameter \\$saldo_history_current_ids with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/SaldoService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\SaldoService\\:\\:getSaldoHistory\\(\\) return type has no value type specified in iterable type array\\.$#"
 			count: 1
 			path: app/Services/SaldoService.php
 
