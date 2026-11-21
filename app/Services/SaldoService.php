@@ -9,8 +9,22 @@ use Carbon\Carbon;
 use DB;
 use Illuminate\Support\Collection;
 
+/**
+ * @phpstan-type SaldoHistoryRow array{
+ *     id: string,
+ *     type: string|null,
+ *     title: string,
+ *     date: string,
+ *     price: float|null,
+ *     description: string
+ * }
+ */
 class SaldoService
 {
+    private const HISTORY_PAGE_SIZE = 30;
+
+    private const RUPIAH_DECIMAL_PLACES = 0;
+
     /**
      * Mengambil saldo milik user berdasarkan ID.
      *
@@ -60,14 +74,7 @@ class SaldoService
      *
      * @return array{status: 'error', message: string}|array{
      *     status: 'success',
-     *     saldoHistory: Collection<int, array{
-     *         id: string,
-     *         type: string|null,
-     *         title: string,
-     *         date: string,
-     *         price: float|null,
-     *         description: string
-     *     }>
+     *     saldoHistory: Collection<int, SaldoHistoryRow>
      * }
      *
      * @throws \Carbon\Exceptions\InvalidFormatException Jika filter tanggal tidak bisa diproses.
@@ -84,7 +91,8 @@ class SaldoService
         }
         // --- step 1 - validasi input - end ---
 
-        // --- step 2 - ambil riwayat saldo - start ---
+        // --- step 2 - bangun query riwayat milik user - start ---
+        // Query daftar dibatasi ke pemilik saldo sebelum filter dari client diterapkan.
         $saldoHistory = SaldoHistory::from('saldo_histories as sh')
             ->select(
                 'sh.*',
@@ -104,74 +112,47 @@ class SaldoService
             ->leftJoin('payment_users as pu', 'pu.id', '=', 'sh.payment_user_id')
             ->leftJoin('payment_lists as pl', 'pl.id', '=', 'pu.payment_id')
             ->where('sh.user_id', $user_id);
+        // --- step 2 - bangun query riwayat milik user - end ---
 
+        // --- step 3 - terapkan rentang tanggal - start ---
         if (
             ! empty($start_date) && trim($start_date) != '' &&
             ! empty($end_date) && trim($end_date) != ''
         ) {
             $start_date = Carbon::parse($start_date)->format('Y-m-d');
             $end_date = Carbon::parse($end_date)->format('Y-m-d');
+
             $saldoHistory->whereBetween(DB::raw('DATE(sh.created_at)'), [$start_date, $end_date]);
         }
+        // --- step 3 - terapkan rentang tanggal - end ---
 
+        // --- step 4 - kecualikan riwayat yang sudah tampil - start ---
         if (count($saldo_history_current_ids) > 0) {
             $saldoHistory->whereNotIn('sh.id', $saldo_history_current_ids);
         }
+        // --- step 4 - kecualikan riwayat yang sudah tampil - end ---
 
-        $saldoHistory = $saldoHistory->orderBy('sh.created_at', 'desc')
-            ->limit(30)
+        // --- step 5 - bentuk halaman riwayat - start ---
+        $rows = $saldoHistory->orderBy('sh.created_at', 'desc')
+            ->limit(self::HISTORY_PAGE_SIZE)
             ->get()
-            ->map(function ($item, $index) {
-                $dateFormat = Carbon::parse($item->created_at)
-                    ->timezone('Asia/Jakarta')
-                    ->translatedFormat('d F Y H:i');
-                $title = match ($item->type) {
-                    'incoming' => 'Pemasukan Saldo',
-                    'withdrawal' => 'Penarikan Saldo',
-                };
+            ->map($this->formatSaldoHistoryRow(...));
+        // --- step 5 - bentuk halaman riwayat - end ---
 
-                $priceString = number_format($item->price, 0, ',', '.');
-                $paymentSlugUpper = strtoupper($item->payment_slug ?? '');
-
-                // LEFT JOIN tetap mengembalikan riwayat ketika referensi terkait kosong.
-                /** @var string|null $invoiceNumber */
-                $invoiceNumber = $item->invoice_id ?? $item->getAttribute('transaction_number');
-                /** @var string|null $buyerName */
-                $buyerName = $item->getAttribute('buyer_name');
-                /** @var string|null $paymentAccount */
-                $paymentAccount = $item->getAttribute('payment_account');
-                /** @var string|null $paymentName */
-                $paymentName = $item->getAttribute('payment_name');
-
-                $description = match ($item->type) {
-                    'incoming' => "Pembelian Dari {$buyerName} - INV {$invoiceNumber}",
-                    'withdrawal' => "Penarikan Saldo Sebesar Rp{$priceString} Ke Bank "
-                        ."{$paymentSlugUpper} {$paymentAccount} ({$paymentName})",
-                };
-
-                return [
-                    'id' => $item->id,
-                    'type' => $item->type,
-                    'title' => $title,
-                    'date' => $dateFormat,
-                    'price' => $item->price,
-                    'description' => $description,
-                ];
-            });
-        // --- step 2 - ambil riwayat saldo - end ---
-
-        return ['status' => 'success', 'saldoHistory' => $saldoHistory];
+        return ['status' => 'success', 'saldoHistory' => $rows];
     }
 
     /**
-     * Mengambil detail saldo berdasarkan ID record saldo.
+     * Membaca satu entri riwayat berdasarkan ID, termasuk untuk hasil pencairan.
      *
-     * Record saldo dipastikan berada dalam scope user sebelum detail pembayaran atau transaksi terkait
-     * dimuat. Error terstruktur dikembalikan ketika record tidak ditemukan atau bukan milik user.
+     * @param  string  $id  UUID riwayat yang dicari.
      *
-     * @param  string  $id  Identifier record yang menjadi target operasi.
+     * @return array{status: 'error', message: string}|array{
+     *     status: 'success',
+     *     saldoHistory: array{}|SaldoHistoryRow
+     * }
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @throws \Carbon\Exceptions\InvalidFormatException Jika waktu mutasi tidak bisa dibaca.
      */
     public function getSaldoById(string $id): array
     {
@@ -181,6 +162,7 @@ class SaldoService
         }
         // --- step 1 - validasi input - end ---
 
+        // --- step 2 - cari entri riwayat - start ---
         $saldoHistory = SaldoHistory::from('saldo_histories as sh')
             ->select(
                 'sh.*',
@@ -201,49 +183,112 @@ class SaldoService
             ->leftJoin('payment_lists as pl', 'pl.id', '=', 'pu.payment_id')
             ->where('sh.id', $id)
             ->first();
+        // --- step 2 - cari entri riwayat - end ---
 
+        // --- step 3 - bentuk detail riwayat - start ---
         $saldoHistoryMap = [];
-        if ($saldoHistory) {
-            $dateFormat = Carbon::parse($saldoHistory->created_at)
-                ->timezone('Asia/Jakarta')
-                ->translatedFormat('d F Y H:i');
 
-            $title = match ($saldoHistory->type) {
-                'incoming' => 'Pemasukan Saldo',
-                'withdrawal' => 'Penarikan Saldo'
-            };
-
-            $priceString = number_format($saldoHistory->price, 0, ',', '.');
-            $paymentSlugUpper = strtoupper($saldoHistory->payment_slug ?? '');
-
-            // Atribut hasil join dapat kosong meski baris riwayat ditemukan.
-            /** @var string|null $invoiceNumber */
-            $invoiceNumber = $saldoHistory->invoice_id
-                ?? $saldoHistory->getAttribute('transaction_number');
-            /** @var string|null $buyerName */
-            $buyerName = $saldoHistory->getAttribute('buyer_name');
-            /** @var string|null $paymentAccount */
-            $paymentAccount = $saldoHistory->getAttribute('payment_account');
-            /** @var string|null $paymentName */
-            $paymentName = $saldoHistory->getAttribute('payment_name');
-
-            $description = match ($saldoHistory->type) {
-                'incoming' => "Pembelian Dari {$buyerName} - INV {$invoiceNumber}",
-                'withdrawal' => "Penarikan Saldo Sebesar Rp{$priceString} Ke Bank "
-                    ."{$paymentSlugUpper} {$paymentAccount} ({$paymentName})",
-            };
-
-            $saldoHistoryMap = [
-                'id' => $saldoHistory->id,
-                'type' => $saldoHistory->type,
-                'title' => $title,
-                'date' => $dateFormat,
-                'price' => $saldoHistory->price,
-                'description' => $description,
-            ];
+        if ($saldoHistory !== null) {
+            $saldoHistoryMap = $this->formatSaldoHistoryRow($saldoHistory);
         }
+        // --- step 3 - bentuk detail riwayat - end ---
 
         return ['status' => 'success', 'saldoHistory' => $saldoHistoryMap];
+    }
+
+    /**
+     * Membentuk baris yang sama untuk daftar riwayat dan detail hasil pencairan.
+     *
+     * @param  SaldoHistory  $history  Mutasi yang sudah dibaca bersama atribut hasil join.
+     *
+     * @return SaldoHistoryRow Baris untuk API dengan jenis dan nominal yang tersimpan.
+     *
+     * @throws \Carbon\Exceptions\InvalidFormatException Jika waktu mutasi tidak bisa dibaca.
+     */
+    private function formatSaldoHistoryRow(SaldoHistory $history): array
+    {
+        // --- step 1 - format waktu mutasi - start ---
+        $date = Carbon::parse($history->created_at)
+            ->timezone('Asia/Jakarta')
+            ->translatedFormat('d F Y H:i');
+        // --- step 1 - format waktu mutasi - end ---
+
+        // --- step 2 - pilih judul mutasi - start ---
+        // Jenis lama tetap ditampilkan tanpa dianggap sebagai pemasukan atau penarikan.
+        $type = $history->type;
+        $title = match ($type) {
+            'incoming' => 'Pemasukan Saldo',
+            'withdrawal' => 'Penarikan Saldo',
+            default => 'Mutasi Saldo',
+        };
+        // --- step 2 - pilih judul mutasi - end ---
+
+        // --- step 3 - pilih deskripsi mutasi - start ---
+        $description = match ($type) {
+            'incoming' => $this->formatIncomingHistoryDescription($history),
+            'withdrawal' => $this->formatWithdrawalHistoryDescription($history),
+            default => 'Jenis mutasi saldo tidak dikenali.',
+        };
+        // --- step 3 - pilih deskripsi mutasi - end ---
+
+        return [
+            'id' => $history->id,
+            'type' => $type,
+            'title' => $title,
+            'date' => $date,
+            'price' => $history->price,
+            'description' => $description,
+        ];
+    }
+
+    /**
+     * Menyusun keterangan pemasukan yang merujuk ke pembelian dan invoice terkait.
+     *
+     * @param  SaldoHistory  $history  Mutasi pemasukan dengan referensi transaksi opsional.
+     *
+     * @return string Deskripsi pemasukan untuk daftar dan detail.
+     */
+    private function formatIncomingHistoryDescription(SaldoHistory $history): string
+    {
+        // Nomor transaksi tetap menjadi referensi ketika LEFT JOIN tidak menemukan invoice.
+        /** @var string|null $invoiceNumber */
+        $invoiceNumber = $history->invoice_id ?? $history->getAttribute('transaction_number');
+        /** @var string|null $buyerName */
+        $buyerName = $history->getAttribute('buyer_name');
+
+        return "Pembelian Dari {$buyerName} - INV {$invoiceNumber}";
+    }
+
+    /**
+     * Menyusun keterangan penarikan berdasarkan nominal dan rekening yang tersedia.
+     *
+     * @param  SaldoHistory  $history  Penarikan dengan atribut nominal dan rekening opsional.
+     *
+     * @return string Deskripsi penarikan untuk daftar dan detail.
+     */
+    private function formatWithdrawalHistoryDescription(SaldoHistory $history): string
+    {
+        // --- step 1 - format nominal penarikan - start ---
+        // Nominal yang tidak tercatat tidak boleh terbaca sebagai penarikan Rp0.
+        $price = $history->price;
+        $formattedPrice = '—';
+
+        if ($price !== null) {
+            $formattedPrice = 'Rp'.number_format($price, self::RUPIAH_DECIMAL_PLACES, ',', '.');
+        }
+        // --- step 1 - format nominal penarikan - end ---
+
+        // --- step 2 - ambil keterangan rekening - start ---
+        // LEFT JOIN bisa kosong. Rekening yang ada tetap string agar nol di depan tidak hilang.
+        $paymentSlugUpper = strtoupper($history->payment_slug ?? '');
+        /** @var string|null $paymentAccount */
+        $paymentAccount = $history->getAttribute('payment_account');
+        /** @var string|null $paymentName */
+        $paymentName = $history->getAttribute('payment_name');
+        // --- step 2 - ambil keterangan rekening - end ---
+
+        return "Penarikan Saldo Sebesar {$formattedPrice} Ke Bank "
+            ."{$paymentSlugUpper} {$paymentAccount} ({$paymentName})";
     }
 
     /**
