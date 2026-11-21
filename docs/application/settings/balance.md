@@ -73,6 +73,8 @@ Description rules:
   and the response keeps `price: null`.
 - An unrecognized or null type uses the title `Mutasi Saldo` and the description
   `Jenis mutasi saldo tidak dikenali.` The response keeps the stored type and price.
+- The `price` field preserves the database driver's representation as a JSON
+  number, a numeric string such as `"450000"`, or `null` if no amount is recorded.
 
 Success response:
 
@@ -110,7 +112,8 @@ Side effects:
 - Creates a withdrawal balance history row.
 - Returns the new balance history item.
 
-The returned history item uses the same description rules as the history list.
+The returned history item uses the same description and amount representation
+as the history list.
 
 Success response:
 
