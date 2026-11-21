@@ -296,26 +296,6 @@ parameters:
 			path: app/Services/CheckoutService.php
 
 		-
-			message: "#^Access to an undefined property App\\\\Models\\\\SaldoHistory\\:\\:\\$buyer_name\\.$#"
-			count: 2
-			path: app/Services/SaldoService.php
-
-		-
-			message: "#^Access to an undefined property App\\\\Models\\\\SaldoHistory\\:\\:\\$payment_account\\.$#"
-			count: 2
-			path: app/Services/SaldoService.php
-
-		-
-			message: "#^Access to an undefined property App\\\\Models\\\\SaldoHistory\\:\\:\\$payment_name\\.$#"
-			count: 2
-			path: app/Services/SaldoService.php
-
-		-
-			message: "#^Access to an undefined property App\\\\Models\\\\SaldoHistory\\:\\:\\$transaction_number\\.$#"
-			count: 2
-			path: app/Services/SaldoService.php
-
-		-
 			message: "#^Cannot access property \\$saldo_income on App\\\\Models\\\\SaldoUser\\|null\\.$#"
 			count: 2
 			path: app/Services/SaldoService.php
