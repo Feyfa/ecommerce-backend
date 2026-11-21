@@ -352,7 +352,15 @@ For BCA Virtual Account, the controller creates a closed, single-use Xendit virt
 - expiration one day from processing time, rounded to the hour;
 - `external_id` containing method, slug, buyer id, timestamp, and unique id.
 
-Xendit errors are returned as `400` with the Xendit service message.
+Xendit errors return HTTP 400 with the message from the
+[Xendit adapter](../integrations/xendit.md#adapter-result-contract).
+Checkout requires `account_number` and `external_id` as non-blank strings.
+A scalar response or a nonempty payload with an invalid payment field returns
+HTTP 400 with `Payment creation failed` before creating the invoice, removing
+cart rows, changing stock, or writing an outbox entry. Checkout stores both
+strings as received, preserving leading zeros in the VA number. A null or
+empty array payload returns HTTP 400 with `Data Xendit Empty` for an otherwise
+valid checkout.
 
 ## Idempotency And Locking
 

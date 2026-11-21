@@ -6,6 +6,11 @@ use Exception;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ClientException;
 
+/**
+ * @phpstan-type XenditError array{status: 'error', message: string}
+ * @phpstan-type CreateVirtualAccountResult array{status: 'suceess', data: mixed}|XenditError
+ * @phpstan-type XenditResult array{status: 'success', data: mixed}|XenditError
+ */
 class XenditService
 {
     private string $api_key;
@@ -13,16 +18,17 @@ class XenditService
     private Client $client;
 
     /**
-     * Menyiapkan dependency yang diperlukan oleh class.
+     * Menyiapkan client provider untuk operasi virtual account dan pencairan.
      *
      * @param  string  $api_key  API key Xendit yang digunakan client provider.
+     * @param  Client|null  $client  Client untuk pengujian respons HTTP tanpa menghubungi provider.
      *
      * @return void Tidak mengembalikan nilai; dependency disimpan pada instance.
      */
-    public function __construct(string $api_key = '')
+    public function __construct(string $api_key = '', ?Client $client = null)
     {
         $this->api_key = $api_key;
-        $this->client = new Client();
+        $this->client = $client ?? new Client();
     }
 
     /**
@@ -42,10 +48,19 @@ class XenditService
      * @param  int  $expected_amount  Nominal yang diharapkan oleh virtual account.
      * @param  string  $expiration_date  Waktu kedaluwarsa virtual account.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return CreateVirtualAccountResult Respons VA dengan status sukses lama atau pesan error.
      */
-    public function createVirtualAccount(string $external_id = '', string $bank_code = '', string $name = '', string $country = 'ID', string $currency = 'IDR', bool $is_single_use = false, bool $is_closed = false, int $expected_amount = 0, string $expiration_date = ''): array
-    {
+    public function createVirtualAccount(
+        string $external_id = '',
+        string $bank_code = '',
+        string $name = '',
+        string $country = 'ID',
+        string $currency = 'IDR',
+        bool $is_single_use = false,
+        bool $is_closed = false,
+        int $expected_amount = 0,
+        string $expiration_date = '',
+    ): array {
         try {
             // --- step 1 - siapkan request pembuatan virtual account - start ---
             $url = 'https://api.xendit.co/callback_virtual_accounts';
@@ -82,8 +97,7 @@ class XenditService
             $response = $e->getResponse();
             $body = $response->getBody()->getContents();
 
-            $json = json_decode($body, true);
-            $message = $json['message'] ?? 'Unknown error';
+            $message = $this->extractErrorMessage($body);
 
             return [
                 'status' => 'error',
@@ -108,10 +122,13 @@ class XenditService
      * @param  string  $bank_account_number  Nomor virtual account pada skenario simulasi.
      * @param  int  $transfer_amount  Nominal transfer pada simulasi pembayaran.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return XenditResult Payload simulasi pool atau pesan error.
      */
-    public function simulateVirtualAccountPool(string $bank_code = '', string $bank_account_number = '', int $transfer_amount = 0): array
-    {
+    public function simulateVirtualAccountPool(
+        string $bank_code = '',
+        string $bank_account_number = '',
+        int $transfer_amount = 0,
+    ): array {
         try {
             // --- step 1 - siapkan request simulasi pembayaran pool - start ---
             $url = 'https://api.xendit.co/pool_virtual_accounts/simulate_payment';
@@ -142,8 +159,7 @@ class XenditService
             $response = $e->getResponse();
             $body = $response->getBody()->getContents();
 
-            $json = json_decode($body, true);
-            $message = $json['message'] ?? 'Unknown error';
+            $message = $this->extractErrorMessage($body);
 
             return [
                 'status' => 'error',
@@ -166,7 +182,7 @@ class XenditService
      * @param  string  $external_id  Identifier idempotensi yang dikirim ke provider.
      * @param  int  $amount  Nominal transaksi yang dikirim ke provider.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return XenditResult Payload simulasi fixed atau pesan error.
      */
     public function simulateVirtualAccountFixed(string $external_id = '', int $amount = 0): array
     {
@@ -198,8 +214,7 @@ class XenditService
             $response = $e->getResponse();
             $body = $response->getBody()->getContents();
 
-            $json = json_decode($body, true);
-            $message = $json['message'] ?? 'Unknown error';
+            $message = $this->extractErrorMessage($body);
 
             return [
                 'status' => 'error',
@@ -227,10 +242,16 @@ class XenditService
      * @param  string  $account_number  Nomor rekening tujuan pencairan.
      * @param  string  $description  Deskripsi pencairan yang dikirim kepada provider.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return XenditResult Payload pencairan atau pesan error.
      */
-    public function disbursement(string $external_id = '', int $amount = 0, string $bank_code = '', string $account_holder_name = '', string $account_number = '', string $description = ''): array
-    {
+    public function disbursement(
+        string $external_id = '',
+        int $amount = 0,
+        string $bank_code = '',
+        string $account_holder_name = '',
+        string $account_number = '',
+        string $description = '',
+    ): array {
         try {
             // --- step 1 - siapkan request disbursement - start ---
             $url = 'https://api.xendit.co/disbursements';
@@ -264,8 +285,7 @@ class XenditService
             $response = $e->getResponse();
             $body = $response->getBody()->getContents();
 
-            $json = json_decode($body, true);
-            $message = $json['message'] ?? 'Unknown error';
+            $message = $this->extractErrorMessage($body);
 
             return [
                 'status' => 'error',
@@ -277,5 +297,22 @@ class XenditService
                 'message' => $e->getMessage(),
             ];
         }
+    }
+
+    /**
+     * Menyiapkan pesan error provider untuk respons API atau exception checkout.
+     *
+     * @param  string  $body  Isi respons ketika provider menolak permintaan.
+     *
+     * @return string Pesan asli jika berbentuk teks, atau pesan fallback.
+     */
+    private function extractErrorMessage(string $body): string
+    {
+        // Pesan non-string tidak dapat dipakai sebagai teks RuntimeException di checkout.
+        $decoded = json_decode($body, true);
+        $fields = is_array($decoded) ? $decoded : [];
+        $message = $fields['message'] ?? null;
+
+        return is_string($message) ? $message : 'Unknown error';
     }
 }
