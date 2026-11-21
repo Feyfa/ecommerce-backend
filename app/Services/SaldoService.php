@@ -108,10 +108,21 @@ class SaldoService
 
                 $priceString = number_format($item->price, 0, ',', '.');
                 $paymentSlugUpper = strtoupper($item->payment_slug ?? '');
-                $invoiceNumber = $item->invoice_id ?? $item->transaction_number;
+
+                // LEFT JOIN tetap mengembalikan riwayat ketika referensi terkait kosong.
+                /** @var string|null $invoiceNumber */
+                $invoiceNumber = $item->invoice_id ?? $item->getAttribute('transaction_number');
+                /** @var string|null $buyerName */
+                $buyerName = $item->getAttribute('buyer_name');
+                /** @var string|null $paymentAccount */
+                $paymentAccount = $item->getAttribute('payment_account');
+                /** @var string|null $paymentName */
+                $paymentName = $item->getAttribute('payment_name');
+
                 $description = match ($item->type) {
-                    'incoming' => "Pembelian Dari {$item->buyer_name} - INV {$invoiceNumber}",
-                    'withdrawal' => "Penarikan Saldo Sebesar Rp{$priceString} Ke Bank {$paymentSlugUpper} {$item->payment_account} ({$item->payment_name})"
+                    'incoming' => "Pembelian Dari {$buyerName} - INV {$invoiceNumber}",
+                    'withdrawal' => "Penarikan Saldo Sebesar Rp{$priceString} Ke Bank "
+                        ."{$paymentSlugUpper} {$paymentAccount} ({$paymentName})",
                 };
 
                 return [
@@ -180,10 +191,22 @@ class SaldoService
 
             $priceString = number_format($saldoHistory->price, 0, ',', '.');
             $paymentSlugUpper = strtoupper($saldoHistory->payment_slug ?? '');
-            $invoiceNumber = $saldoHistory->invoice_id ?? $saldoHistory->transaction_number;
+
+            // Atribut hasil join dapat kosong meski baris riwayat ditemukan.
+            /** @var string|null $invoiceNumber */
+            $invoiceNumber = $saldoHistory->invoice_id
+                ?? $saldoHistory->getAttribute('transaction_number');
+            /** @var string|null $buyerName */
+            $buyerName = $saldoHistory->getAttribute('buyer_name');
+            /** @var string|null $paymentAccount */
+            $paymentAccount = $saldoHistory->getAttribute('payment_account');
+            /** @var string|null $paymentName */
+            $paymentName = $saldoHistory->getAttribute('payment_name');
+
             $description = match ($saldoHistory->type) {
-                'incoming' => "Pembelian Dari {$saldoHistory->buyer_name} - INV {$invoiceNumber}",
-                'withdrawal' => "Penarikan Saldo Sebesar Rp{$priceString} Ke Bank {$paymentSlugUpper} {$saldoHistory->payment_account} ({$saldoHistory->payment_name})"
+                'incoming' => "Pembelian Dari {$buyerName} - INV {$invoiceNumber}",
+                'withdrawal' => "Penarikan Saldo Sebesar Rp{$priceString} Ke Bank "
+                    ."{$paymentSlugUpper} {$paymentAccount} ({$paymentName})",
             };
 
             $saldoHistoryMap = [
