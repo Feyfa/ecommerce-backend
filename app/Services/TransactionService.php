@@ -51,16 +51,16 @@ class TransactionService
      */
     public function getTransaction(string $user_id, string $user_type, array $filters = []): array
     {
-        // --- step 1 - start - validasi input
+        // --- step 1 - validasi input - start ---
         if (empty($user_id) || trim($user_id) == '') {
             return ['status' => 'error', 'message' => 'user id cannot be empty'];
         }
         if (empty($user_type) || ! in_array($user_type, ['seller', 'buyer'])) {
             return ['status' => 'error', 'message' => 'user type cannot be empty and must be seller or buyer'];
         }
-        // --- step 1 - end - validasi input
+        // --- step 1 - validasi input - end ---
 
-        // --- step 2 - start - ambil transaksi user
+        // --- step 2 - ambil transaksi user - start ---
         $perPage = min(max((int) ($filters['per_page'] ?? 5), 1), 20);
         $page = max((int) ($filters['page'] ?? 1), 1);
         $sortOrder = ($filters['sort'] ?? 'newest') == 'oldest' ? 'asc' : 'desc';
@@ -121,7 +121,7 @@ class TransactionService
                 'to' => $transactions->lastItem(),
             ];
         }
-        // --- step 2 - end - ambil transaksi user
+        // --- step 2 - ambil transaksi user - end ---
 
         return [
             'status' => 'success',
@@ -211,7 +211,7 @@ class TransactionService
      */
     private function getPendingBuyerInvoices(Builder $filteredTransactions, string $userId, string $sortOrder): Collection
     {
-        // --- step 1 - start - tentukan invoice pending yang cocok dengan filter buyer
+        // --- step 1 - tentukan invoice pending yang cocok dengan filter buyer - start ---
         $invoiceIds = $this->applyStatusFilter(clone $filteredTransactions, 'pending_payment')
             ->distinct()
             ->pluck('transaction_invoices.id');
@@ -219,9 +219,9 @@ class TransactionService
         if ($invoiceIds->isEmpty()) {
             return collect();
         }
-        // --- step 1 - end - tentukan invoice pending yang cocok dengan filter buyer
+        // --- step 1 - tentukan invoice pending yang cocok dengan filter buyer - end ---
 
-        // --- step 2 - start - muat seluruh paket dari invoice yang cocok
+        // --- step 2 - muat seluruh paket dari invoice yang cocok - start ---
         $packages = $this->selectTransactionFields(
             $this->createBaseTransactionQuery()
                 ->where('transaction_users.user_id_buyer', $userId)
@@ -232,9 +232,9 @@ class TransactionService
         )
             ->orderBy('transaction_users.created_at', $sortOrder)
             ->get();
-        // --- step 2 - end - muat seluruh paket dari invoice yang cocok
+        // --- step 2 - muat seluruh paket dari invoice yang cocok - end ---
 
-        // --- step 3 - start - bentuk satu item tampilan untuk setiap invoice
+        // --- step 3 - bentuk satu item tampilan untuk setiap invoice - start ---
         // Declare the shared model/object contract: PHPStan 1 treats Collection values as invariant.
         /** @var Collection<int, TransactionUser|stdClass> $invoices */
         $invoices = $this->prepareTransactionRows($packages)
@@ -268,7 +268,7 @@ class TransactionService
             ->values();
 
         return $invoices;
-        // --- step 3 - end - bentuk satu item tampilan untuk setiap invoice
+        // --- step 3 - bentuk satu item tampilan untuk setiap invoice - end ---
     }
 
     /**
@@ -287,7 +287,7 @@ class TransactionService
             return $transactions;
         }
 
-        // --- step 1 - start - muat produk untuk seluruh transaksi yang sedang ditampilkan
+        // --- step 1 - muat produk untuk seluruh transaksi yang sedang ditampilkan - start ---
         $productsByTransaction = TransactionProduct::query()
             ->select(
                 'transaction_products.transaction_user_id',
@@ -300,9 +300,9 @@ class TransactionService
             ->whereIn('transaction_products.transaction_user_id', $transactions->pluck('id'))
             ->get()
             ->groupBy('transaction_user_id');
-        // --- step 1 - end - muat produk untuk seluruh transaksi yang sedang ditampilkan
+        // --- step 1 - muat produk untuk seluruh transaksi yang sedang ditampilkan - end ---
 
-        // --- step 2 - start - format data transaksi untuk tampilan buyer atau seller
+        // --- step 2 - format data transaksi untuk tampilan buyer atau seller - start ---
         return $transactions->map(function (TransactionUser $item) use ($productsByTransaction): TransactionUser {
             // These timestamps belong to the joined projection; keep nullable Carbon parsing unchanged.
             /** @var string|null $transactionDate */
@@ -326,7 +326,7 @@ class TransactionService
 
             return $item;
         });
-        // --- step 2 - end - format data transaksi untuk tampilan buyer atau seller
+        // --- step 2 - format data transaksi untuk tampilan buyer atau seller - end ---
     }
 
     /**
@@ -474,12 +474,12 @@ class TransactionService
      */
     public function transferSaldo(string $user_id = '', string $transaction_user_id = '', float $price = 0, string $type = ''): void
     {
-        // --- step 1 - start - siapkan variabel proses
+        // --- step 1 - siapkan variabel proses - start ---
         $saldo_before = 0;
         $saldo_after = 0;
-        // --- step 1 - end - siapkan variabel proses
+        // --- step 1 - siapkan variabel proses - end ---
 
-        // --- step 2 - start - perbarui saldo user
+        // --- step 2 - perbarui saldo user - start ---
         $saldoUser = SaldoUser::where('user_id', $user_id)
             ->first();
         if (empty($saldoUser)) {
@@ -498,9 +498,9 @@ class TransactionService
 
             $saldo_after = (int) $saldoUser->saldo_income + (int) $saldoUser->saldo_refund;
         }
-        // --- step 2 - end - perbarui saldo user
+        // --- step 2 - perbarui saldo user - end ---
 
-        // --- step 3 - start - simpan riwayat saldo
+        // --- step 3 - simpan riwayat saldo - start ---
         SaldoHistory::create([
             'user_id' => $user_id,
             'transaction_user_id' => $transaction_user_id,
@@ -510,6 +510,6 @@ class TransactionService
             'saldo_before' => $saldo_before,
             'saldo_after' => $saldo_after,
         ]);
-        // --- step 3 - end - simpan riwayat saldo
+        // --- step 3 - simpan riwayat saldo - end ---
     }
 }

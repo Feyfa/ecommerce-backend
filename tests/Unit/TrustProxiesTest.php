@@ -108,24 +108,24 @@ class TrustProxiesTest extends TestCase
         string $remoteAddress,
         string $forwardedFor
     ): string {
-        // --- step 1 - start - samakan global REMOTE_ADDR dengan koneksi langsung request
+        // --- step 1 - samakan global REMOTE_ADDR dengan koneksi langsung request - start ---
         $_SERVER['REMOTE_ADDR'] = $remoteAddress;
         config()->set('trustedproxy.proxies', $trustedProxies);
-        // --- step 1 - end - samakan global REMOTE_ADDR dengan koneksi langsung request
+        // --- step 1 - samakan global REMOTE_ADDR dengan koneksi langsung request - end ---
 
-        // --- step 2 - start - bentuk request dengan forwarded chain yang akan dievaluasi middleware
+        // --- step 2 - bentuk request dengan forwarded chain yang akan dievaluasi middleware - start ---
         $request = Request::create('/proxy-test', 'GET', [], [], [], [
             'REMOTE_ADDR' => $remoteAddress,
             'HTTP_X_FORWARDED_FOR' => $forwardedFor,
         ]);
-        // --- step 2 - end - bentuk request dengan forwarded chain yang akan dievaluasi middleware
+        // --- step 2 - bentuk request dengan forwarded chain yang akan dievaluasi middleware - end ---
 
-        // --- step 3 - start - terapkan trust boundary dan ambil hasil resolusi client IP
+        // --- step 3 - terapkan trust boundary dan ambil hasil resolusi client IP - start ---
         (new TrustProxies)->handle(
             $request,
             static fn (Request $request): Request => $request
         );
-        // --- step 3 - end - terapkan trust boundary dan ambil hasil resolusi client IP
+        // --- step 3 - terapkan trust boundary dan ambil hasil resolusi client IP - end ---
 
         return (string) $request->ip();
     }

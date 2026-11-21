@@ -73,7 +73,7 @@ class KeranjangService
      */
     public function getKeranjangs(string $user_id_buyer = ''): array
     {
-        // --- step 1 - start - ambil item termasuk produk yang sudah di-soft-delete
+        // --- step 1 - ambil item termasuk produk yang sudah di-soft-delete - start ---
         $keranjangs = Keranjang::selectRaw('
                 keranjangs.id as k_id,
                 keranjangs.user_id_seller as k_user_id_seller,
@@ -96,9 +96,9 @@ class KeranjangService
             ->where('keranjangs.user_id_buyer', $user_id_buyer)
             ->orderBy('keranjangs.created_at', 'DESC')
             ->get();
-        // --- step 1 - end - ambil item termasuk produk yang sudah di-soft-delete
+        // --- step 1 - ambil item termasuk produk yang sudah di-soft-delete - end ---
 
-        // --- step 2 - start - hitung status availability tanpa query alamat per item
+        // --- step 2 - hitung status availability tanpa query alamat per item - start ---
         /** @var array<int, string> $sellerIds */
         $sellerIds = $keranjangs->pluck('k_user_id_seller')->filter()->all();
         $verifiedSellerIds = $this->productAvailabilityService->verifiedSellerIds(
@@ -210,9 +210,9 @@ class KeranjangService
                 $totalPrice += $itemTotalPrice;
             }
         }
-        // --- step 2 - end - hitung status availability tanpa query alamat per item
+        // --- step 2 - hitung status availability tanpa query alamat per item - end ---
 
-        // --- step 3 - start - simpan status tidak terpilih tanpa menghilangkan quantity buyer
+        // --- step 3 - simpan status tidak terpilih tanpa menghilangkan quantity buyer - start ---
         $invalidCartIds = array_values(array_unique([
             ...$unavailableCartIds,
             ...$stockIssueCartIds,
@@ -223,13 +223,13 @@ class KeranjangService
                 ->whereIn('id', $invalidCartIds)
                 ->update(['checked' => 0, 'checkout' => 0]);
         }
-        // --- step 3 - end - simpan status tidak terpilih tanpa menghilangkan quantity buyer
+        // --- step 3 - simpan status tidak terpilih tanpa menghilangkan quantity buyer - end ---
 
-        // --- step 4 - start - kelompokkan response berdasarkan seller
+        // --- step 4 - kelompokkan response berdasarkan seller - start ---
         /** @var array<string, list<CartItem>> $groupKeranjangs */
         $groupKeranjangs = $keranjangs->groupBy('k_user_id_seller')
             ->toArray();
-        // --- step 4 - end - kelompokkan response berdasarkan seller
+        // --- step 4 - kelompokkan response berdasarkan seller - end ---
 
         return [
             'totalPrice' => $totalPrice,
@@ -325,7 +325,7 @@ class KeranjangService
      */
     public function checkProductUnavailableByIds(array $product_ids = []): array
     {
-        // --- step 1 - start - ambil produk dan seller terverifikasi
+        // --- step 1 - ambil produk dan seller terverifikasi - start ---
         $productIds = array_values(array_unique(array_filter($product_ids)));
         $products = Product::withTrashed()->whereIn('id', $productIds)->get();
         /** @var array<int, string> $sellerIds */
@@ -335,9 +335,9 @@ class KeranjangService
         );
         $verifiedSellerLookup = array_fill_keys($verifiedSellerIds, true);
         $productLookup = $products->keyBy('id');
-        // --- step 1 - end - ambil produk dan seller terverifikasi
+        // --- step 1 - ambil produk dan seller terverifikasi - end ---
 
-        // --- step 2 - start - tentukan alasan unavailable setiap produk
+        // --- step 2 - tentukan alasan unavailable setiap produk - start ---
         $unavailableIds = [];
         $reasons = [];
 
@@ -356,7 +356,7 @@ class KeranjangService
                 $reasons[$productId] = $reason;
             }
         }
-        // --- step 2 - end - tentukan alasan unavailable setiap produk
+        // --- step 2 - tentukan alasan unavailable setiap produk - end ---
 
         return [
             'ids' => $unavailableIds,
@@ -408,20 +408,20 @@ class KeranjangService
      */
     public function updateCheckoutKeranjang(string $user_id_buyer = ''): void
     {
-        // --- step 1 - start - reset status checkout keranjang buyer
+        // --- step 1 - reset status checkout keranjang buyer - start ---
         Keranjang::where('user_id_buyer', $user_id_buyer)
             ->update([
                 'checkout' => 0,
             ]);
-        // --- step 1 - end - reset status checkout keranjang buyer
+        // --- step 1 - reset status checkout keranjang buyer - end ---
 
-        // --- step 2 - start - tandai item terpilih sebagai checkout
+        // --- step 2 - tandai item terpilih sebagai checkout - start ---
         Keranjang::where('user_id_buyer', $user_id_buyer)
             ->where('checked', 1)
             ->update([
                 'checkout' => 1,
             ]);
-        // --- step 2 - end - tandai item terpilih sebagai checkout
+        // --- step 2 - tandai item terpilih sebagai checkout - end ---
     }
 
     /**
@@ -436,12 +436,12 @@ class KeranjangService
      */
     public function checkAlamatBuyerExist(string $user_id_buyer = ''): array
     {
-        // --- step 1 - start - periksa keberadaan alamat buyer
+        // --- step 1 - periksa keberadaan alamat buyer - start ---
         $alamatExists = Alamat::where('user_id', $user_id_buyer)
             ->where('type', 'buyer')
             ->where('enable', 1)
             ->exists();
-        // --- step 1 - end - periksa keberadaan alamat buyer
+        // --- step 1 - periksa keberadaan alamat buyer - end ---
 
         return [
             'exists' => $alamatExists,

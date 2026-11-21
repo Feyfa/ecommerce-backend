@@ -34,7 +34,7 @@ class TransactionController extends Controller
      */
     public function getTransaction(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi user
+        // --- step 1 - validasi user - start ---
         $user = $request->user();
 
         if (! $user instanceof User) {
@@ -47,9 +47,9 @@ class TransactionController extends Controller
         if (! $userExists) {
             return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
         }
-        // --- step 1 - end - validasi user
+        // --- step 1 - validasi user - end ---
 
-        // --- step 2 - start - validasi tipe filter sebelum membentuk query transaksi
+        // --- step 2 - validasi tipe filter sebelum membentuk query transaksi - start ---
         $validator = Validator::make($request->all(), [
             'user_type' => ['nullable', 'string'],
             'status_filter' => ['nullable', 'string'],
@@ -90,9 +90,9 @@ class TransactionController extends Controller
             'date_from' => $validated['date_from'] ?? '',
             'date_to' => $validated['date_to'] ?? '',
         ];
-        // --- step 2 - end - validasi tipe filter sebelum membentuk query transaksi
+        // --- step 2 - validasi tipe filter sebelum membentuk query transaksi - end ---
 
-        // --- step 3 - start - ambil transaksi sesuai perspektif pengguna
+        // --- step 3 - ambil transaksi sesuai perspektif pengguna - start ---
         $getTransaction = $this->transactionService->getTransaction($user_id, $user_type, $filters);
         $status = $getTransaction['status'];
         $message = $getTransaction['message'] ?? '';
@@ -102,7 +102,7 @@ class TransactionController extends Controller
         if ($status == 'error') {
             return response()->json(['status' => $status, 'message' => $message], 400);
         }
-        // --- step 3 - end - ambil transaksi sesuai perspektif pengguna
+        // --- step 3 - ambil transaksi sesuai perspektif pengguna - end ---
 
         return response()->json([
             'status' => 'success',
@@ -125,16 +125,16 @@ class TransactionController extends Controller
      */
     public function approvedTransaction(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi user
+        // --- step 1 - validasi user - start ---
         $user_id = optional(auth()->user())->id;
         $userExists = User::where('id', $user_id)->exists();
 
         if (! $userExists) {
             return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
         }
-        // --- step 1 - end - validasi user
+        // --- step 1 - validasi user - end ---
 
-        // --- step 2 - start - validasi request
+        // --- step 2 - validasi request - start ---
         $user_type = $request->user_type ?? '';
         $transaction_user_id = $request->transaction_user_id ?? '';
         if ($user_type != 'seller') {
@@ -143,9 +143,9 @@ class TransactionController extends Controller
         if (empty($transaction_user_id) || trim($transaction_user_id) == '') {
             return response()->json(['status' => 'error', 'message' => 'Transaction User ID Cannot Be Empty'], 400);
         }
-        // --- step 2 - end - validasi request
+        // --- step 2 - validasi request - end ---
 
-        // --- step 3 - start - proses persetujuan transaksi
+        // --- step 3 - proses persetujuan transaksi - start ---
         $transactionUser = TransactionUser::where('id', $transaction_user_id)
             ->where('user_id_seller', $user_id)
             ->where('status', 'approved_seller')
@@ -156,23 +156,23 @@ class TransactionController extends Controller
 
         $transactionUser->status = 'done';
         $transactionUser->save();
-        // --- step 3 - end - proses persetujuan transaksi
+        // --- step 3 - proses persetujuan transaksi - end ---
 
-        // --- step 4 - start - transfer saldo ke seller
+        // --- step 4 - transfer saldo ke seller - start ---
         $this->transactionService->transferSaldo(
             user_id: $user_id,
             transaction_user_id: $transactionUser->id,
             price: (float) $transactionUser->product_price,
             type: 'incoming'
         );
-        // --- step 4 - end - transfer saldo ke seller
+        // --- step 4 - transfer saldo ke seller - end ---
 
-        // --- step 5 - start - ambil transaksi
+        // --- step 5 - ambil transaksi - start ---
         $getTransaction = $this->transactionService->getTransaction($user_id, $user_type);
         $transactions = $getTransaction['transactions'] ?? [];
         $counts = $getTransaction['counts'] ?? [];
         $pagination = $getTransaction['pagination'] ?? [];
-        // --- step 5 - end - ambil transaksi
+        // --- step 5 - ambil transaksi - end ---
 
         return response()->json([
             'status' => 'success',

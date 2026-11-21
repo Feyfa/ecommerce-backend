@@ -27,19 +27,19 @@ class AssignRequestId
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // --- step 1 - start - hanya terima incoming UUID valid agar header tidak menjadi data bebas
+        // --- step 1 - hanya terima incoming UUID valid agar header tidak menjadi data bebas - start ---
         $incomingRequestId = trim((string) $request->header('X-Request-ID', ''));
         $requestId = Str::isUuid($incomingRequestId)
             ? $incomingRequestId
             : (string) Str::uuid();
 
         $request->attributes->set('request_id', $requestId);
-        // --- step 1 - end - hanya terima incoming UUID valid agar header tidak menjadi data bebas
+        // --- step 1 - hanya terima incoming UUID valid agar header tidak menjadi data bebas - end ---
 
-        // --- step 2 - start - teruskan request lalu pantulkan correlation id pada response
+        // --- step 2 - teruskan request lalu pantulkan correlation id pada response - start ---
         $response = $next($request);
         $response->headers->set('X-Request-ID', $requestId);
-        // --- step 2 - end - teruskan request lalu pantulkan correlation id pada response
+        // --- step 2 - teruskan request lalu pantulkan correlation id pada response - end ---
 
         return $response;
     }

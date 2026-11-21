@@ -32,7 +32,7 @@ class AuditLogController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi filter dan batasi ukuran halaman sebelum query dijalankan
+        // --- step 1 - validasi filter dan batasi ukuran halaman sebelum query dijalankan - start ---
         $validated = $request->validate([
             'event' => ['nullable', 'string', Rule::in(array_column(AuditEvent::cases(), 'value'))],
             'from' => ['nullable', 'date_format:Y-m-d'],
@@ -50,9 +50,9 @@ class AuditLogController extends Controller
             ],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
         ]);
-        // --- step 1 - end - validasi filter dan batasi ukuran halaman sebelum query dijalankan
+        // --- step 1 - validasi filter dan batasi ukuran halaman sebelum query dijalankan - end ---
 
-        // --- step 2 - start - susun query owner-scoped dengan order cursor yang deterministik
+        // --- step 2 - susun query owner-scoped dengan order cursor yang deterministik - start ---
         $user = $this->authenticatedUser($request);
         $perPage = (int) ($validated['per_page'] ?? 20);
         $from = isset($validated['from']) ? $this->startOfApplicationDay($validated['from']) : null;
@@ -64,9 +64,9 @@ class AuditLogController extends Controller
             ->when($to, fn ($query, string $boundary) => $query->where('occurred_at', '<=', $boundary))
             ->orderByDesc('occurred_at')
             ->orderByDesc('id');
-        // --- step 2 - end - susun query owner-scoped dengan order cursor yang deterministik
+        // --- step 2 - susun query owner-scoped dengan order cursor yang deterministik - end ---
 
-        // --- step 3 - start - jalankan cursor pagination dan bentuk metadata load-more frontend
+        // --- step 3 - jalankan cursor pagination dan bentuk metadata load-more frontend - start ---
         $paginator = $query->cursorPaginate($perPage);
         $responseData = [
             'status' => 200,
@@ -77,7 +77,7 @@ class AuditLogController extends Controller
                 'per_page' => $perPage,
             ],
         ];
-        // --- step 3 - end - jalankan cursor pagination dan bentuk metadata load-more frontend
+        // --- step 3 - jalankan cursor pagination dan bentuk metadata load-more frontend - end ---
 
         return response()->json($responseData, 200);
     }
@@ -97,20 +97,20 @@ class AuditLogController extends Controller
      */
     public function show(Request $request, string $auditLog): JsonResponse
     {
-        // --- step 1 - start - resolve row hanya melalui actor user aktif agar id user lain menghasilkan 404
+        // --- step 1 - resolve row hanya melalui actor user aktif agar id user lain menghasilkan 404 - start ---
         $user = $this->authenticatedUser($request);
         $audit = AuditLog::query()
             ->where('actor_user_id', $user->id)
             ->whereKey($auditLog)
             ->firstOrFail();
-        // --- step 1 - end - resolve row hanya melalui actor user aktif agar id user lain menghasilkan 404
+        // --- step 1 - resolve row hanya melalui actor user aktif agar id user lain menghasilkan 404 - end ---
 
-        // --- step 2 - start - resource detail boleh mengembalikan full IP setelah ownership terbukti
+        // --- step 2 - resource detail boleh mengembalikan full IP setelah ownership terbukti - start ---
         $responseData = [
             'status' => 200,
             'data' => AuditLogResource::make($audit)->resolve($request),
         ];
-        // --- step 2 - end - resource detail boleh mengembalikan full IP setelah ownership terbukti
+        // --- step 2 - resource detail boleh mengembalikan full IP setelah ownership terbukti - end ---
 
         return response()->json($responseData, 200);
     }
@@ -209,7 +209,7 @@ class AuditLogController extends Controller
      */
     private function isValidCursor(string $encodedCursor): bool
     {
-        // --- step 1 - start - decode base64 URL-safe secara ketat sebelum membaca JSON
+        // --- step 1 - decode base64 URL-safe secara ketat sebelum membaca JSON - start ---
         $normalizedCursor = strtr($encodedCursor, '-_', '+/');
         $paddingLength = (4 - strlen($normalizedCursor) % 4) % 4;
         $decodedCursor = base64_decode($normalizedCursor.str_repeat('=', $paddingLength), true);
@@ -223,9 +223,9 @@ class AuditLogController extends Controller
         if (! is_array($parameters)) {
             return false;
         }
-        // --- step 1 - end - decode base64 URL-safe secara ketat sebelum membaca JSON
+        // --- step 1 - decode base64 URL-safe secara ketat sebelum membaca JSON - end ---
 
-        // --- step 2 - start - validasi shape dan nilai tie-breaker cursor timeline
+        // --- step 2 - validasi shape dan nilai tie-breaker cursor timeline - start ---
         $expectedKeys = ['occurred_at', 'id', '_pointsToNextItems'];
 
         if (array_diff(array_keys($parameters), $expectedKeys) !== []
@@ -249,7 +249,7 @@ class AuditLogController extends Controller
         } catch (Throwable) {
             return false;
         }
-        // --- step 2 - end - validasi shape dan nilai tie-breaker cursor timeline
+        // --- step 2 - validasi shape dan nilai tie-breaker cursor timeline - end ---
 
         return true;
     }

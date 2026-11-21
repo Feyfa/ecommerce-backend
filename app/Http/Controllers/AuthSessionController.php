@@ -42,10 +42,10 @@ class AuthSessionController extends Controller
      */
     public function show(Request $request): JsonResponse
     {
-        // --- step 1 - start - ambil identity provider yang sudah diverifikasi middleware
+        // --- step 1 - ambil identity provider yang sudah diverifikasi middleware - start ---
         $clerkUserIdAttribute = $request->attributes->get('clerk_user_id', '');
         $clerkUserId = is_string($clerkUserIdAttribute) ? $clerkUserIdAttribute : '';
-        // --- step 1 - end - ambil identity provider yang sudah diverifikasi middleware
+        // --- step 1 - ambil identity provider yang sudah diverifikasi middleware - end ---
 
         if ($clerkUserId === '') {
             return response()->json([
@@ -54,7 +54,7 @@ class AuthSessionController extends Controller
             ], 401);
         }
 
-        // --- step 2 - start - sync Clerk dan catat register atau login dalam transaction yang sama
+        // --- step 2 - sync Clerk dan catat register atau login dalam transaction yang sama - start ---
         try {
             $syncResult = $this->clerkUserSyncService->syncByClerkUserIdWithStatus(
                 $clerkUserId,
@@ -80,11 +80,11 @@ class AuthSessionController extends Controller
                 'message' => 'Authenticated session could not be synchronized locally.',
             ], 500);
         }
-        // --- step 2 - end - sync Clerk dan catat register atau login dalam transaction yang sama
+        // --- step 2 - sync Clerk dan catat register atau login dalam transaction yang sama - end ---
 
-        // --- step 3 - start - tetap pakai formatter company lama agar response konsisten
+        // --- step 3 - tetap pakai formatter company lama agar response konsisten - start ---
         $company = $this->companyService->getCompany($user->id)['company'];
-        // --- step 3 - end - tetap pakai formatter company lama agar response konsisten
+        // --- step 3 - tetap pakai formatter company lama agar response konsisten - end ---
 
         return response()->json([
             'status' => 200,

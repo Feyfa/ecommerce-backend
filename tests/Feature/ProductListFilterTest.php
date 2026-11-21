@@ -399,7 +399,7 @@ class ProductListFilterTest extends TestCase
      */
     public function seller_returns_explicit_completion_metadata_for_terminal_and_multi_batch_catalogs(): void
     {
-        // --- step 1 - start - verifikasi katalog pendek dan tepat satu batch
+        // --- step 1 - verifikasi katalog pendek dan tepat satu batch - start ---
         for ($index = 1; $index <= 4; $index++) {
             $this->createProduct($this->user, "Produk Pendek {$index}", 10000 + $index, 10);
         }
@@ -417,9 +417,9 @@ class ProductListFilterTest extends TestCase
             ->assertOk()
             ->assertJsonCount(50, 'products')
             ->assertJsonPath('has_more', false);
-        // --- step 1 - end - verifikasi katalog pendek dan tepat satu batch
+        // --- step 1 - verifikasi katalog pendek dan tepat satu batch - end ---
 
-        // --- step 2 - start - verifikasi lookahead dan kelengkapan dua batch
+        // --- step 2 - verifikasi lookahead dan kelengkapan dua batch - start ---
         $this->createProduct($this->user, 'Produk Lookahead', 20000, 10);
         $firstBatch = $this->getJson($this->sellerUrl($this->user))
             ->assertOk()
@@ -439,7 +439,7 @@ class ProductListFilterTest extends TestCase
 
         $this->assertSame([], array_intersect($firstBatchIds, $secondBatchIds));
         $this->assertEqualsCanonicalizing($allProductIds, [...$firstBatchIds, ...$secondBatchIds]);
-        // --- step 2 - end - verifikasi lookahead dan kelengkapan dua batch
+        // --- step 2 - verifikasi lookahead dan kelengkapan dua batch - end ---
     }
 
     /**
@@ -505,15 +505,15 @@ class ProductListFilterTest extends TestCase
      */
     public function test_seller_request_page_size_overrides_default_with_correct_completion(): void
     {
-        // --- step 1 - start - siapkan katalog yang melebihi ukuran request
+        // --- step 1 - siapkan katalog yang melebihi ukuran request - start ---
         config()->set('seller_product.per_page', 1);
         config()->set('seller_product.max_per_page', 3);
         for ($index = 1; $index <= 3; $index++) {
             $this->createProduct($this->user, "Ukuran Seller {$index}", 10000 + $index, 10);
         }
-        // --- step 1 - end - siapkan katalog yang melebihi ukuran request
+        // --- step 1 - siapkan katalog yang melebihi ukuran request - end ---
 
-        // --- step 2 - start - verifikasi request eksplisit dan batch terakhir
+        // --- step 2 - verifikasi request eksplisit dan batch terakhir - start ---
         $first = $this->getJson($this->sellerUrl($this->user, ['per_page' => 2]))
             ->assertOk()->assertJsonCount(2, 'products')->assertJsonPath('has_more', true);
         $firstIds = array_column($first->json('products'), 'id');
@@ -524,7 +524,7 @@ class ProductListFilterTest extends TestCase
         $this->assertSame([], array_intersect($firstIds, array_column($second->json('products'), 'id')));
         $this->getJson($this->sellerUrl($this->user, ['per_page' => 3]))
             ->assertOk()->assertJsonCount(3, 'products')->assertJsonPath('has_more', false);
-        // --- step 2 - end - verifikasi request eksplisit dan batch terakhir
+        // --- step 2 - verifikasi request eksplisit dan batch terakhir - end ---
     }
 
     /**
@@ -534,7 +534,7 @@ class ProductListFilterTest extends TestCase
      */
     public function test_seller_uses_configured_default_and_rejects_invalid_page_sizes(): void
     {
-        // --- step 1 - start - verifikasi fallback client tanpa ukuran batch
+        // --- step 1 - verifikasi fallback client tanpa ukuran batch - start ---
         config()->set('seller_product.per_page', 1);
         config()->set('seller_product.max_per_page', 2);
         $this->createProduct($this->user, 'Default Seller A', 10000, 10);
@@ -543,14 +543,14 @@ class ProductListFilterTest extends TestCase
             ->assertOk()->assertJsonCount(1, 'products')->assertJsonPath('has_more', true);
         $this->getJson($this->sellerUrl($this->user, ['per_page' => '']))
             ->assertOk()->assertJsonCount(1, 'products')->assertJsonPath('has_more', true);
-        // --- step 1 - end - verifikasi fallback client tanpa ukuran batch
+        // --- step 1 - verifikasi fallback client tanpa ukuran batch - end ---
 
-        // --- step 2 - start - tolak input di luar batas atau bukan bilangan bulat
+        // --- step 2 - tolak input di luar batas atau bukan bilangan bulat - start ---
         foreach ([0, -1, 3, 1.5, 'invalid', [1]] as $invalidSize) {
             $this->getJson($this->sellerUrl($this->user, ['per_page' => $invalidSize]))
                 ->assertStatus(422)->assertJsonValidationErrors(['per_page'], 'message');
         }
-        // --- step 2 - end - tolak input di luar batas atau bukan bilangan bulat
+        // --- step 2 - tolak input di luar batas atau bukan bilangan bulat - end ---
     }
 
     /**

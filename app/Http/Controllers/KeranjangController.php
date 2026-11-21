@@ -40,7 +40,7 @@ class KeranjangController extends Controller
      */
     public function index(Request $request, string $user_id_buyer): JsonResponse
     {
-        // --- step 1 - start - validasi request dan ambil data
+        // --- step 1 - validasi request dan ambil data - start ---
         $validator = Validator::make(
             [
                 'user_id_buyer' => $user_id_buyer,
@@ -55,7 +55,7 @@ class KeranjangController extends Controller
         }
 
         $validate = $validator->validate();
-        // --- step 1 - end - validasi request dan ambil data
+        // --- step 1 - validasi request dan ambil data - end ---
 
         if ($response = $this->buyerOwnershipResponse($request, $validate['user_id_buyer'])) {
             return $response;
@@ -81,7 +81,7 @@ class KeranjangController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi request dan ambil data
+        // --- step 1 - validasi request dan ambil data - start ---
         $validator = Validator::make($request->all(),
             [
                 'user_id_seller' => ['required', 'uuid'],
@@ -95,7 +95,7 @@ class KeranjangController extends Controller
         }
 
         $validate = $validator->validate();
-        // --- step 1 - end - validasi request dan ambil data
+        // --- step 1 - validasi request dan ambil data - end ---
 
         if ($response = $this->buyerOwnershipResponse($request, $validate['user_id_buyer'])) {
             return $response;
@@ -107,7 +107,7 @@ class KeranjangController extends Controller
         $product = $this->productAvailabilityService
             ->findProductForAvailability($validate['product_id']);
 
-        // --- step 2 - start - validasi produk
+        // --- step 2 - validasi produk - start ---
         if (! $product) {
             return response()->json(['status' => 404, 'message' => 'Produk tidak ditemukan'], 404);
         }
@@ -135,33 +135,33 @@ class KeranjangController extends Controller
                 'message' => 'Produk sementara tidak dapat ditambahkan ke keranjang.',
             ], 409);
         }
-        // --- step 2 - end - validasi produk
+        // --- step 2 - validasi produk - end ---
 
-        // --- step 3 - start - ambil item keranjang
+        // --- step 3 - ambil item keranjang - start ---
         $keranjang = Keranjang::where('user_id_seller', $validate['user_id_seller'])
             ->where('user_id_buyer', $validate['user_id_buyer'])
             ->where('product_id', $validate['product_id'])
             ->first();
-        // --- step 3 - end - ambil item keranjang
+        // --- step 3 - ambil item keranjang - end ---
 
-        // --- step 4 - start - proses item keranjang yang sudah tersedia
+        // --- step 4 - proses item keranjang yang sudah tersedia - start ---
         if (! empty($keranjang)) {
-            // --- step 5 - start - validasi batas maksimum stok produk
+            // --- step 5 - validasi batas maksimum stok produk - start ---
             if ($keranjang->total >= $product->stock) {
                 return response()->json(['status' => 422, 'message' => ['stock_maximum' => ["This product stock is a maximum of {$product->stock}"]]], 422);
             }
-            // --- step 5 - end - validasi batas maksimum stok produk
+            // --- step 5 - validasi batas maksimum stok produk - end ---
 
             $keranjang->total += 1;
             $keranjang->save();
         }
-        // --- step 4 - end - proses item keranjang yang sudah tersedia
+        // --- step 4 - proses item keranjang yang sudah tersedia - end ---
 
-        // --- step 6 - start - buat item keranjang baru
+        // --- step 6 - buat item keranjang baru - start ---
         else {
             Keranjang::create($validate);
         }
-        // --- step 6 - end - buat item keranjang baru
+        // --- step 6 - buat item keranjang baru - end ---
 
         return response()->json(['status' => 200], 200);
     }
@@ -181,7 +181,7 @@ class KeranjangController extends Controller
      */
     public function delete(Request $request, string $user_id_buyer, string $product_id): JsonResponse
     {
-        // --- step 1 - start - validasi request dan ambil data
+        // --- step 1 - validasi request dan ambil data - start ---
         $validator = Validator::make(
             [
                 'user_id_buyer' => $user_id_buyer,
@@ -198,17 +198,17 @@ class KeranjangController extends Controller
         }
 
         $validate = $validator->validate();
-        // --- step 1 - end - validasi request dan ambil data
+        // --- step 1 - validasi request dan ambil data - end ---
 
         if ($response = $this->buyerOwnershipResponse($request, $validate['user_id_buyer'])) {
             return $response;
         }
 
-        // --- step 2 - start - hapus item keranjang
+        // --- step 2 - hapus item keranjang - start ---
         $keranjangs = Keranjang::where('user_id_buyer', $validate['user_id_buyer'])
             ->where('product_id', $validate['product_id'])
             ->delete();
-        // --- step 2 - end - hapus item keranjang
+        // --- step 2 - hapus item keranjang - end ---
 
         $getKeranjangs = $this->keranjangService->getKeranjangs($validate['user_id_buyer']);
         $keranjangs = $getKeranjangs['keranjangs'];
@@ -230,7 +230,7 @@ class KeranjangController extends Controller
      */
     public function checked(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi request dan ambil data
+        // --- step 1 - validasi request dan ambil data - start ---
         $validator = Validator::make($request->all(),
             [
                 'user_id_buyer' => ['required', 'uuid'],
@@ -244,13 +244,13 @@ class KeranjangController extends Controller
         }
 
         $validate = $validator->validate();
-        // --- step 1 - end - validasi request dan ambil data
+        // --- step 1 - validasi request dan ambil data - end ---
 
         if ($response = $this->buyerOwnershipResponse($request, $validate['user_id_buyer'])) {
             return $response;
         }
 
-        // --- step 2 - start - ubah pilihan dan validasi availability produk
+        // --- step 2 - ubah pilihan dan validasi availability produk - start ---
         $keranjang = Keranjang::where('product_id', $validate['product_id'])
             ->where('user_id_buyer', $validate['user_id_buyer'])
             ->first();
@@ -267,7 +267,7 @@ class KeranjangController extends Controller
 
         $keranjang->checked = ($validate['checked']) && empty($productSoldOutIds['ids']) ? true : false;
         $keranjang->save();
-        // --- step 2 - end - ubah pilihan dan validasi availability produk
+        // --- step 2 - ubah pilihan dan validasi availability produk - end ---
 
         $getKeranjangs = $this->keranjangService->getKeranjangs($validate['user_id_buyer']);
         $keranjangs = $getKeranjangs['keranjangs'];
@@ -289,7 +289,7 @@ class KeranjangController extends Controller
      */
     public function checkedGroup(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi request dan ambil data
+        // --- step 1 - validasi request dan ambil data - start ---
         $validator = Validator::make($request->all(),
             [
                 'user_id_buyer' => ['required', 'uuid'],
@@ -303,13 +303,13 @@ class KeranjangController extends Controller
         }
 
         $validate = $validator->validate();
-        // --- step 1 - end - validasi request dan ambil data
+        // --- step 1 - validasi request dan ambil data - end ---
 
         if ($response = $this->buyerOwnershipResponse($request, $validate['user_id_buyer'])) {
             return $response;
         }
 
-        // --- step 2 - start - ubah pilihan dan validasi availability produk
+        // --- step 2 - ubah pilihan dan validasi availability produk - start ---
         $groupQuery = Keranjang::where('user_id_seller', $validate['user_id_seller'])
             ->where('user_id_buyer', $validate['user_id_buyer']);
         $groupQuery->update(['checked' => 0]);
@@ -322,13 +322,13 @@ class KeranjangController extends Controller
                     ->select('id')
             )->update(['checked' => 1]);
         }
-        // --- step 2 - end - ubah pilihan dan validasi availability produk
+        // --- step 2 - ubah pilihan dan validasi availability produk - end ---
 
-        // --- step 3 - start - ambil state keranjang terbaru
+        // --- step 3 - ambil state keranjang terbaru - start ---
         $getKeranjangs = $this->keranjangService->getKeranjangs($validate['user_id_buyer']);
         $keranjangs = $getKeranjangs['keranjangs'];
         $totalPrice = $getKeranjangs['totalPrice'];
-        // --- step 3 - end - ambil state keranjang terbaru
+        // --- step 3 - ambil state keranjang terbaru - end ---
 
         return response()->json(['status' => 200, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 200);
     }
@@ -345,7 +345,7 @@ class KeranjangController extends Controller
      */
     public function checkedAll(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi request dan ambil data
+        // --- step 1 - validasi request dan ambil data - start ---
         $validator = Validator::make($request->all(),
             [
                 'user_id_buyer' => ['required', 'uuid'],
@@ -358,30 +358,30 @@ class KeranjangController extends Controller
         }
 
         $validate = $validator->validate();
-        // --- step 1 - end - validasi request dan ambil data
+        // --- step 1 - validasi request dan ambil data - end ---
 
         if ($response = $this->buyerOwnershipResponse($request, $validate['user_id_buyer'])) {
             return $response;
         }
 
-        // --- step 2 - start - reset pilihan keranjang
+        // --- step 2 - reset pilihan keranjang - start ---
         Keranjang::where('user_id_buyer', $validate['user_id_buyer'])
             ->update(['checked' => 0]);
-        // --- step 2 - end - reset pilihan keranjang
+        // --- step 2 - reset pilihan keranjang - end ---
 
-        // --- step 3 - start - pilih seluruh item keranjang yang tersedia
+        // --- step 3 - pilih seluruh item keranjang yang tersedia - start ---
         if ($validate['checked']) {
             Keranjang::where('user_id_buyer', $validate['user_id_buyer'])
                 ->whereIn('product_id', Product::purchasable()->select('id'))
                 ->update(['checked' => 1]);
         }
-        // --- step 3 - end - pilih seluruh item keranjang yang tersedia
+        // --- step 3 - pilih seluruh item keranjang yang tersedia - end ---
 
-        // --- step 4 - start - ambil state keranjang terbaru
+        // --- step 4 - ambil state keranjang terbaru - start ---
         $getKeranjangs = $this->keranjangService->getKeranjangs($validate['user_id_buyer']);
         $keranjangs = $getKeranjangs['keranjangs'];
         $totalPrice = $getKeranjangs['totalPrice'];
-        // --- step 4 - end - ambil state keranjang terbaru
+        // --- step 4 - ambil state keranjang terbaru - end ---
 
         return response()->json(['status' => 200, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 200);
     }
@@ -399,7 +399,7 @@ class KeranjangController extends Controller
      */
     public function plusTotalKeranjang(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi request dan ambil data
+        // --- step 1 - validasi request dan ambil data - start ---
         $validator = Validator::make($request->all(),
             [
                 'user_id_buyer' => ['required', 'uuid'],
@@ -412,7 +412,7 @@ class KeranjangController extends Controller
         }
 
         $validate = $validator->validate();
-        // --- step 1 - end - validasi request dan ambil data
+        // --- step 1 - validasi request dan ambil data - end ---
 
         if ($response = $this->buyerOwnershipResponse($request, $validate['user_id_buyer'])) {
             return $response;
@@ -448,22 +448,22 @@ class KeranjangController extends Controller
             return response()->json(['status' => 404, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice, 'message' => 'Produk tidak ditemukan'], 404);
         }
 
-        // --- step 2 - start - validasi batas maksimum stok produk
+        // --- step 2 - validasi batas maksimum stok produk - start ---
         if ($keranjang->total >= $product->stock) {
             return response()->json(['status' => 422, 'message' => ['stock_maximum' => ["This product stock is a maximum of {$product->stock}"]]], 422);
         }
-        // --- step 2 - end - validasi batas maksimum stok produk
+        // --- step 2 - validasi batas maksimum stok produk - end ---
 
-        // --- step 3 - start - tambah satu quantity keranjang
+        // --- step 3 - tambah satu quantity keranjang - start ---
         $keranjang->total += 1;
         $keranjang->save();
-        // --- step 3 - end - tambah satu quantity keranjang
+        // --- step 3 - tambah satu quantity keranjang - end ---
 
-        // --- step 4 - start - ambil state keranjang terbaru
+        // --- step 4 - ambil state keranjang terbaru - start ---
         $getKeranjangs = $this->keranjangService->getKeranjangs($validate['user_id_buyer']);
         $keranjangs = $getKeranjangs['keranjangs'];
         $totalPrice = $getKeranjangs['totalPrice'];
-        // --- step 4 - end - ambil state keranjang terbaru
+        // --- step 4 - ambil state keranjang terbaru - end ---
 
         return response()->json(['status' => 200, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 200);
     }
@@ -480,7 +480,7 @@ class KeranjangController extends Controller
      */
     public function minusTotalKeranjang(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi request dan ambil data
+        // --- step 1 - validasi request dan ambil data - start ---
         $validator = Validator::make($request->all(),
             [
                 'user_id_buyer' => ['required', 'uuid'],
@@ -493,13 +493,13 @@ class KeranjangController extends Controller
         }
 
         $validate = $validator->validate();
-        // --- step 1 - end - validasi request dan ambil data
+        // --- step 1 - validasi request dan ambil data - end ---
 
         if ($response = $this->buyerOwnershipResponse($request, $validate['user_id_buyer'])) {
             return $response;
         }
 
-        // --- step 2 - start - tambah satu quantity keranjang
+        // --- step 2 - tambah satu quantity keranjang - start ---
         $keranjang = Keranjang::select('id', 'user_id_seller', 'user_id_buyer', 'product_id', 'checked', 'total')
             ->where('user_id_buyer', $validate['user_id_buyer'])
             ->where('product_id', $validate['product_id'])
@@ -523,13 +523,13 @@ class KeranjangController extends Controller
 
         $keranjang->total -= 1;
         $keranjang->save();
-        // --- step 2 - end - tambah satu quantity keranjang
+        // --- step 2 - tambah satu quantity keranjang - end ---
 
-        // --- step 3 - start - ambil state keranjang terbaru
+        // --- step 3 - ambil state keranjang terbaru - start ---
         $getKeranjangs = $this->keranjangService->getKeranjangs($validate['user_id_buyer']);
         $keranjangs = $getKeranjangs['keranjangs'];
         $totalPrice = $getKeranjangs['totalPrice'];
-        // --- step 3 - end - ambil state keranjang terbaru
+        // --- step 3 - ambil state keranjang terbaru - end ---
 
         return response()->json(['status' => 200, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 200);
     }
@@ -547,7 +547,7 @@ class KeranjangController extends Controller
      */
     public function changeTotalKeranjang(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi request dan ambil data
+        // --- step 1 - validasi request dan ambil data - start ---
         $validator = Validator::make($request->all(),
             [
                 'user_id_buyer' => ['required', 'uuid'],
@@ -561,7 +561,7 @@ class KeranjangController extends Controller
         }
 
         $validate = $validator->validate();
-        // --- step 1 - end - validasi request dan ambil data
+        // --- step 1 - validasi request dan ambil data - end ---
 
         if ($response = $this->buyerOwnershipResponse($request, $validate['user_id_buyer'])) {
             return $response;
@@ -597,28 +597,28 @@ class KeranjangController extends Controller
             return response()->json(['status' => 404, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice, 'message' => 'Produk tidak ditemukan'], 404);
         }
 
-        // --- step 2 - start - validasi quantity terhadap stok produk
+        // --- step 2 - validasi quantity terhadap stok produk - start ---
         if ($validate['total'] > $product->stock) {
-            // --- step 3 - start - ambil state keranjang terbaru
+            // --- step 3 - ambil state keranjang terbaru - start ---
             $getKeranjangs = $this->keranjangService->getKeranjangs($validate['user_id_buyer']);
             $keranjangs = $getKeranjangs['keranjangs'];
             $totalPrice = $getKeranjangs['totalPrice'];
-            // --- step 3 - end - ambil state keranjang terbaru
+            // --- step 3 - ambil state keranjang terbaru - end ---
 
             return response()->json(['status' => 422, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice, 'message' => ['stock_maximum' => ["This product stock is a maximum of {$product->stock}"]]], 422);
         }
-        // --- step 2 - end - validasi quantity terhadap stok produk
+        // --- step 2 - validasi quantity terhadap stok produk - end ---
 
-        // --- step 4 - start - ubah quantity keranjang
+        // --- step 4 - ubah quantity keranjang - start ---
         $keranjang->total = $validate['total'];
         $keranjang->save();
-        // --- step 4 - end - ubah quantity keranjang
+        // --- step 4 - ubah quantity keranjang - end ---
 
-        // --- step 5 - start - ambil state keranjang terbaru
+        // --- step 5 - ambil state keranjang terbaru - start ---
         $getKeranjangs = $this->keranjangService->getKeranjangs($validate['user_id_buyer']);
         $keranjangs = $getKeranjangs['keranjangs'];
         $totalPrice = $getKeranjangs['totalPrice'];
-        // --- step 5 - end - ambil state keranjang terbaru
+        // --- step 5 - ambil state keranjang terbaru - end ---
 
         return response()->json(['status' => 200, 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 200);
     }
@@ -637,7 +637,7 @@ class KeranjangController extends Controller
      */
     public function validateCheckout(Request $request): JsonResponse
     {
-        // --- step 1 - start - validasi request dan ambil data
+        // --- step 1 - validasi request dan ambil data - start ---
         $validator = Validator::make($request->all(), [
             'product_ids' => ['required', 'array'],
             'product_ids.*' => ['uuid'],
@@ -655,9 +655,9 @@ class KeranjangController extends Controller
         if ($response = $this->buyerOwnershipResponse($request, $buyerId)) {
             return $response;
         }
-        // --- step 1 - end - validasi request dan ambil data
+        // --- step 1 - validasi request dan ambil data - end ---
 
-        // --- step 2 - start - validasi alamat buyer
+        // --- step 2 - validasi alamat buyer - start ---
         $checkAlamatBuyerExist = $this->keranjangService->checkAlamatBuyerExist($buyerId);
 
         if (! $checkAlamatBuyerExist['exists']) {
@@ -667,9 +667,9 @@ class KeranjangController extends Controller
                 'message' => 'Tambahkan alamat pengiriman sebelum melanjutkan checkout.',
             ], 400);
         }
-        // --- step 2 - end - validasi alamat buyer
+        // --- step 2 - validasi alamat buyer - end ---
 
-        // --- step 3 - start - sinkronkan availability produk terbaru
+        // --- step 3 - sinkronkan availability produk terbaru - start ---
         $currentCart = $this->keranjangService->getKeranjangs($buyerId);
         $selectedStockIssues = $currentCart['selectedStockIssues'];
         $unavailableSelectedReasons = $currentCart['unavailableSelectedReasons'];
@@ -702,9 +702,9 @@ class KeranjangController extends Controller
                 'totalPrice' => $currentCart['totalPrice'],
             ], 409);
         }
-        // --- step 3 - end - sinkronkan availability produk terbaru
+        // --- step 3 - sinkronkan availability produk terbaru - end ---
 
-        // --- step 4 - start - validasi item keranjang terpilih
+        // --- step 4 - validasi item keranjang terpilih - start ---
         $keranjangNotChecked = $this->keranjangService->checkKeranjangNotChecked($buyerId);
 
         if (! $keranjangNotChecked['checked']) {
@@ -713,9 +713,9 @@ class KeranjangController extends Controller
 
             return response()->json(['status' => 'error', 'message' => 'Keranjang belum ada yang di checked', 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 400);
         }
-        // --- step 4 - end - validasi item keranjang terpilih
+        // --- step 4 - validasi item keranjang terpilih - end ---
 
-        // --- step 5 - start - validasi state keranjang frontend
+        // --- step 5 - validasi state keranjang frontend - start ---
         $checkedProductIds = Keranjang::where('user_id_buyer', $buyerId)
             ->where('checked', 1)
             ->where('total', '>', 0)
@@ -737,9 +737,9 @@ class KeranjangController extends Controller
 
             return response()->json(['status' => 'error', 'message' => 'Keranjang berubah, silakan cek ulang sebelum checkout', 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 409);
         }
-        // --- step 5 - end - validasi state keranjang frontend
+        // --- step 5 - validasi state keranjang frontend - end ---
 
-        // --- step 6 - start - periksa availability produk terpilih
+        // --- step 6 - periksa availability produk terpilih - start ---
         $productSoldOutIds = $this->keranjangService->checkProductUnavailableByIds($productIds);
 
         if (! empty($productSoldOutIds['ids'])) {
@@ -763,9 +763,9 @@ class KeranjangController extends Controller
                 'totalPrice' => $totalPrice,
             ], 409);
         }
-        // --- step 6 - end - periksa availability produk terpilih
+        // --- step 6 - periksa availability produk terpilih - end ---
 
-        // --- step 7 - start - validasi quantity checkout
+        // --- step 7 - validasi quantity checkout - start ---
         $invalidCheckoutKeranjangIds = Keranjang::leftJoin('products', 'keranjangs.product_id', '=', 'products.id')
             ->where('keranjangs.user_id_buyer', $buyerId)
             ->where('keranjangs.checked', 1)
@@ -795,11 +795,11 @@ class KeranjangController extends Controller
 
             return response()->json(['status' => 'error', 'message' => 'Jumlah produk di keranjang berubah, silakan cek ulang sebelum checkout', 'keranjangs' => $keranjangs, 'totalPrice' => $totalPrice], 409);
         }
-        // --- step 7 - end - validasi quantity checkout
+        // --- step 7 - validasi quantity checkout - end ---
 
-        // --- step 8 - start - perbarui item checkout
+        // --- step 8 - perbarui item checkout - start ---
         $this->keranjangService->updateCheckoutKeranjang($buyerId);
-        // --- step 8 - end - perbarui item checkout
+        // --- step 8 - perbarui item checkout - end ---
 
         return response()->json(['status' => 'success', 'message' => 'Checkout validation successful']);
     }

@@ -44,7 +44,7 @@ class PaymentService
      */
     public function getWithdrawalPayments(string $user_id = '', string $search = ''): array
     {
-        // --- step 1 - start - ambil data payment
+        // --- step 1 - ambil data payment - start ---
         $payments = PaymentUser::select(
             'payment_users.id as id',
             'payment_lists.slug as slug',
@@ -67,7 +67,7 @@ class PaymentService
 
         $payments = $payments->orderBy('payment_users.created_at', 'desc')
             ->get();
-        // --- step 1 - end - ambil data payment
+        // --- step 1 - ambil data payment - end ---
 
         return ['status' => 'success', 'payments' => $payments];
     }
@@ -86,16 +86,16 @@ class PaymentService
      */
     public function getWithdrawalPayment(string $user_id, string $account): array
     {
-        // --- step 1 - start - validasi input
+        // --- step 1 - validasi input - start ---
         if (empty($user_id) || trim($user_id) == '') {
             return ['status' => 'error', 'message' => 'user id cannot be empty'];
         }
         if (empty($account) || trim($account) == '') {
             return ['status' => 'error', 'message' => 'payment account cannot be empty'];
         }
-        // --- step 1 - end - validasi input
+        // --- step 1 - validasi input - end ---
 
-        // --- step 2 - start - ambil data payment
+        // --- step 2 - ambil data payment - start ---
         $payment = PaymentUser::from('payment_users as pu')
             ->select(
                 'pu.id',
@@ -121,7 +121,7 @@ class PaymentService
         if (empty($userName) || trim($userName) == '') {
             return ['status' => 'error', 'message' => 'User Name Cannot Be Empty'];
         }
-        // --- step 2 - end - ambil data payment
+        // --- step 2 - ambil data payment - end ---
 
         return ['status' => 'success', 'payment' => $paymentData];
     }

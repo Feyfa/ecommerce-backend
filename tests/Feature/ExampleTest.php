@@ -16,11 +16,11 @@ class ExampleTest extends TestCase
      */
     public function test_the_root_endpoint_returns_backend_health_response(): void
     {
-        // --- step 1 - start - request health tanpa header negara
+        // --- step 1 - request health tanpa header negara - start ---
         $response = $this->get('/');
-        // --- step 1 - end - request health tanpa header negara
+        // --- step 1 - request health tanpa header negara - end ---
 
-        // --- step 2 - start - verifikasi health, negara kosong, dan kebijakan cache
+        // --- step 2 - verifikasi health, negara kosong, dan kebijakan cache - start ---
         $response->assertOk()
             ->assertJson([
                 'status' => 'ok',
@@ -36,7 +36,7 @@ class ExampleTest extends TestCase
 
         $this->assertTrue($response->headers->hasCacheControlDirective('private'));
         $this->assertTrue($response->headers->hasCacheControlDirective('no-store'));
-        // --- step 2 - end - verifikasi health, negara kosong, dan kebijakan cache
+        // --- step 2 - verifikasi health, negara kosong, dan kebijakan cache - end ---
     }
 
     /**
@@ -49,7 +49,7 @@ class ExampleTest extends TestCase
      */
     public function test_the_root_endpoint_preserves_received_country_headers(): void
     {
-        // --- step 1 - start - siapkan waktu tetap dan variasi header diagnostik
+        // --- step 1 - siapkan waktu tetap dan variasi header diagnostik - start ---
         $this->freezeTime();
 
         $countryHeaders = [
@@ -58,9 +58,9 @@ class ExampleTest extends TestCase
             'T1',
             ' id ',
         ];
-        // --- step 1 - end - siapkan waktu tetap dan variasi header diagnostik
+        // --- step 1 - siapkan waktu tetap dan variasi header diagnostik - end ---
 
-        // --- step 2 - start - verifikasi setiap header pada response root
+        // --- step 2 - verifikasi setiap header pada response root - start ---
         foreach ($countryHeaders as $countryHeader) {
             $response = $this->get('/', [
                 'CF-IPCountry' => $countryHeader,
@@ -77,6 +77,6 @@ class ExampleTest extends TestCase
             $this->assertTrue($response->headers->hasCacheControlDirective('private'));
             $this->assertTrue($response->headers->hasCacheControlDirective('no-store'));
         }
-        // --- step 2 - end - verifikasi setiap header pada response root
+        // --- step 2 - verifikasi setiap header pada response root - end ---
     }
 }

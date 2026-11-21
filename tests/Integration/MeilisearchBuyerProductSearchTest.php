@@ -35,15 +35,15 @@ class MeilisearchBuyerProductSearchTest extends TestCase
     {
         parent::setUp();
 
-        // --- step 1 - start - buat identitas index integration yang terisolasi
+        // --- step 1 - buat identitas index integration yang terisolasi - start ---
         $testingIndex = (string) config('buyer_product_search.index');
         $this->assertStringContainsString('testing', $testingIndex);
 
         $this->indexName = $testingIndex.'_integration_'.bin2hex(random_bytes(6));
         config(['buyer_product_search.index' => $this->indexName]);
-        // --- step 1 - end - buat identitas index integration yang terisolasi
+        // --- step 1 - buat identitas index integration yang terisolasi - end ---
 
-        // --- step 2 - start - buat dan konfigurasi index nyata melalui SDK
+        // --- step 2 - buat dan konfigurasi index nyata melalui SDK - start ---
         $this->client = $this->app->make(Client::class);
         $createTask = $this->client->createIndex($this->indexName, ['primaryKey' => 'id']);
         $this->client->waitForTask($createTask['taskUid'], 10_000);
@@ -51,12 +51,12 @@ class MeilisearchBuyerProductSearchTest extends TestCase
 
         $this->searchService = $this->app->make(BuyerProductSearchService::class);
         $this->searchService->configureIndex();
-        // --- step 2 - end - buat dan konfigurasi index nyata melalui SDK
+        // --- step 2 - buat dan konfigurasi index nyata melalui SDK - end ---
 
-        // --- step 3 - start - masukkan fixture document pencarian
+        // --- step 3 - masukkan fixture document pencarian - start ---
         $addTask = $this->client->index($this->indexName)->addDocuments($this->documents(), 'id');
         $this->client->waitForTask($addTask['taskUid'], 10_000);
-        // --- step 3 - end - masukkan fixture document pencarian
+        // --- step 3 - masukkan fixture document pencarian - end ---
     }
 
     /**
@@ -81,7 +81,7 @@ class MeilisearchBuyerProductSearchTest extends TestCase
      */
     public function test_buyer_search_contract_works_against_real_meilisearch(): void
     {
-        // --- step 1 - start - verifikasi typo tolerance dan sinonim aplikasi
+        // --- step 1 - verifikasi typo tolerance dan sinonim aplikasi - start ---
         $typoResult = $this->searchService->search('buyer-1', [
             'search_product' => 'spatu',
             'sort_product' => 'relevance',
@@ -93,9 +93,9 @@ class MeilisearchBuyerProductSearchTest extends TestCase
 
         $this->assertSame(['product-sepatu'], array_column($typoResult['products'], 'id'));
         $this->assertSame(['product-handphone'], array_column($synonymResult['products'], 'id'));
-        // --- step 1 - end - verifikasi typo tolerance dan sinonim aplikasi
+        // --- step 1 - verifikasi typo tolerance dan sinonim aplikasi - end ---
 
-        // --- step 2 - start - verifikasi filter harga dan exclusion seller buyer
+        // --- step 2 - verifikasi filter harga dan exclusion seller buyer - start ---
         $filteredResult = $this->searchService->search('buyer-1', [
             'min_price' => 300_000,
             'max_price' => 400_000,
@@ -104,9 +104,9 @@ class MeilisearchBuyerProductSearchTest extends TestCase
 
         $this->assertSame(['product-sepatu'], array_column($filteredResult['products'], 'id'));
         $this->assertNotContains('product-owned', array_column($filteredResult['products'], 'id'));
-        // --- step 2 - end - verifikasi filter harga dan exclusion seller buyer
+        // --- step 2 - verifikasi filter harga dan exclusion seller buyer - end ---
 
-        // --- step 3 - start - verifikasi sorting harga dan pagination lookahead nyata
+        // --- step 3 - verifikasi sorting harga dan pagination lookahead nyata - start ---
         $sortedResult = $this->searchService->search('buyer-1', [
             'sort_product' => 'price_lowest',
         ], 1, 10);
@@ -127,7 +127,7 @@ class MeilisearchBuyerProductSearchTest extends TestCase
         $this->assertSame(['product-laptop'], array_column($secondPage['products'], 'id'));
         $this->assertFalse($secondPage['has_more']);
         $this->assertFalse($secondPage['limit_reached']);
-        // --- step 3 - end - verifikasi sorting harga dan pagination lookahead nyata
+        // --- step 3 - verifikasi sorting harga dan pagination lookahead nyata - end ---
     }
 
     /**
@@ -221,7 +221,7 @@ class MeilisearchBuyerProductSearchTest extends TestCase
      */
     public function test_fifty_product_pages_return_all_fifty_one_products_without_duplicates(): void
     {
-        // --- step 1 - start - masukkan 51 fixture dengan keyword khusus dan urutan harga stabil
+        // --- step 1 - masukkan 51 fixture dengan keyword khusus dan urutan harga stabil - start ---
         $documents = [];
 
         for ($index = 1; $index <= 51; $index++) {
@@ -240,9 +240,9 @@ class MeilisearchBuyerProductSearchTest extends TestCase
             'search_product' => 'Fifty Pagination Fixture',
             'sort_product' => 'price_lowest',
         ];
-        // --- step 1 - end - masukkan 51 fixture dengan keyword khusus dan urutan harga stabil
+        // --- step 1 - masukkan 51 fixture dengan keyword khusus dan urutan harga stabil - end ---
 
-        // --- step 2 - start - verifikasi dua halaman beserta metadata dan kelengkapan ID
+        // --- step 2 - verifikasi dua halaman beserta metadata dan kelengkapan ID - start ---
         $firstPage = $this->searchService->search('buyer-1', $filters, 1, 50);
         $secondPage = $this->searchService->search('buyer-1', $filters, 2, 50);
         $expectedIds = array_column($documents, 'id');
@@ -261,7 +261,7 @@ class MeilisearchBuyerProductSearchTest extends TestCase
         $this->assertFalse($secondPage['has_more']);
         $this->assertFalse($secondPage['limit_reached']);
         $this->assertSame($expectedIds, [...$firstIds, ...$secondIds]);
-        // --- step 2 - end - verifikasi dua halaman beserta metadata dan kelengkapan ID
+        // --- step 2 - verifikasi dua halaman beserta metadata dan kelengkapan ID - end ---
     }
 
     /**
@@ -274,7 +274,7 @@ class MeilisearchBuyerProductSearchTest extends TestCase
      */
     public function test_fifty_product_pages_stop_at_ten_thousand_results_without_querying_the_next_page(): void
     {
-        // --- step 1 - start - siapkan hasil yang melampaui batas index aplikasi
+        // --- step 1 - siapkan hasil yang melampaui batas index aplikasi - start ---
         $this->assertSame(10000, config('buyer_product_search.max_total_hits'));
         $documents = [];
 
@@ -298,9 +298,9 @@ class MeilisearchBuyerProductSearchTest extends TestCase
         // Dokumen di luar batas benar-benar tersimpan; hasil terminal bukan akibat fixture habis.
         $extraDocument = $this->client->index($this->indexName)->getDocument('boundary-10001');
         $this->assertSame('boundary-10001', $extraDocument['id']);
-        // --- step 1 - end - siapkan hasil yang melampaui batas index aplikasi
+        // --- step 1 - siapkan hasil yang melampaui batas index aplikasi - end ---
 
-        // --- step 2 - start - verifikasi transisi halaman sebelum batas menuju halaman terminal
+        // --- step 2 - verifikasi transisi halaman sebelum batas menuju halaman terminal - start ---
         $penultimatePage = $this->searchService->search('buyer-1', $filters, 199, 50);
         $lastPage = $this->searchService->search('buyer-1', $filters, 200, 50);
         $expectedIds = array_column($documents, 'id');
@@ -316,9 +316,9 @@ class MeilisearchBuyerProductSearchTest extends TestCase
         $this->assertSame(50, $lastPage['per_page']);
         $this->assertFalse($lastPage['has_more']);
         $this->assertTrue($lastPage['limit_reached']);
-        // --- step 2 - end - verifikasi transisi halaman sebelum batas menuju halaman terminal
+        // --- step 2 - verifikasi transisi halaman sebelum batas menuju halaman terminal - end ---
 
-        // --- step 3 - start - pastikan halaman setelah batas tidak mengakses Meilisearch
+        // --- step 3 - pastikan halaman setelah batas tidak mengakses Meilisearch - start ---
         $client = Mockery::mock(Client::class);
         $client->shouldNotReceive('index');
         $service = new BuyerProductSearchService(
@@ -333,7 +333,7 @@ class MeilisearchBuyerProductSearchTest extends TestCase
             'has_more' => false,
             'limit_reached' => true,
         ], $service->search('buyer-1', $filters, 201, 50));
-        // --- step 3 - end - pastikan halaman setelah batas tidak mengakses Meilisearch
+        // --- step 3 - pastikan halaman setelah batas tidak mengakses Meilisearch - end ---
     }
 
     /**

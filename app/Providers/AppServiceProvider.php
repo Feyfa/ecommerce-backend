@@ -65,7 +65,7 @@ class AppServiceProvider extends ServiceProvider
             return;
         }
 
-        // --- step 1 - start - resolve konfigurasi final termasuk override DATABASE_URL
+        // --- step 1 - resolve konfigurasi final termasuk override DATABASE_URL - start ---
         $connectionName = $this->configurationString('database.default');
         $connectionConfig = config("database.connections.{$connectionName}");
 
@@ -78,9 +78,9 @@ class AppServiceProvider extends ServiceProvider
         $resolvedConfig = (new ConfigurationUrlParser)->parseConfiguration($connectionConfig);
         $connection = (string) ($resolvedConfig['driver'] ?? $connectionName);
         $database = (string) ($resolvedConfig['database'] ?? '');
-        // --- step 1 - end - resolve konfigurasi final termasuk override DATABASE_URL
+        // --- step 1 - resolve konfigurasi final termasuk override DATABASE_URL - end ---
 
-        // --- step 2 - start - izinkan SQLite memory atau database yang namanya eksplisit testing
+        // --- step 2 - izinkan SQLite memory atau database yang namanya eksplisit testing - start ---
         $usesInMemorySqlite = $connection === 'sqlite' && $database === ':memory:';
         $usesNamedTestingDatabase = $this->hasTestingIdentifier(basename($database));
 
@@ -90,7 +90,7 @@ class AppServiceProvider extends ServiceProvider
                 .'Use SQLite :memory: or a database whose name explicitly contains test/testing.'
             );
         }
-        // --- step 2 - end - izinkan SQLite memory atau database yang namanya eksplisit testing
+        // --- step 2 - izinkan SQLite memory atau database yang namanya eksplisit testing - end ---
     }
 
     /**
@@ -111,7 +111,7 @@ class AppServiceProvider extends ServiceProvider
             return;
         }
 
-        // --- step 1 - start - pastikan standard test tidak memakai driver eksternal
+        // --- step 1 - pastikan standard test tidak memakai driver eksternal - start ---
         $queueConnection = $this->configurationString('queue.default');
         $cacheStore = $this->configurationString('cache.default');
 
@@ -121,9 +121,9 @@ class AppServiceProvider extends ServiceProvider
                 .'Use the sync queue and array cache for the standard test suite.'
             );
         }
-        // --- step 1 - end - pastikan standard test tidak memakai driver eksternal
+        // --- step 1 - pastikan standard test tidak memakai driver eksternal - end ---
 
-        // --- step 2 - start - validasi namespace dan koneksi Redis testing
+        // --- step 2 - validasi namespace dan koneksi Redis testing - start ---
         $redisHost = $this->configurationString('database.redis.default.host');
         $redisPrefix = $this->configurationString('database.redis.options.prefix');
         $redisDatabase = $this->configurationString('database.redis.default.database');
@@ -140,9 +140,9 @@ class AppServiceProvider extends ServiceProvider
                 .'Use loopback Redis databases 14/15 and a prefix containing test/testing.'
             );
         }
-        // --- step 2 - end - validasi namespace dan koneksi Redis testing
+        // --- step 2 - validasi namespace dan koneksi Redis testing - end ---
 
-        // --- step 3 - start - validasi host dan index Meilisearch testing
+        // --- step 3 - validasi host dan index Meilisearch testing - start ---
         $meilisearchHost = $this->configurationString('meilisearch.host');
         $meilisearchHostname = (string) parse_url($meilisearchHost, PHP_URL_HOST);
         $meilisearchIndex = $this->configurationString('buyer_product_search.index');
@@ -156,7 +156,7 @@ class AppServiceProvider extends ServiceProvider
                 .'Use a loopback host and an index containing test/testing.'
             );
         }
-        // --- step 3 - end - validasi host dan index Meilisearch testing
+        // --- step 3 - validasi host dan index Meilisearch testing - end ---
     }
 
     /**
