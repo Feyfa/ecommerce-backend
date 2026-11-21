@@ -48,6 +48,23 @@ Important local fields:
 - `transaction_invoices.expired_at`
 - `transaction_users.status`
 
+## Adapter Result Contract
+
+The Xendit adapter returns a result with keys determined by its status:
+
+- Success returns `status` and the decoded provider payload in `data`.
+  VA creation retains the legacy status `suceess`. Pool and fixed VA simulations
+  and disbursement use `success`.
+- Failure returns `status: error` and a string `message`. For HTTP client errors,
+  a string from the provider, including an empty string, is returned as received.
+  A missing or non-string message, an empty body, or a non-JSON body yields
+  `Unknown error`.
+
+Checkout requires a payload containing `account_number` and `external_id` as
+non-blank strings before saving the invoice. Missing or invalid fields are
+handled as a payment error within the checkout transaction. See
+[Buyer Checkout](../buyer/checkout.md#payment-behavior).
+
 ## Fixed Virtual Account Simulation
 
 `POST /api/payment/simulate/charge-virtual-account` is the existing authenticated

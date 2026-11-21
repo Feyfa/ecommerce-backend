@@ -273,10 +273,13 @@ class SaldoController extends Controller
             account_number: $paymentAccount,
             description: "Transfer Rekening $paymentSlugUpper Sebesar Rp$wihtdrawPriceString"
         );
-        $status = $disbursement['status'] ?? '';
-        $message = $disbursement['message'] ?? '';
-        if ($status == 'error') {
-            return response()->json(['status' => 'error', 'message' => $message], 400);
+
+        // Penolakan provider harus keluar sebelum saldo atau riwayat diubah.
+        if ($disbursement['status'] === 'error') {
+            return response()->json([
+                'status' => 'error',
+                'message' => $disbursement['message'],
+            ], 400);
         }
         // --- step 5 - proses penarikan saldo - end ---
 

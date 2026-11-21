@@ -18,14 +18,23 @@ use App\Services\CheckoutService;
 use App\Services\OutboxRecorderService;
 use App\Services\PaymentService;
 use App\Services\XenditService;
+use GuzzleHttp\Client;
+use GuzzleHttp\Handler\MockHandler;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Psr7\Response;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Testing\TestResponse;
 use Mockery\MockInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Symfony\Component\HttpFoundation\Response as HttpStatus;
 use Tests\TestCase;
 
 class CheckoutTest extends TestCase
 {
     use RefreshDatabase;
+
+    private const JNT_CHECKOUT_SHIPPING = 15000;
 
     protected CheckoutService $checkoutService;
 
@@ -440,55 +449,33 @@ class CheckoutTest extends TestCase
     {
         $this->withoutMiddleware();
 
-        // --- step 1 - siapkan checkout yang valid beserta metode pembayaran - start ---
+        // --- step 1 - Siapkan fixture checkout - start ---
         $fixture = $this->createCheckoutLockFixture();
         $buyer = $fixture['buyer'];
-        $buyerAddress = $fixture['buyerAddress'];
-        $cart = $fixture['cart'];
-
-        PaymentList::create([
-            'type' => 'incoming',
-            'method' => 'va',
-            'slug' => 'bca',
-            'name' => 'BCA Virtual Account',
-        ]);
-        // --- step 1 - siapkan checkout yang valid beserta metode pembayaran - end ---
+        $paymentAccount = '001659999724432';
+        $paymentReference = 'va-bca-checkout-test';
+        $this->enableCheckoutPayment();
+        // --- step 1 - Siapkan fixture checkout - end ---
 
         // --- step 2 - palsukan pembuatan virtual account agar test tidak memanggil provider - start ---
-        $this->mock(XenditService::class, function (MockInterface $mock): void {
+        $this->mock(XenditService::class, function (MockInterface $mock) use (
+            $paymentAccount,
+            $paymentReference,
+        ): void {
             $mock->shouldReceive('createVirtualAccount')
                 ->once()
                 ->andReturn([
-                    'status' => 'success',
+                    'status' => 'suceess',
                     'data' => [
-                        'account_number' => '381659999724432',
-                        'external_id' => 'va-bca-checkout-test',
+                        'account_number' => $paymentAccount,
+                        'external_id' => $paymentReference,
                     ],
                 ]);
         });
         // --- step 2 - palsukan pembuatan virtual account agar test tidak memanggil provider - end ---
 
         // --- step 3 - proses checkout dan periksa identitas pesanan pada response - start ---
-        $response = $this->actingAs($buyer)
-            ->postJson('/api/checkout/process', [
-                'payment_slug' => 'bca',
-                'shipping_options' => [[
-                    'user_id_seller' => $fixture['seller']->id,
-                    'kurir_name' => 'JNT',
-                ]],
-                'noteds' => [[
-                    'user_id_seller' => $fixture['seller']->id,
-                    'noted' => '',
-                ]],
-                'client_snapshot' => [
-                    'alamat_id' => $buyerAddress->id,
-                    'alamat_updated_at' => $buyerAddress->updated_at?->toJSON(),
-                    'cart_item_ids' => [$cart->id],
-                    'total_product' => 10000,
-                    'total_shipping' => 15000,
-                    'total_all' => 25000,
-                ],
-            ])
+        $response = $this->processCheckoutFixture($fixture)
             ->assertOk()
             ->assertJson([
                 'status' => 'success',
@@ -502,6 +489,8 @@ class CheckoutTest extends TestCase
         $this->assertDatabaseHas('transaction_users', ['transaction_invoice_id' => $invoice->id]);
 
         $response->assertJsonPath('transaction_invoice_id', $invoice->id);
+        $this->assertSame($paymentAccount, $invoice->payment_account);
+        $this->assertSame($paymentReference, $invoice->payment_reference);
         // --- step 4 - pastikan id invoice pada response cocok dengan baris yang tersimpan - end ---
 
         // --- step 5 - pastikan stok terbaru dicatat durable bersama checkout - start ---
@@ -516,6 +505,140 @@ class CheckoutTest extends TestCase
         ], $outbox->payload);
         Queue::assertNothingPushed();
         // --- step 5 - pastikan stok terbaru dicatat durable bersama checkout - end ---
+    }
+
+    /**
+     * Verifies rejected provider responses leave the checkout available for review.
+     *
+     * @param  int  $status  HTTP status supplied by the fake provider.
+     * @param  string  $body  Body returned by the fake provider.
+     * @param  string  $message  Expected error shown to the buyer.
+     *
+     * @return void Checks the response and related checkout state.
+     */
+    #[DataProvider('rejectedProviderResponses')]
+    public function test_checkout_rejects_unusable_provider_responses(
+        int $status,
+        string $body,
+        string $message,
+    ): void {
+        // --- step 1 - Prepare the buyer checkout - start ---
+        $this->withoutMiddleware();
+        $fixture = $this->createCheckoutLockFixture();
+        $stockBefore = $fixture['product']->stock;
+        $this->enableCheckoutPayment();
+        // --- step 1 - Prepare the buyer checkout - end ---
+
+        // --- step 2 - Supply a fake provider response - start ---
+        $handler = HandlerStack::create(new MockHandler([new Response($status, [], $body)]));
+        $client = new Client(['handler' => $handler]);
+        $this->instance(XenditService::class, new XenditService('test-key', $client));
+        // --- step 2 - Supply a fake provider response - end ---
+
+        // --- step 3 - Submit the checkout - start ---
+        $response = $this->processCheckoutFixture($fixture);
+        // --- step 3 - Submit the checkout - end ---
+
+        // --- step 4 - Check the rejection - start ---
+        $response->assertBadRequest()->assertExactJson(['status' => 'error', 'message' => $message]);
+        // --- step 4 - Check the rejection - end ---
+
+        // --- step 5 - Check checkout state after rejection - start ---
+        // A buyer must retain their cart if the provider response cannot create an invoice.
+        $this->assertDatabaseCount('transaction_invoices', 0);
+        $this->assertDatabaseCount('outbox_messages', 0);
+        $this->assertDatabaseHas('keranjangs', ['id' => $fixture['cart']->id, 'checkout' => true]);
+        $this->assertSame($stockBefore, $fixture['product']->refresh()->stock);
+        // --- step 5 - Check checkout state after rejection - end ---
+    }
+
+    /**
+     * Covers unusable provider responses while preserving the empty-payload error.
+     *
+     * @return array<string, array{int, string, string}> Fake HTTP status, body, and API message.
+     */
+    public static function rejectedProviderResponses(): array
+    {
+        return [
+            'unexpected scalar' => [HttpStatus::HTTP_OK, 'true', 'Payment creation failed'],
+            'existing empty-payload handling' => [HttpStatus::HTTP_OK, 'null', 'Data Xendit Empty'],
+            'missing payment identifiers' => [
+                HttpStatus::HTTP_OK,
+                '{"id":"fake-va"}',
+                'Payment creation failed',
+            ],
+            'missing virtual account number' => [
+                HttpStatus::HTTP_OK,
+                '{"external_id":"va-checkout-test"}',
+                'Payment creation failed',
+            ],
+            'missing payment reference' => [
+                HttpStatus::HTTP_OK,
+                '{"account_number":"001234"}',
+                'Payment creation failed',
+            ],
+            'blank payment reference' => [
+                HttpStatus::HTTP_OK,
+                '{"account_number":"001234","external_id":"  "}',
+                'Payment creation failed',
+            ],
+            'non-string virtual account number' => [
+                HttpStatus::HTTP_OK,
+                '{"account_number":1234,"external_id":"va-checkout-test"}',
+                'Payment creation failed',
+            ],
+            'non-string error' => [
+                HttpStatus::HTTP_BAD_REQUEST,
+                '{"message":["invalid"]}',
+                'Unknown error',
+            ],
+        ];
+    }
+
+    /**
+     * Enables BCA VA so the fixture can reach the payment provider.
+     *
+     * @return void Creates the payment option expected by the submitted quote.
+     */
+    private function enableCheckoutPayment(): void
+    {
+        PaymentList::create([
+            'type' => 'incoming',
+            'method' => 'va',
+            'slug' => 'bca',
+            'name' => 'BCA Virtual Account',
+        ]);
+    }
+
+    /**
+     * Submits the same valid quote for both accepted and rejected provider responses.
+     *
+     * @param  array{
+     *     buyer: User, seller: User, buyerAddress: Alamat, product: Product, cart: Keranjang
+     * }  $fixture  Buyer checkout data.
+     *
+     * @return TestResponse Endpoint response before assertions.
+     */
+    private function processCheckoutFixture(array $fixture): TestResponse
+    {
+        // Use the fixture's product price to quote the same cart the server will validate.
+        $productTotal = $fixture['product']->price;
+        $jntShipping = self::JNT_CHECKOUT_SHIPPING;
+        $snapshot = [
+            'alamat_id' => $fixture['buyerAddress']->id,
+            'alamat_updated_at' => $fixture['buyerAddress']->updated_at?->toJSON(),
+            'cart_item_ids' => [$fixture['cart']->id],
+            'total_product' => $productTotal,
+            'total_shipping' => $jntShipping,
+            'total_all' => $productTotal + $jntShipping,
+        ];
+
+        return $this->actingAs($fixture['buyer'])->postJson('/api/checkout/process', [
+            'payment_slug' => 'bca',
+            'shipping_options' => [['user_id_seller' => $fixture['seller']->id, 'kurir_name' => 'JNT']],
+            'noteds' => [['user_id_seller' => $fixture['seller']->id, 'noted' => '']],
+            'client_snapshot' => $snapshot,
+        ]);
     }
 
     /**

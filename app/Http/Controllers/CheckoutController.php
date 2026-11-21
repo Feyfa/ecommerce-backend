@@ -260,13 +260,16 @@ class CheckoutController extends Controller
                 $expected_amount,
                 $expired_at_xendit,
             ) {
+                // --- step 7.1 - kunci item checkout - start ---
                 // Data dikunci dan diverifikasi lagi karena seller dapat mengubah produk
                 // setelah buyer membuka halaman checkout atau setelah snapshot awal dibuat.
                 $this->checkoutService->lockAndValidateCheckoutItems(
                     $user_id_buyer,
                     $checkoutSnapshot,
                 );
+                // --- step 7.1 - kunci item checkout - end ---
 
+                // --- step 7.2 - buat virtual account - start ---
                 // Payment baru dibuat setelah data checkout lolos validasi row-lock,
                 // sehingga item invalid tidak menghasilkan virtual account yatim.
                 $resultXendit = $this->xenditService->createVirtualAccount(
@@ -280,11 +283,23 @@ class CheckoutController extends Controller
                     expected_amount: $expected_amount,
                     expiration_date: $expired_at_xendit,
                 );
+                // --- step 7.2 - buat virtual account - end ---
 
-                if (($resultXendit['status'] ?? 'error') === 'error') {
-                    throw new RuntimeException($resultXendit['message'] ?? 'Payment creation failed');
+                // --- step 7.3 - validasi respons Xendit - start ---
+                // Tolak payload skalar sebelum penyimpanan invoice, cart, dan stok.
+                // Data null tetap mengikuti validasi payload kosong di service.
+                if ($resultXendit['status'] === 'error') {
+                    throw new RuntimeException($resultXendit['message']);
                 }
 
+                $dataXendit = $resultXendit['data'] ?? [];
+
+                if (! is_array($dataXendit)) {
+                    throw new RuntimeException('Payment creation failed');
+                }
+                // --- step 7.3 - validasi respons Xendit - end ---
+
+                // --- step 7.4 - simpan invoice checkout - start ---
                 $saveCheckoutToDatabase = $this->checkoutService->saveCheckoutToDatabase(
                     user_id_buyer: $user_id_buyer,
                     checkouts: $checkoutSnapshot['data']['checkouts'] ?? [],
@@ -297,13 +312,15 @@ class CheckoutController extends Controller
                     expired_at: $expired_at_transaction,
                     price: intval($checkoutSnapshot['clientComparable']['total_all'] ?? 0),
                     checkout_key: $checkoutKey,
-                    dataXendit: $resultXendit['data'] ?? []
+                    dataXendit: $dataXendit
                 );
 
                 if ($saveCheckoutToDatabase['status'] == 'error') {
                     throw new RuntimeException($saveCheckoutToDatabase['message'] ?? 'Save checkout failed');
                 }
+                // --- step 7.4 - simpan invoice checkout - end ---
 
+                // --- step 7.5 - hapus item keranjang yang diproses - start ---
                 $deleteKeranjangAfterCheckout = $this->checkoutService->deleteKeranjangAfterCheckoutForBuyer(
                     user_id_buyer: $user_id_buyer,
                     checkouts: $checkoutSnapshot['data']['checkouts'] ?? []
@@ -312,7 +329,9 @@ class CheckoutController extends Controller
                 if ($deleteKeranjangAfterCheckout['status'] == 'error') {
                     throw new RuntimeException($deleteKeranjangAfterCheckout['message'] ?? 'Delete keranjang failed');
                 }
+                // --- step 7.5 - hapus item keranjang yang diproses - end ---
 
+                // --- step 7.6 - kurangi stok produk - start ---
                 $changeStockProductAfterCheckout = $this->checkoutService->changeStockProductAfterCheckout(
                     checkouts: $checkoutSnapshot['data']['checkouts'] ?? []
                 );
@@ -325,7 +344,9 @@ class CheckoutController extends Controller
                         ),
                     );
                 }
+                // --- step 7.6 - kurangi stok produk - end ---
 
+                // Catat sinkronisasi katalog di transaksi yang sama dengan perubahan stok.
                 $this->recordCheckoutProductOutbox($checkoutSnapshot['data']['checkouts'] ?? []);
 
                 // Id invoice dikembalikan dari dalam transaksi database supaya frontend dapat menandai

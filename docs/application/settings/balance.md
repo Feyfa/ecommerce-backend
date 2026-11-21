@@ -112,6 +112,10 @@ Side effects:
 - Creates a withdrawal balance history row.
 - Returns the new balance history item.
 
+An Xendit rejection returns HTTP 400 with the message from the
+[Xendit adapter](../integrations/xendit.md#adapter-result-contract) before the
+controller attempts to change the balance or write a history row.
+
 The returned history item uses the same description and amount representation
 as the history list.
 
