@@ -8,7 +8,9 @@ use App\Models\SaldoUser;
 use App\Models\User;
 use App\Services\SaldoService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Mockery\MockInterface;
+use PDO;
 use Tests\TestCase;
 
 class SaldoReadControllerTest extends TestCase
@@ -22,6 +24,8 @@ class SaldoReadControllerTest extends TestCase
     private const INCOME = 125_000;
 
     private const REFUND = 25_000;
+
+    private const HISTORY_PRICE = 450_000;
 
     /**
      * Keeps the API request flow local while exercising Laravel's request user resolver.
@@ -105,6 +109,55 @@ class SaldoReadControllerTest extends TestCase
             ->assertJsonCount(1, 'saldoHistory')
             ->assertJsonPath('saldoHistory.0.id', $included->id);
         // --- step 3 - verify the matching history row - end ---
+    }
+
+    /**
+     * Covers the history amount representation observed in the deployed API.
+     *
+     * @return void The list JSON and withdrawal detail preserve a numeric string from PDO.
+     */
+    public function test_history_preserves_amounts_fetched_as_numeric_strings(): void
+    {
+        // --- step 1 - create a withdrawal history fixture - start ---
+        $owner = User::factory()->create();
+        $this->actingAs($owner);
+
+        $history = SaldoHistory::create([
+            'user_id' => $owner->id,
+            'type' => 'withdrawal',
+            'price' => self::HISTORY_PRICE,
+        ]);
+        // --- step 1 - create a withdrawal history fixture - end ---
+
+        // --- step 2 - read history with numeric strings - start ---
+        // Restore PDO behavior because RefreshDatabase reuses this test connection.
+        $pdo = DB::connection()->getPdo();
+        $previousStringify = $pdo->getAttribute(PDO::ATTR_STRINGIFY_FETCHES);
+
+        $pdo->setAttribute(PDO::ATTR_STRINGIFY_FETCHES, true);
+
+        try {
+            $list = $this->getJson(self::HISTORY_ENDPOINT);
+            $detail = app(SaldoService::class)->getSaldoById($history->id);
+        } finally {
+            $pdo->setAttribute(PDO::ATTR_STRINGIFY_FETCHES, $previousStringify);
+        }
+        // --- step 2 - read history with numeric strings - end ---
+
+        // --- step 3 - verify the serialized history amount - start ---
+        $list->assertOk()
+            ->assertJsonPath('status', 'success')
+            ->assertJsonCount(1, 'saldoHistory')
+            ->assertJsonPath('saldoHistory.0.id', $history->id)
+            ->assertJsonPath('saldoHistory.0.price', (string) self::HISTORY_PRICE)
+            ->assertJsonPath(
+                'saldoHistory.0.description',
+                'Penarikan Saldo Sebesar Rp450.000 Ke Bank   ()',
+            );
+
+        $this->assertSame('success', $detail['status']);
+        $this->assertSame($list->json('saldoHistory.0'), $detail['saldoHistory']);
+        // --- step 3 - verify the serialized history amount - end ---
     }
 
     /**
