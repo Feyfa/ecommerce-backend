@@ -121,27 +121,12 @@ parameters:
 			path: app/Services/CheckoutService.php
 
 		-
-			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:buildCheckoutSnapshot\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
 			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:changeStockProductAfterCheckout\\(\\) has parameter \\$checkouts with no value type specified in iterable type array\\.$#"
 			count: 1
 			path: app/Services/CheckoutService.php
 
 		-
 			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:changeStockProductAfterCheckout\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:checkoutCartIds\\(\\) has parameter \\$checkouts with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:checkoutSnapshotChanged\\(\\) has parameter \\$backendSnapshot with no value type specified in iterable type array\\.$#"
 			count: 1
 			path: app/Services/CheckoutService.php
 
@@ -157,26 +142,6 @@ parameters:
 
 		-
 			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:deleteKeranjangAfterCheckoutForBuyer\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:formatCheckoutSnapshotForFrontend\\(\\) has parameter \\$checkoutSnapshot with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:formatCheckoutSnapshotForFrontend\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:generateCheckoutKey\\(\\) has parameter \\$checkoutSnapshot with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:lockAndValidateCheckoutItems\\(\\) has parameter \\$checkoutSnapshot with no value type specified in iterable type array\\.$#"
 			count: 1
 			path: app/Services/CheckoutService.php
 

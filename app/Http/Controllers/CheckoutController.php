@@ -125,18 +125,15 @@ class CheckoutController extends Controller
     }
 
     /**
-     * Memvalidasi ulang dan memproses pembayaran checkout buyer.
+     * Memproses pembayaran setelah checkout aktual cocok dengan snapshot yang dilihat buyer.
      *
-     * Payload frontend dibandingkan dengan snapshot backend terbaru setelah cart dan produk dikunci
-     * serta divalidasi ulang. Virtual account dibuat sebelum invoice dan transaksi disimpan; kegagalan
-     * availability membuka lock dan mengembalikan state yang perlu dimuat ulang tanpa membuat pesanan
-     * parsial.
+     * Snapshot frontend dibandingkan sebelum lock checkout diambil. Cart, produk, dan alamat
+     * diperiksa kembali pada baris yang terkunci sebelum Xendit diminta membuat Virtual Account.
+     * Jika ketersediaan berubah, transaksi di-rollback sebelum pilihan item dilepas.
      *
      * @param  Request  $request  Data pembayaran dan snapshot checkout.
      *
-     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
-     *                      Respons sukses menyertakan id invoice yang dibuat agar frontend dapat menandai
-     *                      transaksi hasil checkout ini pada halaman transaksi buyer.
+     * @return JsonResponse Hasil checkout dengan ID invoice saat berhasil, atau alasan penolakan.
      */
     public function processCheckout(Request $request): JsonResponse
     {
@@ -178,18 +175,18 @@ class CheckoutController extends Controller
             paymentSlug: $request->payment_slug ?? '',
         );
 
-        if (($checkoutSnapshot['status'] ?? '') == 'invalid') {
+        if ($checkoutSnapshot['status'] === 'invalid') {
             return response()->json([
                 'status' => 'error',
-                'code' => $checkoutSnapshot['code'] ?? 'CHECKOUT_INVALID',
-                'message' => $checkoutSnapshot['message'] ?? 'Keranjang berubah, silakan cek ulang',
+                'code' => $checkoutSnapshot['code'],
+                'message' => $checkoutSnapshot['message'],
             ], 409);
         }
 
-        if (($checkoutSnapshot['status'] ?? '') == 'error') {
+        if ($checkoutSnapshot['status'] === 'error') {
             return response()->json([
                 'status' => 'error',
-                'message' => $checkoutSnapshot['message'] ?? 'Checkout tidak valid',
+                'message' => $checkoutSnapshot['message'],
             ], 400);
         }
 
@@ -239,7 +236,7 @@ class CheckoutController extends Controller
             $currency = 'IDR';
             $is_single_use = true;
             $is_closed = true;
-            $expected_amount = intval($checkoutSnapshot['clientComparable']['total_all'] ?? 0);
+            $expected_amount = intval($checkoutSnapshot['clientComparable']['total_all']);
 
             $expired_at = Carbon::now()->addDay()->setMinutes(0)->setSeconds(0)->setMicroseconds(0);
             $expired_at_xendit = $expired_at->toIso8601String();
@@ -304,15 +301,15 @@ class CheckoutController extends Controller
                 // --- step 7.4 - simpan invoice checkout - start ---
                 $saveCheckoutToDatabase = $this->checkoutService->saveCheckoutToDatabase(
                     user_id_buyer: $user_id_buyer,
-                    checkouts: $checkoutSnapshot['data']['checkouts'] ?? [],
-                    kurirs: $checkoutSnapshot['data']['kurirs'] ?? [],
-                    noteds: $checkoutSnapshot['data']['noteds'] ?? [],
-                    alamat_buyer: $checkoutSnapshot['data']['alamat'] ?? null,
+                    checkouts: $checkoutSnapshot['data']['checkouts'],
+                    kurirs: $checkoutSnapshot['data']['kurirs'],
+                    noteds: $checkoutSnapshot['data']['noteds'],
+                    alamat_buyer: $checkoutSnapshot['data']['alamat'],
                     payment_method: $checkoutSnapshot['data']['payment']['method'] ?? '',
                     payment_slug: $checkoutSnapshot['data']['payment']['slug'] ?? '',
                     payment_name: $checkoutSnapshot['data']['payment']['name'] ?? '',
                     expired_at: $expired_at_transaction,
-                    price: intval($checkoutSnapshot['clientComparable']['total_all'] ?? 0),
+                    price: intval($checkoutSnapshot['clientComparable']['total_all']),
                     checkout_key: $checkoutKey,
                     dataXendit: $dataXendit
                 );
@@ -325,7 +322,7 @@ class CheckoutController extends Controller
                 // --- step 7.5 - hapus item keranjang yang diproses - start ---
                 $deleteKeranjangAfterCheckout = $this->checkoutService->deleteKeranjangAfterCheckoutForBuyer(
                     user_id_buyer: $user_id_buyer,
-                    checkouts: $checkoutSnapshot['data']['checkouts'] ?? []
+                    checkouts: $checkoutSnapshot['data']['checkouts']
                 );
 
                 if ($deleteKeranjangAfterCheckout['status'] == 'error') {
@@ -335,21 +332,21 @@ class CheckoutController extends Controller
 
                 // --- step 7.6 - kurangi stok produk - start ---
                 $changeStockProductAfterCheckout = $this->checkoutService->changeStockProductAfterCheckout(
-                    checkouts: $checkoutSnapshot['data']['checkouts'] ?? []
+                    checkouts: $checkoutSnapshot['data']['checkouts']
                 );
 
                 if ($changeStockProductAfterCheckout['status'] == 'error') {
                     throw new CheckoutAvailabilityException(
                         $changeStockProductAfterCheckout['message'] ?? 'Change stock product failed',
                         $this->checkoutService->checkoutCartIds(
-                            checkouts: $checkoutSnapshot['data']['checkouts'] ?? [],
+                            checkouts: $checkoutSnapshot['data']['checkouts'],
                         ),
                     );
                 }
                 // --- step 7.6 - kurangi stok produk - end ---
 
                 // Catat sinkronisasi katalog di transaksi yang sama dengan perubahan stok.
-                $this->recordCheckoutProductOutbox($checkoutSnapshot['data']['checkouts'] ?? []);
+                $this->recordCheckoutProductOutbox($checkoutSnapshot['data']['checkouts']);
 
                 // Id invoice dikembalikan dari dalam transaksi database supaya frontend dapat menandai
                 // transaksi hasil checkout ini secara langsung, bukan menebak data terbaru buyer.
@@ -375,11 +372,11 @@ class CheckoutController extends Controller
                 paymentSlug: $request->payment_slug ?? '',
             );
 
-            if (($currentSnapshot['status'] ?? '') !== 'success') {
+            if ($currentSnapshot['status'] !== 'success') {
                 return response()->json([
                     'status' => 'error',
                     'code' => $currentSnapshot['code'] ?? 'CHECKOUT_INVALID',
-                    'message' => $currentSnapshot['message'] ?? 'Checkout tidak lagi dapat diproses',
+                    'message' => $currentSnapshot['message'],
                 ], 409);
             }
 
