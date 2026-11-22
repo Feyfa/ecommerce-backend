@@ -39,6 +39,16 @@ use App\Models\Product;
  *     stock_issue: StockIssue|null,
  *     is_selectable: bool
  * }
+ * @phpstan-type CartState array{
+ *     totalPrice: int|float,
+ *     keranjangs: array<string, list<CartItem>>,
+ *     unavailableSelectedItemIds: list<string>,
+ *     unavailableSelectedReasons: array<string, string>,
+ *     unavailableCheckoutItemIds: list<string>,
+ *     unavailableCheckoutReasons: array<string, string>,
+ *     stockIssues: list<StockIssue>,
+ *     selectedStockIssues: list<StockIssue>
+ * }
  */
 class KeranjangService
 {
@@ -60,16 +70,7 @@ class KeranjangService
      *
      * @param  string  $user_id_buyer  ID buyer pemilik cart, alamat, atau transaksi.
      *
-     * @return array{
-     *     totalPrice: int|float,
-     *     keranjangs: array<string, list<CartItem>>,
-     *     unavailableSelectedItemIds: list<string>,
-     *     unavailableSelectedReasons: array<string, string>,
-     *     unavailableCheckoutItemIds: list<string>,
-     *     unavailableCheckoutReasons: array<string, string>,
-     *     stockIssues: list<StockIssue>,
-     *     selectedStockIssues: list<StockIssue>
-     * } State keranjang per seller setelah read-repair beserta issue dari pilihan awal buyer.
+     * @return CartState State keranjang per seller beserta issue dari pilihan awal buyer.
      */
     public function getKeranjangs(string $user_id_buyer = ''): array
     {

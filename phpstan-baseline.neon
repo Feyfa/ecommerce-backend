@@ -12,7 +12,7 @@ parameters:
 
 		-
 			message: "#^Cannot access property \\$id on mixed\\.$#"
-			count: 2
+			count: 1
 			path: app/Http/Controllers/CheckoutController.php
 
 		-
@@ -96,26 +96,6 @@ parameters:
 			path: app/Http/Controllers/TransactionController.php
 
 		-
-			message: "#^Access to an undefined property App\\\\Models\\\\Keranjang\\:\\:\\$k_total_price\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Cannot access offset 'k_user_id_seller' on mixed\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Cannot access offset 'u_name_seller' on mixed\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Cannot access offset 0 on mixed\\.$#"
-			count: 2
-			path: app/Services/CheckoutService.php
-
-		-
 			message: "#^Cannot access property \\$alamat on App\\\\Models\\\\Alamat\\|null\\.$#"
 			count: 1
 			path: app/Services/CheckoutService.php
@@ -196,42 +176,7 @@ parameters:
 			path: app/Services/CheckoutService.php
 
 		-
-			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:generateFormatKeranjangs\\(\\) has parameter \\$keranjangs with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:generateFormatKeranjangs\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:generateFormatKurirs\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:getAlamatBuyer\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:getKeranjangCheckout\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:hasUnverifiedSellerAddress\\(\\) has parameter \\$checkouts with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
 			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:lockAndValidateCheckoutItems\\(\\) has parameter \\$checkoutSnapshot with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:reconcileCheckoutCart\\(\\) return type has no value type specified in iterable type array\\.$#"
 			count: 1
 			path: app/Services/CheckoutService.php
 
@@ -257,16 +202,6 @@ parameters:
 
 		-
 			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:saveCheckoutToDatabase\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Parameter \\#1 \\$keranjangs of method App\\\\Services\\\\CheckoutService\\:\\:generateFormatKeranjangs\\(\\) expects array, mixed given\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Parameter \\#1 \\$reasons of method App\\\\Services\\\\ProductAvailabilityService\\:\\:hasOnlyUnavailableReason\\(\\) expects array\\<string, string\\>, mixed given\\.$#"
 			count: 1
 			path: app/Services/CheckoutService.php
 
