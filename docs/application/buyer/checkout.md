@@ -162,18 +162,23 @@ The same generated options are used later when validating selected courier names
 
 Required body data:
 
-- `payment_slug`: selected payment slug.
-- `shipping_options`: array of selected courier choices.
-- `shipping_options.*.user_id_seller`: seller id for the selected package.
-- `shipping_options.*.kurir_name`: selected courier name.
-- `noteds`: array of seller notes.
+- `payment_slug`: selected payment slug as a string.
+- `shipping_options`: array of selected courier rows.
+- `shipping_options.*.user_id_seller`: seller ID as a string.
+- `shipping_options.*.kurir_name`: selected courier name as a string.
+- `noteds`: array of seller note rows. Each row can contain `user_id_seller` and
+  `noted` as strings or `null`. A blank note is saved as an empty string.
 - `client_snapshot`: frontend checkout comparison data.
 - `client_snapshot.alamat_id`: active address reviewed by the buyer.
 - `client_snapshot.alamat_updated_at`: version of that active address.
-- `client_snapshot.cart_item_ids`: checkout cart row ids.
+- `client_snapshot.cart_item_ids`: array of non-empty checkout cart row ID strings.
 - `client_snapshot.total_product`: frontend product total.
 - `client_snapshot.total_shipping`: frontend shipping total.
 - `client_snapshot.total_all`: frontend final total.
+
+The three snapshot totals accept numbers and numeric strings. Fields with an
+invalid type return HTTP 422 with validation messages before cart
+reconciliation or Virtual Account creation.
 
 Request example:
 
@@ -206,7 +211,8 @@ Request example:
 High-level behavior:
 
 1. Reads the authenticated buyer.
-2. Validates request shape.
+2. Validates the payload and uses the validated selections for both the initial
+   snapshot and any snapshot rebuilt after a checkout change.
 3. Builds a backend checkout snapshot from current database state.
 4. Returns `409 SELLER_ADDRESS_REQUIRES_VERIFICATION` when the only newly
    unavailable checkout reason is a seller location that lost Pinpoint
@@ -509,6 +515,8 @@ to trust PostgreSQL while the asynchronous search projection catches up. See
 - [TOK-81 Checkout Persistence PHPStan QA](../../qa/tok-81-checkout-persistence-phpstan.md)
   tracks local coverage for invoice persistence, the checkout key, and buyer
   identity on checkout processing.
+- [TOK-82 Checkout Payload PHPStan QA](../../qa/tok-82-checkout-payload-phpstan.md)
+  tracks local coverage for request validation and snapshot conflicts.
 - [TOK-8 Pinpoint Address QA](../../qa/tok-8-pinpoint-address.md) tracks backend
   address and checkout verification; the matching frontend checklist is
   available at `frontend-repo:/docs/qa/tok-8-pinpoint-address.md`.

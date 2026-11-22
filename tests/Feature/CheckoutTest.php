@@ -7,6 +7,7 @@ use App\Enums\OutboxEventType;
 use App\Enums\OutboxStatus;
 use App\Exceptions\CheckoutAvailabilityException;
 use App\Exceptions\CheckoutChangedException;
+use App\Http\Middleware\AuthenticateApiRequest;
 use App\Models\Alamat;
 use App\Models\Company;
 use App\Models\Keranjang;
@@ -15,17 +16,22 @@ use App\Models\PaymentList;
 use App\Models\Product;
 use App\Models\TransactionInvoice;
 use App\Models\User;
+use App\Services\AlamatService;
 use App\Services\CheckoutService;
+use App\Services\KeranjangService;
 use App\Services\OutboxRecorderService;
 use App\Services\PaymentService;
+use App\Services\ProductAvailabilityService;
 use App\Services\XenditService;
 use GuzzleHttp\Client;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Testing\TestResponse;
+use Mockery;
 use Mockery\MockInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\HttpFoundation\Response as HttpStatus;
@@ -760,6 +766,173 @@ class CheckoutTest extends TestCase
     }
 
     /**
+     * Rejects malformed checkout payload fields before cart reconciliation or payment.
+     *
+     * @param  string  $field  Dot path of the checkout field to invalidate.
+     * @param  mixed  $value  Value that violates the field's input type.
+     *
+     * @return void Verifies the endpoint returns the field error without preparing payment.
+     */
+    #[DataProvider('invalidCheckoutPayloadFields')]
+    public function test_process_checkout_rejects_invalid_payload_fields(
+        string $field,
+        mixed $value,
+    ): void {
+        // --- step 1 - Prepare the buyer checkout - start ---
+        $this->withoutMiddleware(AuthenticateApiRequest::class);
+        $fixture = $this->createCheckoutLockFixture();
+        // --- step 1 - Prepare the buyer checkout - end ---
+
+        // --- step 2 - Guard against checkout side effects - start ---
+        // Reconciliation can change selected cart rows before any Virtual Account is created.
+        $this->mock(CheckoutService::class)->shouldNotReceive('buildCheckoutSnapshot');
+        $this->mock(XenditService::class)->shouldNotReceive('createVirtualAccount');
+        // --- step 2 - Guard against checkout side effects - end ---
+
+        // --- step 3 - Verify the validation response - start ---
+        $this->processCheckoutFixture($fixture, [$field => $value])
+            ->assertUnprocessable()
+            ->assertJsonPath('status', 'error')
+            ->assertJsonValidationErrors($field, 'message');
+        // --- step 3 - Verify the validation response - end ---
+    }
+
+    /**
+     * Provides request types that the snapshot service cannot consume as checkout fields.
+     *
+     * @return array<string, array{string, mixed}> Field paths with malformed values.
+     */
+    public static function invalidCheckoutPayloadFields(): array
+    {
+        // Each case changes one field so the response can be tied to its validation rule.
+        return [
+            'payment slug array' => ['payment_slug', ['bca']],
+            'non-array shipping row' => ['shipping_options.0', 'JNT'],
+            'non-string shipping seller' => ['shipping_options.0.user_id_seller', 1],
+            'non-string courier name' => ['shipping_options.0.kurir_name', ['JNT']],
+            'non-array note row' => ['noteds.0', 'Leave at the door'],
+            'non-string note seller' => ['noteds.0.user_id_seller', 1],
+            'non-string note text' => ['noteds.0.noted', ['Leave at the door']],
+            'non-string cart item ID' => ['client_snapshot.cart_item_ids.0', 1],
+        ];
+    }
+
+    /**
+     * Preserves numeric-string totals and the frontend's blank seller note through checkout.
+     *
+     * @return void Verifies checkout succeeds and the blank note is saved as an empty string.
+     */
+    public function test_process_checkout_accepts_numeric_string_totals_and_a_blank_note(): void
+    {
+        // --- step 1 - Prepare numeric-string snapshot totals - start ---
+        // Request normalization turns the frontend's blank note into null before validation.
+        $this->withoutMiddleware(AuthenticateApiRequest::class);
+        $fixture = $this->createCheckoutLockFixture();
+        $productTotal = $fixture['product']->price;
+        $shippingTotal = self::JNT_CHECKOUT_SHIPPING;
+
+        $overrides = [
+            'client_snapshot.total_product' => (string) $productTotal,
+            'client_snapshot.total_shipping' => (string) $shippingTotal,
+            'client_snapshot.total_all' => (string) ($productTotal + $shippingTotal),
+        ];
+        // --- step 1 - Prepare numeric-string snapshot totals - end ---
+
+        // --- step 2 - Fake Virtual Account creation - start ---
+        $this->enableCheckoutPayment();
+        $this->mock(XenditService::class)
+            ->shouldReceive('createVirtualAccount')
+            ->once()
+            ->andReturn([
+                'status' => 'suceess',
+                'data' => [
+                    'account_number' => '001234',
+                    'external_id' => 'va-numeric-totals',
+                ],
+            ]);
+        // --- step 2 - Fake Virtual Account creation - end ---
+
+        // --- step 3 - Verify the accepted checkout - start ---
+        $response = $this->processCheckoutFixture($fixture, $overrides);
+        $response->assertOk()->assertJsonPath('status', 'success');
+        // --- step 3 - Verify the accepted checkout - end ---
+
+        // --- step 4 - Verify the saved seller note - start ---
+        $this->assertDatabaseHas('transaction_users', [
+            'transaction_invoice_id' => $response->json('transaction_invoice_id'),
+            'noted' => '',
+        ]);
+        // --- step 4 - Verify the saved seller note - end ---
+    }
+
+    /**
+     * Returns the current server quote when the total reviewed by the buyer is stale.
+     *
+     * @return void Verifies the conflict response before any Virtual Account is created.
+     */
+    public function test_checkout_returns_the_current_quote_for_a_stale_total(): void
+    {
+        // --- step 1 - Prepare a stale buyer snapshot - start ---
+        $this->withoutMiddleware(AuthenticateApiRequest::class);
+        $fixture = $this->createCheckoutLockFixture();
+        $this->enableCheckoutPayment();
+
+        $productTotal = $fixture['product']->price;
+        $currentTotal = $productTotal + self::JNT_CHECKOUT_SHIPPING;
+        $staleTotal = (string) $productTotal;
+        // --- step 1 - Prepare a stale buyer snapshot - end ---
+
+        $this->mock(XenditService::class)->shouldNotReceive('createVirtualAccount');
+
+        // --- step 2 - Verify the refreshed quote - start ---
+        $this->processCheckoutFixture($fixture, ['client_snapshot.total_all' => $staleTotal])
+            ->assertConflict()
+            ->assertJsonPath('code', 'CHECKOUT_CHANGED')
+            ->assertJsonPath('checkout.totalAll', $currentTotal);
+        // --- step 2 - Verify the refreshed quote - end ---
+    }
+
+    /**
+     * Reuses the buyer's validated selections when the locked state requires a refreshed quote.
+     *
+     * @return void Verifies the refreshed courier and note are returned before payment.
+     */
+    public function test_process_checkout_reuses_validated_selections_after_a_lock_conflict(): void
+    {
+        // --- step 1 - Prepare the buyer checkout - start ---
+        $this->withoutMiddleware(AuthenticateApiRequest::class);
+        $fixture = $this->createCheckoutLockFixture();
+        $this->enableCheckoutPayment();
+
+        $note = 'Leave at the door';
+        // --- step 1 - Prepare the buyer checkout - end ---
+
+        // --- step 2 - Simulate checkout changing under the lock - start ---
+        // Both snapshots still use the real code, including cart and address dependencies.
+        $checkout = Mockery::mock(CheckoutService::class, [
+            $this->app->make(AlamatService::class),
+            $this->app->make(KeranjangService::class),
+            $this->app->make(ProductAvailabilityService::class),
+        ])->makePartial();
+
+        $checkout->shouldReceive('lockAndValidateCheckoutItems')
+            ->once()
+            ->andThrow(new CheckoutChangedException('Checkout berubah saat dikunci'));
+        $this->instance(CheckoutService::class, $checkout);
+
+        $this->mock(XenditService::class)->shouldNotReceive('createVirtualAccount');
+        // --- step 2 - Simulate checkout changing under the lock - end ---
+
+        // --- step 3 - Verify the refreshed checkout selections - start ---
+        $this->processCheckoutFixture($fixture, ['noteds.0.noted' => $note])
+            ->assertConflict()
+            ->assertJsonPath('code', 'CHECKOUT_CHANGED')
+            ->assertJsonPath('checkout.kurirs.0.name', 'JNT')
+            ->assertJsonPath('checkout.noteds.0.noted', $note);
+        // --- step 3 - Verify the refreshed checkout selections - end ---
+    }
+
+    /**
      * Enables BCA VA so the fixture can reach the payment provider.
      *
      * @return void Creates the payment option expected by the submitted quote.
@@ -781,10 +954,11 @@ class CheckoutTest extends TestCase
      * @param  array{
      *     buyer: User, seller: User, buyerAddress: Alamat, product: Product, cart: Keranjang
      * }  $fixture  Buyer checkout data.
+     * @param  array<string, mixed>  $overrides  Fixture overrides by field path.
      *
      * @return TestResponse Endpoint response before assertions.
      */
-    private function processCheckoutFixture(array $fixture): TestResponse
+    private function processCheckoutFixture(array $fixture, array $overrides = []): TestResponse
     {
         // --- step 1 - Susun snapshot buyer - start ---
         // The read endpoint counts a missing price as zero in the displayed product total.
@@ -801,17 +975,24 @@ class CheckoutTest extends TestCase
         ];
         // --- step 1 - Susun snapshot buyer - end ---
 
-        // --- step 2 - Kirim checkout buyer - start ---
+        // --- step 2 - Susun payload checkout buyer - start ---
         $sellerId = $fixture['seller']->id;
-        $response = $this->actingAs($fixture['buyer'])->postJson('/api/checkout/process', [
+
+        $payload = [
             'payment_slug' => 'bca',
             'shipping_options' => [['user_id_seller' => $sellerId, 'kurir_name' => 'JNT']],
             'noteds' => [['user_id_seller' => $sellerId, 'noted' => '']],
             'client_snapshot' => $snapshot,
-        ]);
-        // --- step 2 - Kirim checkout buyer - end ---
+        ];
+        // --- step 2 - Susun payload checkout buyer - end ---
 
-        return $response;
+        // --- step 3 - Terapkan variasi payload - start ---
+        foreach ($overrides as $field => $value) {
+            Arr::set($payload, $field, $value);
+        }
+        // --- step 3 - Terapkan variasi payload - end ---
+
+        return $this->actingAs($fixture['buyer'])->postJson('/api/checkout/process', $payload);
     }
 
     /**
