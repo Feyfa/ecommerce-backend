@@ -115,18 +115,25 @@ class TransactionController extends Controller
     /**
      * Menyetujui transaksi dan menerapkan perubahan status terkait.
      *
-     * Request persetujuan divalidasi terhadap user dan transaksi sasaran. Service menerapkan
-     * perpindahan status serta saldo yang relevan, kemudian controller mengembalikan hasil terbaru
-     * atau error bisnis tanpa melakukan mutasi tambahan.
+     * Identitas user diperiksa sebelum input. `user_type` harus persis string `seller`, dan
+     * `transaction_user_id` yang tidak kosong tetapi bukan string ditolak dengan 422 sebelum query
+     * transaksi dijalankan. Service menerapkan perpindahan status serta saldo yang relevan,
+     * kemudian controller mengembalikan hasil terbaru atau error bisnis tanpa mutasi tambahan.
      *
      * @param  Request  $request  Data transaksi yang disetujui.
      *
-     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Daftar transaksi seller terbaru atau detail kegagalan untuk client.
      */
     public function approvedTransaction(Request $request): JsonResponse
     {
         // --- step 1 - validasi user - start ---
-        $user_id = optional(auth()->user())->id;
+        $user = $request->user();
+
+        if (! $user instanceof User) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
+        }
+
+        $user_id = $user->id;
         $userExists = User::where('id', $user_id)->exists();
 
         if (! $userExists) {
@@ -134,45 +141,83 @@ class TransactionController extends Controller
         }
         // --- step 1 - validasi user - end ---
 
-        // --- step 2 - validasi request - start ---
+        // --- step 2 - validasi perspektif seller - start ---
+        // Perbandingan ketat: dengan `!=`, JSON `true` dianggap sama dengan 'seller'
+        // dan transaksi ikut disetujui.
         $user_type = $request->user_type ?? '';
-        $transaction_user_id = $request->transaction_user_id ?? '';
-        if ($user_type != 'seller') {
-            return response()->json(['status' => 'error', 'message' => 'This Action Only For Seller'], 400);
-        }
-        if (empty($transaction_user_id) || trim($transaction_user_id) == '') {
-            return response()->json(['status' => 'error', 'message' => 'Transaction User ID Cannot Be Empty'], 400);
-        }
-        // --- step 2 - validasi request - end ---
 
-        // --- step 3 - proses persetujuan transaksi - start ---
+        if ($user_type !== 'seller') {
+            return response()->json(
+                ['status' => 'error', 'message' => 'This Action Only For Seller'],
+                400,
+            );
+        }
+        // --- step 2 - validasi perspektif seller - end ---
+
+        // --- step 3 - validasi ID transaksi - start ---
+        // `?:` mengubah semua nilai kosong (null, false, 0, [], "0") menjadi '' sehingga tetap
+        // mendapat 400 seperti sebelumnya. Nilai non-string lain sebelumnya membuat trim()
+        // melempar TypeError, atau ditolak PostgreSQL sebagai UUID tidak valid (SQLSTATE 22P02).
+        // Keduanya berakhir HTTP 500.
+        $transaction_user_id = $request->transaction_user_id ?: '';
+
+        if (! is_string($transaction_user_id)) {
+            return response()->json(
+                ['status' => 'error', 'message' => 'Transaction User ID Must Be A String'],
+                422,
+            );
+        }
+
+        if (empty($transaction_user_id) || trim($transaction_user_id) == '') {
+            return response()->json(
+                ['status' => 'error', 'message' => 'Transaction User ID Cannot Be Empty'],
+                400,
+            );
+        }
+        // --- step 3 - validasi ID transaksi - end ---
+
+        // --- step 4 - cari transaksi yang menunggu persetujuan - start ---
+        // Filter `approved_seller` adalah satu-satunya penjaga agar satu transaksi tidak
+        // dikredit dua kali: transaksi yang sudah `done` mendapat 404 sebelum transfer saldo.
+        // Pembacaan ini tidak memakai DB transaction atau lock baris, sehingga dua request
+        // bersamaan masih bisa sama-sama membaca `approved_seller`. Saldo seller lalu
+        // bertambah dua kali, dan kelebihannya bisa ditarik lewat /api/saldo-withdraw.
         $transactionUser = TransactionUser::where('id', $transaction_user_id)
             ->where('user_id_seller', $user_id)
             ->where('status', 'approved_seller')
             ->first();
-        if (empty($transactionUser)) {
-            return response()->json(['status' => 'error', 'message' => 'Transaksi Tidak Ditemukan'], 404);
-        }
 
+        if (empty($transactionUser)) {
+            return response()->json(
+                ['status' => 'error', 'message' => 'Transaksi Tidak Ditemukan'],
+                404,
+            );
+        }
+        // --- step 4 - cari transaksi yang menunggu persetujuan - end ---
+
+        // --- step 5 - tandai transaksi selesai - start ---
         $transactionUser->status = 'done';
         $transactionUser->save();
-        // --- step 3 - proses persetujuan transaksi - end ---
+        // --- step 5 - tandai transaksi selesai - end ---
 
-        // --- step 4 - transfer saldo ke seller - start ---
+        // --- step 6 - transfer saldo ke seller - start ---
+        // Status disimpan lebih dulu agar request berikutnya yang datang setelah save()
+        // mendapat 404 dan tidak mengkredit saldo lagi.
         $this->transactionService->transferSaldo(
             user_id: $user_id,
             transaction_user_id: $transactionUser->id,
             price: (float) $transactionUser->product_price,
             type: 'incoming'
         );
-        // --- step 4 - transfer saldo ke seller - end ---
+        // --- step 6 - transfer saldo ke seller - end ---
 
-        // --- step 5 - ambil transaksi - start ---
+        // --- step 7 - ambil transaksi - start ---
         $getTransaction = $this->transactionService->getTransaction($user_id, $user_type);
+
         $transactions = $getTransaction['transactions'] ?? [];
         $counts = $getTransaction['counts'] ?? [];
         $pagination = $getTransaction['pagination'] ?? [];
-        // --- step 5 - ambil transaksi - end ---
+        // --- step 7 - ambil transaksi - end ---
 
         return response()->json([
             'status' => 'success',

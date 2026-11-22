@@ -36,21 +36,6 @@ parameters:
 			path: app/Http/Controllers/SaldoController.php
 
 		-
-			message: "#^Cannot access property \\$id on mixed\\.$#"
-			count: 1
-			path: app/Http/Controllers/TransactionController.php
-
-		-
-			message: "#^Parameter \\#1 \\$string of function trim expects string, mixed given\\.$#"
-			count: 1
-			path: app/Http/Controllers/TransactionController.php
-
-		-
-			message: "#^Parameter \\#2 \\$user_type of method App\\\\Services\\\\TransactionService\\:\\:getTransaction\\(\\) expects string, mixed given\\.$#"
-			count: 1
-			path: app/Http/Controllers/TransactionController.php
-
-		-
 			message: "#^Cannot access property \\$saldo_income on App\\\\Models\\\\SaldoUser\\|null\\.$#"
 			count: 2
 			path: app/Services/SaldoService.php
