@@ -193,6 +193,8 @@ Request example:
     }
   ],
   "client_snapshot": {
+    "alamat_id": "6d433c58-3b32-4e81-80cc-7c5970f3bcda",
+    "alamat_updated_at": "2026-06-01T08:30:00.000000Z",
     "cart_item_ids": ["cart uuid"],
     "total_product": 1310000,
     "total_shipping": 30000,
@@ -258,7 +260,13 @@ The snapshot validates:
 - payment method is currently supported for processing;
 - selected courier exists for each seller package.
 
-The returned snapshot includes:
+The result status determines which fields are present.
+
+- `success` includes `data` and `clientComparable`.
+- `invalid` includes a `code` and `message` explaining why checkout is blocked.
+- `error` includes a `message` when the payment or courier choice cannot be used.
+
+A successful snapshot includes these fields.
 
 ```json
 {
@@ -280,6 +288,8 @@ The returned snapshot includes:
     }
   },
   "clientComparable": {
+    "alamat_id": "6d433c58-3b32-4e81-80cc-7c5970f3bcda",
+    "alamat_updated_at": "2026-06-01T08:30:00.000000Z",
     "cart_item_ids": ["cart uuid"],
     "total_product": 1310000,
     "total_shipping": 30000,
