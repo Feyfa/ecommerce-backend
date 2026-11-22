@@ -36,22 +36,24 @@ class CheckoutController extends Controller
     /**
      * Mengambil data checkout terkini untuk buyer yang terautentikasi.
      *
-     * Function merekonsiliasi cart checkout, memverifikasi alamat buyer serta seller, lalu menyusun
-     * snapshot harga, kurir, catatan, dan metode pembayaran dari database. Snapshot dan checkout key
-     * dikembalikan agar frontend dapat mendeteksi perubahan sebelum pembayaran.
+     * Rekonsiliasi cart dan pemeriksaan alamat buyer serta seller dilakukan sebelum opsi
+     * pengiriman dan pembayaran ditampilkan.
      *
-     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Alamat, paket checkout, metode pembayaran, dan total harga produk.
      */
     public function getDataCheckout(): JsonResponse
     {
         // --- step 1 - validasi buyer terautentikasi - start ---
-        $user_id_buyer = optional(auth()->user())->id;
-        $userExists = User::where('id', $user_id_buyer)->exists();
+        // Model user lokal harus masih ada sebelum rekonsiliasi dapat mengubah pilihan cart.
+        $user = auth()->user();
+        $userExists = $user instanceof User && User::where('id', $user->id)->exists();
+        // --- step 1 - validasi buyer terautentikasi - end ---
 
         if (! $userExists) {
             return response()->json(['result' => 'error', 'message' => 'Unauthorized'], 401);
         }
-        // --- step 1 - validasi buyer terautentikasi - end ---
+
+        $user_id_buyer = $user->id;
 
         // --- step 2 - sinkronkan availability item checkout - start ---
         $cartState = $this->checkoutService->reconcileCheckoutCart($user_id_buyer);
