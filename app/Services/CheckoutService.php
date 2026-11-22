@@ -13,6 +13,7 @@ use App\Models\TransactionProduct;
 use App\Models\TransactionUser;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use JsonException;
 
 /**
  * Menyiapkan data checkout buyer dan menyusun snapshot dari data terbaru.
@@ -735,16 +736,21 @@ class CheckoutService
      * }}  $checkoutSnapshot  ID cart yang dipakai untuk membentuk checkout key.
      *
      * @return string Hash SHA-256 yang dipakai untuk lock dan pencarian invoice.
+     *
+     * @throws JsonException Saat payload key tidak dapat di-encode sebagai JSON.
      */
     public function generateCheckoutKey(string $user_id_buyer = '', array $checkoutSnapshot = []): string
     {
         $cartItemIds = $checkoutSnapshot['clientComparable']['cart_item_ids'] ?? [];
         sort($cartItemIds);
 
+        // Encoding yang gagal tidak boleh di-hash sebagai string kosong, karena semua checkout
+        // yang gagal akan berbagi key advisory lock dan pencarian invoice yang sama.
+        // Flag ini tidak mengubah JSON yang berhasil, sehingga key invoice lama tetap cocok.
         return hash('sha256', json_encode([
             'buyer_id' => $user_id_buyer,
             'cart_item_ids' => $cartItemIds,
-        ]));
+        ], JSON_THROW_ON_ERROR));
     }
 
     /**
@@ -809,9 +815,25 @@ class CheckoutService
      * dibuat, sehingga controller tidak menghapus keranjang atau mengurangi stok.
      *
      * @param  string  $user_id_buyer  ID buyer pemilik cart, alamat, atau transaksi.
-     * @param  array  $checkouts  Kumpulan item checkout yang telah dimuat dan divalidasi.
-     * @param  array  $kurirs  Pilihan kurir tervalidasi untuk setiap transaksi seller.
-     * @param  array  $noteds  Catatan buyer yang dipetakan untuk setiap grup seller.
+     * @param  list<array{
+     *     user_id_seller?: string,
+     *     keranjangs?: list<array{
+     *         p_id: string,
+     *         p_price?: CheckoutPrice,
+     *         k_total?: int|numeric-string,
+     *         k_total_price: CheckoutPrice
+     *     }>
+     * }>  $checkouts  Kumpulan item checkout yang telah dimuat dan divalidasi.
+     * @param  list<array{
+     *     user_id_seller?: string,
+     *     name?: string,
+     *     price?: int,
+     *     estimation?: string
+     * }>  $kurirs  Pilihan kurir tervalidasi untuk setiap transaksi seller.
+     * @param  list<array{
+     *     user_id_seller?: string,
+     *     noted?: string
+     * }>  $noteds  Catatan buyer yang dipetakan untuk setiap grup seller.
      * @param  Alamat|null  $alamat_buyer  Snapshot alamat buyer yang akan disimpan pada invoice.
      * @param  string  $payment_method  Jenis metode pembayaran yang disimpan pada invoice.
      * @param  string  $payment_slug  Slug pembayaran yang disimpan pada invoice.
@@ -819,11 +841,16 @@ class CheckoutService
      * @param  string  $expired_at  Waktu kedaluwarsa pembayaran dari provider.
      * @param  int  $price  Nominal uang yang digunakan oleh operasi.
      * @param  string  $checkout_key  Kunci idempotensi yang mewakili satu snapshot checkout.
-     * @param  array  $dataXendit  Response pembayaran Xendit yang telah berhasil dibuat.
+     * @param  array<mixed>  $dataXendit  Response pembayaran Xendit yang belum dipercaya.
+     *                                    Nomor VA dan referensi divalidasi sebelum invoice dibuat.
      *
-     * @return array Data terstruktur yang memuat status, pesan, dan id invoice yang baru dibuat. Id
-     *               invoice dikembalikan agar pemanggil dapat menandai transaksi hasil checkout tanpa
-     *               menebak data terbaru buyer. Satu invoice mencakup seluruh seller pada checkout ini.
+     * @return array{status: 'error', message: string}|array{
+     *     status: 'success',
+     *     message: string,
+     *     transaction_invoice_id: string
+     * } Status, pesan, dan id invoice yang baru dibuat. Id invoice dikembalikan agar pemanggil
+     *   dapat menandai transaksi hasil checkout tanpa menebak data terbaru buyer. Satu invoice
+     *   mencakup seluruh seller pada checkout ini.
      */
     public function saveCheckoutToDatabase(
         string $user_id_buyer = '',
@@ -862,6 +889,15 @@ class CheckoutService
                     'message' => $message,
                 ];
             }
+        }
+
+        // Loop di atas sudah menolak alamat kosong. Guard ini hanya membuat tipe Alamat terlihat
+        // oleh analisis statis tanpa mengubah urutan pesan error saat beberapa data kosong.
+        if ($alamat_buyer === null) {
+            return [
+                'status' => 'error',
+                'message' => 'Data Alamat Buyer Empty',
+            ];
         }
         // --- step 1 - validasi data transaksi checkout - end ---
 
@@ -977,9 +1013,11 @@ class CheckoutService
      * mencegah checkout satu user membersihkan item user lain atau item baru yang tidak ikut dibayar.
      *
      * @param  string  $user_id_buyer  ID buyer pemilik cart, alamat, atau transaksi.
-     * @param  array  $checkouts  Kumpulan item checkout yang telah dimuat dan divalidasi.
+     * @param  list<array{
+     *     keranjangs?: list<array{k_id?: string}>
+     * }>  $checkouts  Kumpulan item checkout yang telah dimuat dan divalidasi.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{status: 'error'|'success', message: string} Status dan pesan penghapusan cart.
      */
     public function deleteKeranjangAfterCheckoutForBuyer(string $user_id_buyer = '', array $checkouts = []): array
     {
@@ -1020,9 +1058,11 @@ class CheckoutService
      * satu update gagal, function mengembalikan error agar transaksi pemanggil dapat membatalkan
      * seluruh penyimpanan pesanan.
      *
-     * @param  array  $checkouts  Kumpulan item checkout yang telah dimuat dan divalidasi.
+     * @param  list<array{
+     *     keranjangs?: list<array{p_id?: string, k_total?: int|numeric-string}>
+     * }>  $checkouts  Kumpulan item checkout yang telah dimuat dan divalidasi.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{status: 'error'|'success', message: string} Status dan pesan pengurangan stok.
      */
     public function changeStockProductAfterCheckout(array $checkouts = []): array
     {

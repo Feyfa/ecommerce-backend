@@ -712,6 +712,54 @@ class CheckoutTest extends TestCase
     }
 
     /**
+     * Memastikan request tanpa buyer terautentikasi ditolak sebelum pembayaran diproses.
+     *
+     * @return void Memverifikasi respons 401 yang sudah ada tanpa permintaan Virtual Account.
+     */
+    public function test_process_checkout_rejects_a_request_without_an_authenticated_buyer(): void
+    {
+        // --- step 1 - siapkan request tanpa buyer - start ---
+        // Middleware dimatikan agar guard di controller yang diuji, bukan middleware auth.
+        $this->withoutMiddleware();
+        $this->mock(XenditService::class, function (MockInterface $mock): void {
+            $mock->shouldNotReceive('createVirtualAccount');
+        });
+        // --- step 1 - siapkan request tanpa buyer - end ---
+
+        $response = $this->postJson('/api/checkout/process', []);
+
+        $response->assertUnauthorized()
+            ->assertExactJson(['result' => 'error', 'message' => 'Unauthorized']);
+    }
+
+    /**
+     * Memastikan buyer yang record lokalnya sudah dihapus tidak dapat membuat pembayaran.
+     *
+     * Model user masih terbawa pada request, sehingga controller wajib memeriksa database sebelum
+     * nama buyer dipakai sebagai nama pemilik Virtual Account.
+     *
+     * @return void Memverifikasi respons 401 yang sudah ada tanpa permintaan Virtual Account.
+     */
+    public function test_process_checkout_rejects_a_buyer_deleted_after_authentication(): void
+    {
+        // --- step 1 - siapkan request dari buyer yang sudah terhapus - start ---
+        $this->withoutMiddleware();
+        $buyer = User::factory()->create();
+        $this->actingAs($buyer);
+        $buyer->delete();
+
+        $this->mock(XenditService::class, function (MockInterface $mock): void {
+            $mock->shouldNotReceive('createVirtualAccount');
+        });
+        // --- step 1 - siapkan request dari buyer yang sudah terhapus - end ---
+
+        $response = $this->postJson('/api/checkout/process', []);
+
+        $response->assertUnauthorized()
+            ->assertExactJson(['result' => 'error', 'message' => 'Unauthorized']);
+    }
+
+    /**
      * Enables BCA VA so the fixture can reach the payment provider.
      *
      * @return void Creates the payment option expected by the submitted quote.
