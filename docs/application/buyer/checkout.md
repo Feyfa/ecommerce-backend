@@ -84,12 +84,13 @@ That validation route is owned by the cart feature, but it is part of the checko
 
 Behavior:
 
-1. Reads the authenticated user id from `auth()->user()`.
-2. Rejects missing users with `401`.
-3. Loads the active buyer address through `CheckoutService::getAlamatBuyer()`.
-4. Rejects missing active address with `400`.
-5. Reconciles current product availability and loads cart rows where `keranjangs.checkout = 1` and `keranjangs.total > 0`.
-6. Groups checkout rows by seller.
+1. Reads the authenticated user from `auth()->user()`.
+2. Rejects a missing local buyer record with `401`.
+3. Reconciles availability for the selected cart items.
+4. Loads the active buyer address through `CheckoutService::getAlamatBuyer()`.
+5. Rejects a missing active address with `400` and an unverified address with `409`.
+6. Loads cart rows where `keranjangs.checkout = 1` and `keranjangs.total > 0`,
+   then groups them by seller.
 7. Generates courier options for each seller group.
 8. Calculates product total.
 9. Rejects empty checkout rows with `409 CHECKOUT_INVALID` before loading payment methods.
@@ -135,6 +136,11 @@ Each checkout group has this shape:
   ]
 }
 ```
+
+Each `p_price` and `k_total_price` can be a JSON number or a numeric string
+depending on the database driver. A legacy item with a missing price has
+`null` in both fields. Its subtotal contributes zero to the displayed
+`totalPrice`.
 
 ## Courier Generation
 
@@ -200,7 +206,10 @@ High-level behavior:
 1. Reads the authenticated buyer.
 2. Validates request shape.
 3. Builds a backend checkout snapshot from current database state.
-4. Returns `409 SELLER_ADDRESS_REQUIRES_VERIFICATION` when the only newly unavailable checkout reason is a seller location that lost Pinpoint verification; other unrecoverable availability changes return `409 CHECKOUT_INVALID`.
+4. Returns `409 SELLER_ADDRESS_REQUIRES_VERIFICATION` when the only newly
+   unavailable checkout reason is a seller location that lost Pinpoint
+   verification. A missing item price or another unrecoverable availability
+   change returns `409 CHECKOUT_INVALID`.
 5. Returns `400` when payment or courier choices are unavailable.
 6. Compares backend snapshot with the frontend `client_snapshot`.
 7. Returns `409 CHECKOUT_CHANGED` with a refresh snapshot when totals, cart ids, or the active address differ.
@@ -208,7 +217,8 @@ High-level behavior:
 9. Acquires a PostgreSQL advisory lock for the checkout key.
 10. Checks whether an invoice for the same checkout key already exists.
 11. Starts a database transaction and locks the selected cart, product, active buyer-address, and seller-location rows.
-12. Revalidates deletion, stock, seller ownership, checked state, and verified seller location while those rows are locked.
+12. Revalidates deletion, stock, price presence, seller ownership, checked
+    state, and verified seller location while those rows are locked.
 13. Compares locked cart quantity, product price, product and seller identity, and active buyer-address version with the initial server snapshot.
 14. Returns `409 CHECKOUT_CHANGED` with current data when a payable snapshot changed, or the relevant invalid-checkout code when it is no longer payable.
 15. Creates the supported Xendit virtual account only after the locked state matches the snapshot.
@@ -243,6 +253,7 @@ The snapshot validates:
 - checkout products are not soft-deleted and their sellers still have verified locations;
 - checkout quantity is at least `1`;
 - checkout quantity is not greater than current product stock;
+- each selected item has a unit price and subtotal;
 - payment method exists in `payment_lists`;
 - payment method is currently supported for processing;
 - selected courier exists for each seller package.
@@ -321,6 +332,11 @@ When checkout cannot be recovered on the checkout page, the controller returns:
 ```
 
 The frontend should send the buyer back to cart.
+
+A missing unit price or subtotal stops snapshot creation before the request
+to Xendit. If a product loses its price after the snapshot is built, the
+locked check rejects checkout with `409 CHECKOUT_INVALID`. The controller
+unchecks the affected cart row after rollback and preserves its quantity.
 
 Checkout never silently drops only the invalid item. One invalid selected item cancels the complete order attempt, no payment is created, no stock is decremented, and no partial transaction is stored.
 
@@ -473,6 +489,8 @@ to trust PostgreSQL while the asynchronous search projection catches up. See
 
 ## QA Coverage
 
+- [TOK-79 Checkout Data Contracts](../../qa/tok-79-checkout-data-phpstan.md)
+  tracks local coverage for the checkout response and the missing-price guards.
 - [TOK-8 Pinpoint Address QA](../../qa/tok-8-pinpoint-address.md) tracks backend
   address and checkout verification; the matching frontend checklist is
   available at `frontend-repo:/docs/qa/tok-8-pinpoint-address.md`.

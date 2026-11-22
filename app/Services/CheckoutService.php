@@ -14,6 +14,40 @@ use App\Models\TransactionUser;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * Menyiapkan data checkout buyer dan menyusun snapshot dari data terbaru.
+ *
+ * @phpstan-import-type CartState from KeranjangService
+ *
+ * @phpstan-type CheckoutPrice int|float|numeric-string|null
+ * @phpstan-type CheckoutCartRow array{
+ *     k_id: string,
+ *     k_user_id_seller: string,
+ *     k_total: int|numeric-string,
+ *     k_total_price: CheckoutPrice,
+ *     p_id: string,
+ *     p_name: string|null,
+ *     p_price: CheckoutPrice,
+ *     p_img: string|null,
+ *     u_name_seller: string
+ * }
+ * @phpstan-type CheckoutItem array{
+ *     k_id: string,
+ *     k_total: int|numeric-string,
+ *     k_total_price: CheckoutPrice,
+ *     p_id: string,
+ *     p_name: string|null,
+ *     p_price: CheckoutPrice,
+ *     p_img: string|null
+ * }
+ * @phpstan-type CheckoutCourier array{name: string, price: int, estimation: string}
+ * @phpstan-type CheckoutGroup array{
+ *     user_id_seller: string,
+ *     user_name_seller: string,
+ *     keranjangs: list<CheckoutItem>,
+ *     kurirs: list<CheckoutCourier>
+ * }
+ */
 class CheckoutService
 {
     /**
@@ -40,7 +74,7 @@ class CheckoutService
      *
      * @param  string  $buyerId  ID buyer yang menjadi scope operasi.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return CartState State cart terbaru beserta issue ketersediaan pada pilihan awal.
      */
     public function reconcileCheckoutCart(string $buyerId): array
     {
@@ -50,12 +84,15 @@ class CheckoutService
     /**
      * Membentuk error availability checkout tanpa kehilangan penyebab setelah read-repair cart.
      *
-     * Issue ketersediaan diprioritaskan menjadi kode dan pesan bisnis yang stabil. Cart terbaru tetap
-     * disertakan agar frontend dapat memperbarui state setelah validasi backend menolak checkout.
+     * Lokasi seller yang kehilangan verifikasi memerlukan pesan tersendiri agar buyer tahu
+     * penyebab item dilepas dari checkout.
      *
-     * @param  array<string, mixed>  $cartState  State cart terbaru beserta issue ketersediaannya.
+     * @param  array{
+     *     unavailableCheckoutItemIds?: list<string>,
+     *     unavailableCheckoutReasons?: array<string, string>
+     * }  $cartState  ID item checkout yang tidak tersedia beserta alasannya.
      *
-     * @return array{code: string, message: string}|null Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{code: string, message: string}|null Kode dan pesan jika ada item yang ditolak.
      */
     public function checkoutAvailabilityError(array $cartState): ?array
     {
@@ -136,17 +173,23 @@ class CheckoutService
      * metadata pinpoint lengkap. Satu seller yang gagal memenuhi invariant sudah cukup untuk
      * menghentikan checkout.
      *
-     * @param  array  $checkouts  Kumpulan item checkout yang telah dimuat dan divalidasi.
+     * @param  array<array-key, array{user_id_seller?: string}>  $checkouts  Grup seller yang dicek.
      *
-     * @return bool True ketika kondisi has unverified seller address terpenuhi; false jika tidak.
+     * @return bool True jika ada seller tanpa alamat aktif dengan pinpoint terverifikasi.
      */
     public function hasUnverifiedSellerAddress(array $checkouts): bool
     {
-        $sellerIds = array_values(array_unique(array_filter(array_column($checkouts, 'user_id_seller'))));
-        if (count($sellerIds) === 0) {
+        // --- step 1 - kumpulkan ID seller - start ---
+        $sellerIds = array_column($checkouts, 'user_id_seller');
+        $nonEmptySellerIds = array_filter($sellerIds);
+        $sellerIds = array_values(array_unique($nonEmptySellerIds));
+        // --- step 1 - kumpulkan ID seller - end ---
+
+        if ($sellerIds === []) {
             return false;
         }
 
+        // --- step 2 - muat ID seller terverifikasi - start ---
         $verifiedSellerIds = Alamat::whereIn('user_id', $sellerIds)
             ->where('type', 'seller')
             ->where('enable', 1)
@@ -154,28 +197,27 @@ class CheckoutService
             ->filter(fn (Alamat $alamat) => $this->alamatService->isVerifiedPinpoint($alamat))
             ->pluck('user_id')
             ->all();
+        // --- step 2 - muat ID seller terverifikasi - end ---
 
         return count(array_diff($sellerIds, $verifiedSellerIds)) > 0;
     }
 
     /**
-     * Mengambil alamat buyer aktif yang memenuhi kontrak lokasi untuk checkout.
+     * Mengambil alamat aktif buyer untuk diperiksa sebelum checkout.
      *
-     * Service mengambil satu alamat buyer aktif dengan metadata lokasi lengkap. Alamat manual legacy
-     * atau pinpoint yang belum terverifikasi tidak dianggap layak untuk snapshot pengiriman.
+     * Pemanggil memilih respons untuk alamat yang belum ada atau belum terverifikasi.
      *
-     * @param  string  $user_id_buyer  ID buyer pemilik cart, alamat, atau transaksi.
+     * @param  string  $user_id_buyer  ID buyer pemilik alamat.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{alamat: Alamat|null} Alamat buyer aktif jika tersedia.
      */
     public function getAlamatBuyer(string $user_id_buyer = ''): array
     {
-        // --- step 1 - ambil alamat aktif buyer - start ---
+        // Akun yang sama dapat memiliki alamat aktif untuk buyer dan seller.
         $alamat = Alamat::where('user_id', $user_id_buyer)
             ->where('type', 'buyer')
             ->where('enable', 1)
             ->first();
-        // --- step 1 - ambil alamat aktif buyer - end ---
 
         return [
             'alamat' => $alamat,
@@ -188,14 +230,14 @@ class CheckoutService
      * Query memuat item checkout milik buyer beserta produk, seller, gambar, dan data pendukung yang
      * dibutuhkan. Item kemudian dikelompokkan menggunakan kontrak yang sama dengan tampilan checkout.
      *
-     * @param  string  $user_id_buyer  ID buyer pemilik cart, alamat, atau transaksi.
+     * @param  string  $user_id_buyer  ID buyer pemilik cart yang dipilih.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{checkouts: list<CheckoutGroup>, totalPrice: int|float} Paket dan total produk.
      */
     public function getKeranjangCheckout(string $user_id_buyer = ''): array
     {
-        // --- step 1 - ambil dan kelompokkan item checkout buyer - start ---
-        $keranjangs = Keranjang::selectRaw('
+        // --- step 1 - pilih kolom item checkout - start ---
+        $query = Keranjang::selectRaw('
                 keranjangs.id as k_id,
                 keranjangs.user_id_seller as k_user_id_seller,
                 keranjangs.total as k_total,
@@ -205,7 +247,11 @@ class CheckoutService
                 products.price as p_price,
                 products.img as p_img,
                 COALESCE(NULLIF(companies.name, \'\'), users.name) as u_name_seller
-            ')
+            ');
+        // --- step 1 - pilih kolom item checkout - end ---
+
+        // --- step 2 - muat item checkout buyer - start ---
+        $keranjangs = $query
             ->join('users', 'keranjangs.user_id_seller', '=', 'users.id')
             ->leftJoin('companies', 'companies.user_id', '=', 'users.id')
             ->join('products', 'keranjangs.product_id', '=', 'products.id')
@@ -215,35 +261,39 @@ class CheckoutService
             ->whereNull('products.deleted_at')
             ->orderBy('k_user_id_seller', 'ASC')
             ->get();
+        // --- step 2 - muat item checkout buyer - end ---
 
-        $groupKeranjangs = $keranjangs->groupBy('k_user_id_seller')
-            ->toArray();
-        // --- step 1 - ambil dan kelompokkan item checkout buyer - end ---
-
-        // --- step 2 - hitung total harga produk - start ---
+        // --- step 3 - hitung total harga produk - start ---
         $totalPrice = 0;
+
         foreach ($keranjangs as $keranjang) {
-            $totalPrice += $keranjang->k_total_price;
+            // Alias SQL dapat berupa string numerik di PostgreSQL. Harga null tetap dikirim
+            // pada item lama dan hanya dihitung sebagai nol untuk total produk.
+            /** @var CheckoutPrice $itemTotalPrice */
+            $itemTotalPrice = $keranjang->getAttribute('k_total_price');
+            $totalPrice += $itemTotalPrice ?? 0;
         }
-        // --- step 2 - hitung total harga produk - end ---
+        // --- step 3 - hitung total harga produk - end ---
 
-        // --- step 3 - bentuk paket checkout per seller - start ---
+        // --- step 4 - bentuk paket checkout per seller - start ---
+        // Setiap grup terbentuk dari baris yang membawa identitas seller.
+        /** @var array<string, non-empty-list<CheckoutCartRow>> $cartRowsBySeller */
+        $cartRowsBySeller = $keranjangs->groupBy('k_user_id_seller')->toArray();
         $checkouts = [];
-        foreach ($groupKeranjangs as $keranjangs) {
-            $generateFormatKeranjangs = $this->generateFormatKeranjangs($keranjangs);
-            $keranjangsFormat = $generateFormatKeranjangs['keranjangs'];
 
-            $generateFormatKurirs = $this->generateFormatKurirs();
-            $kurirs = $generateFormatKurirs['kurirs'];
+        foreach ($cartRowsBySeller as $sellerCartRows) {
+            $firstCartRow = $sellerCartRows[0];
+            $formattedItems = $this->generateFormatKeranjangs($sellerCartRows);
+            $formattedCouriers = $this->generateFormatKurirs();
 
             $checkouts[] = [
-                'user_id_seller' => $keranjangs[0]['k_user_id_seller'],
-                'user_name_seller' => $keranjangs[0]['u_name_seller'],
-                'keranjangs' => $keranjangsFormat,
-                'kurirs' => $kurirs,
+                'user_id_seller' => $firstCartRow['k_user_id_seller'],
+                'user_name_seller' => $firstCartRow['u_name_seller'],
+                'keranjangs' => $formattedItems['keranjangs'],
+                'kurirs' => $formattedCouriers['kurirs'],
             ];
         }
-        // --- step 3 - bentuk paket checkout per seller - end ---
+        // --- step 4 - bentuk paket checkout per seller - end ---
 
         return [
             'checkouts' => $checkouts,
@@ -252,19 +302,17 @@ class CheckoutService
     }
 
     /**
-     * Mengelompokkan item keranjang menjadi paket checkout per seller.
+     * Membentuk daftar item yang dipakai halaman checkout dan snapshot pembayaran.
      *
-     * Item cart dikelompokkan per seller sambil mempertahankan produk, quantity, harga, dan identitas
-     * toko yang diperlukan checkout. Struktur hasil menjadi dasar ongkir, catatan, serta transaksi
-     * seller.
+     * @param  list<CheckoutCartRow>  $keranjangs  Baris cart dari paket satu seller.
      *
-     * @param  array  $keranjangs  Kumpulan item keranjang yang akan dikelompokkan atau diproses.
-     *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{keranjangs: list<CheckoutItem>} Item dan nilai harga asli dari query.
      */
-    private function generateFormatKeranjangs($keranjangs = []): array
+    private function generateFormatKeranjangs(array $keranjangs = []): array
     {
+        // Identitas seller sudah tersedia pada level paket checkout.
         $keranjangsFormat = [];
+
         foreach ($keranjangs as $keranjang) {
             $keranjangsFormat[] = [
                 'k_id' => $keranjang['k_id'],
@@ -283,13 +331,9 @@ class CheckoutService
     }
 
     /**
-     * Menormalisasi pilihan kurir untuk setiap paket seller.
+     * Menyiapkan tarif dan estimasi kurir yang dipakai paket seller dan snapshot checkout.
      *
-     * Pilihan kurir dari request dicocokkan ke setiap grup seller dan dinormalisasi ke bentuk yang
-     * dapat dibandingkan. Seller tanpa pilihan valid membuat snapshot berbeda sehingga checkout harus
-     * dikonfirmasi ulang.
-     *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{kurirs: list<CheckoutCourier>} Opsi kurir dalam urutan tampilan checkout.
      */
     private function generateFormatKurirs(): array
     {
@@ -326,18 +370,19 @@ class CheckoutService
     }
 
     /**
-     * membuat snapshot checkout dari database sebagai sumber kebenaran backend.
+     * Membuat snapshot pembayaran checkout dari database.
      *
      * Snapshot dihitung ulang dari cart, alamat, ongkir, catatan, serta metode pembayaran yang
      * tersimpan di backend. Harga dan struktur seller tidak dipercaya dari frontend, sehingga hasil
      * ini menjadi dasar checkout key dan pemeriksaan perubahan sebelum pembayaran.
+     * Harga satuan serta subtotal wajib tersedia sebelum snapshot dapat dipakai untuk pembayaran.
      *
      * @param  string  $user_id_buyer  ID buyer pemilik cart, alamat, atau transaksi.
      * @param  array  $shippingOptions  Pilihan kurir per seller yang dikirim untuk penyusunan snapshot.
      * @param  array  $noteds  Catatan buyer yang dipetakan untuk setiap grup seller.
      * @param  string  $paymentSlug  Slug metode pembayaran yang dipilih.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array Snapshot yang siap dibayar atau alasan checkout ditolak.
      */
     public function buildCheckoutSnapshot(string $user_id_buyer = '', array $shippingOptions = [], array $noteds = [], string $paymentSlug = ''): array
     {
@@ -465,8 +510,10 @@ class CheckoutService
         $cartItemIds = [];
 
         foreach ($checkouts as $checkout) {
-            $sellerId = $checkout['user_id_seller'] ?? '';
+            // --- step 7.1 - ambil pilihan kurir buyer - start ---
+            $sellerId = $checkout['user_id_seller'];
             $selectedKurirName = $shippingOptionsBySeller[$sellerId] ?? '';
+            // --- step 7.1 - ambil pilihan kurir buyer - end ---
 
             if ($selectedKurirName == '') {
                 return [
@@ -475,13 +522,16 @@ class CheckoutService
                 ];
             }
 
+            // --- step 7.2 - cari opsi kurir seller - start ---
+            // Cocokkan nama dari request agar ongkir memakai tarif dari opsi yang dibuat backend.
             $selectedKurir = null;
-            foreach (($checkout['kurirs'] ?? []) as $kurir) {
-                if (($kurir['name'] ?? '') == $selectedKurirName) {
+            foreach ($checkout['kurirs'] as $kurir) {
+                if ($kurir['name'] == $selectedKurirName) {
                     $selectedKurir = $kurir;
                     break;
                 }
             }
+            // --- step 7.2 - cari opsi kurir seller - end ---
 
             if (empty($selectedKurir)) {
                 return [
@@ -490,6 +540,7 @@ class CheckoutService
                 ];
             }
 
+            // --- step 7.3 - catat pengiriman paket - start ---
             $selectedKurirs[] = [
                 'user_id_seller' => $sellerId,
                 'name' => $selectedKurir['name'],
@@ -497,16 +548,34 @@ class CheckoutService
                 'estimation' => $selectedKurir['estimation'],
             ];
             $totalShipping += $selectedKurir['price'];
+            // --- step 7.3 - catat pengiriman paket - end ---
 
+            // --- step 7.4 - siapkan catatan untuk seller - start ---
             $selectedNoteds[] = [
                 'user_id_seller' => $sellerId,
                 'noted' => substr($notedsBySeller[$sellerId] ?? '', 0, 200),
             ];
+            // --- step 7.4 - siapkan catatan untuk seller - end ---
 
-            foreach (($checkout['keranjangs'] ?? []) as $keranjang) {
-                $totalProduct += $keranjang['k_total_price'];
+            // --- step 7.5 - rekap item checkout - start ---
+            // PostgreSQL menolak fallback string kosong pada penyimpanan harga. Tolak harga
+            // kosong di sini agar Xendit tidak membuat VA untuk pesanan yang gagal disimpan.
+            foreach ($checkout['keranjangs'] as $keranjang) {
+                $itemPrice = $keranjang['p_price'];
+                $itemSubtotal = $keranjang['k_total_price'];
+
+                if ($itemPrice === null || $itemSubtotal === null) {
+                    return [
+                        'status' => 'invalid',
+                        'code' => 'CHECKOUT_INVALID',
+                        'message' => 'Harga salah satu produk belum tersedia. Silakan cek keranjang.',
+                    ];
+                }
+
+                $totalProduct += $itemSubtotal;
                 $cartItemIds[] = $keranjang['k_id'];
             }
+            // --- step 7.5 - rekap item checkout - end ---
         }
 
         sort($cartItemIds);
@@ -944,28 +1013,29 @@ class CheckoutService
     /**
      * Mengunci seluruh state mutable checkout lalu memvalidasi ulang snapshot sebelum pembayaran.
      *
-     * Row cart, produk, serta alamat aktif buyer dan seller dikunci sebelum availability diperiksa.
-     * Perubahan quantity, harga, produk, seller, atau alamat buyer terhadap snapshot awal dihentikan
-     * sebagai perubahan checkout, sedangkan item yang tidak lagi tersedia memakai exception
-     * availability agar selection dapat diperbaiki setelah transaksi di-rollback.
+     * Row cart, produk, serta alamat aktif buyer dan seller dikunci sebelum validasi. Jika harga
+     * hilang sejak snapshot dibuat, controller dapat melepas pilihan item setelah rollback.
+     * Perubahan yang masih dapat dibayar meminta buyer meninjau ulang snapshot checkout.
      *
-     * @param  string  $buyerId  ID buyer yang menjadi scope operasi.
-     * @param  array  $checkoutSnapshot  Snapshot authoritative yang akan dibandingkan dengan row terkunci.
+     * @param  string  $buyerId  ID buyer pemilik item yang akan dikunci.
+     * @param  array  $checkoutSnapshot  Snapshot backend sebelum transaksi dimulai.
      *
-     * @return void Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
+     * @return void Pembayaran dapat diteruskan setelah seluruh pemeriksaan lolos.
      *
-     * @throws CheckoutAvailabilityException
-     * @throws CheckoutChangedException
+     * @throws CheckoutAvailabilityException Saat item checkout tidak dapat diproses.
+     * @throws CheckoutChangedException Saat checkout yang masih bisa diproses berubah.
      */
     public function lockAndValidateCheckoutItems(string $buyerId, array $checkoutSnapshot): void
     {
-        // --- step 1 - indeks nilai cart yang menjadi dasar checkout snapshot - start ---
+        // --- step 1 - indeks item dari snapshot - start ---
         $checkouts = $checkoutSnapshot['data']['checkouts'] ?? [];
         $expectedCartItems = [];
         $expectedCartIds = [];
+
         foreach ($checkouts as $checkout) {
             foreach (($checkout['keranjangs'] ?? []) as $keranjang) {
                 $cartId = $keranjang['k_id'] ?? '';
+
                 if ($cartId !== '') {
                     $expectedCartIds[] = $cartId;
                     $expectedCartItems[$cartId] = [
@@ -977,55 +1047,79 @@ class CheckoutService
                 }
             }
         }
-        $expectedCartIds = array_values(array_unique($expectedCartIds));
-        // --- step 1 - indeks nilai cart yang menjadi dasar checkout snapshot - end ---
 
-        // --- step 2 - lock row cart dan seluruh produk terkait - start ---
+        $expectedCartIds = array_values(array_unique($expectedCartIds));
+        // --- step 1 - indeks item dari snapshot - end ---
+
+        // --- step 2 - kunci item keranjang - start ---
+        // Scope buyer menjaga penguncian tetap terbatas pada keranjang yang dikirim untuk dibayar.
         $cartItems = Keranjang::where('user_id_buyer', $buyerId)
             ->whereIn('id', $expectedCartIds)
             ->lockForUpdate()
             ->get();
+        // --- step 2 - kunci item keranjang - end ---
+
+        // --- step 3 - kunci produk checkout - start ---
+        // Muat produk soft-deleted agar statusnya diperiksa sebelum permintaan Virtual Account.
         $productIds = $cartItems->pluck('product_id')->filter()->unique()->values()->all();
         $products = Product::withTrashed()
             ->whereIn('id', $productIds)
             ->lockForUpdate()
             ->get()
             ->keyBy('id');
+        // --- step 3 - kunci produk checkout - end ---
+
+        // --- step 4 - kunci lokasi aktif seller - start ---
         $sellerIds = $cartItems->pluck('user_id_seller')->filter()->unique()->values()->all();
-        $verifiedSellerIds = Alamat::whereIn('user_id', $sellerIds)
+        $sellerAddresses = Alamat::whereIn('user_id', $sellerIds)
             ->where('type', 'seller')
             ->where('enable', 1)
             ->lockForUpdate()
-            ->get()
+            ->get();
+        // --- step 4 - kunci lokasi aktif seller - end ---
+
+        // --- step 5 - indeks seller yang terverifikasi - start ---
+        // Status terverifikasi dinilai dari lokasi yang sudah dikunci untuk transaksi ini.
+        $verifiedSellerIds = $sellerAddresses
             ->filter(fn (Alamat $alamat) => $this->alamatService->isVerifiedPinpoint($alamat))
             ->pluck('user_id')
             ->unique()
             ->values()
             ->all();
         $verifiedSellerLookup = array_fill_keys($verifiedSellerIds, true);
+        // --- step 5 - indeks seller yang terverifikasi - end ---
 
+        // --- step 6 - kunci alamat aktif buyer - start ---
         $activeBuyerAddress = Alamat::where('user_id', $buyerId)
             ->where('type', 'buyer')
             ->where('enable', 1)
             ->lockForUpdate()
             ->first();
-        // --- step 2 - lock row cart dan seluruh produk terkait - end ---
+        // --- step 6 - kunci alamat aktif buyer - end ---
 
-        // --- step 3 - validasi snapshot terhadap state yang sudah dikunci - start ---
+        // --- step 7 - identifikasi item keranjang yang hilang - start ---
         $lockedCartIds = $cartItems->pluck('id')->all();
         $invalidCartIds = array_values(array_diff($expectedCartIds, $lockedCartIds));
         $snapshotChanged = count($lockedCartIds) !== count($expectedCartIds);
+        // --- step 7 - identifikasi item keranjang yang hilang - end ---
 
+        // --- step 8 - periksa item checkout terkunci - start ---
         foreach ($cartItems as $cartItem) {
+            // --- step 8.1 - baca ketersediaan produk terkunci - start ---
             $product = $products->get($cartItem->product_id);
-            $expectedCartItem = $expectedCartItems[$cartItem->id] ?? null;
+            $productPrice = $product?->price;
+
             $reason = $this->productAvailabilityService->unavailableReason(
                 productExists: $product !== null,
                 deletedAt: $product?->deleted_at,
                 stock: intval($product?->stock ?? 0),
                 sellerLocationVerified: isset($verifiedSellerLookup[$cartItem->user_id_seller]),
             );
+            // --- step 8.1 - baca ketersediaan produk terkunci - end ---
 
+            // --- step 8.2 - tandai item yang tidak tersedia - start ---
+            // Harga dapat hilang sejak snapshot dibangun. Baris yang sudah dikunci menjadi
+            // dasar penolakan sebelum Xendit diminta membuat Virtual Account.
             if (
                 ! $cartItem->checked
                 || ! $cartItem->checkout
@@ -1033,40 +1127,53 @@ class CheckoutService
                 || $reason !== null
                 || $product?->user_id_seller !== $cartItem->user_id_seller
                 || intval($cartItem->total) > intval($product?->stock ?? 0)
+                || $productPrice === null
             ) {
                 $invalidCartIds[] = $cartItem->id;
             }
+            // --- step 8.2 - tandai item yang tidak tersedia - end ---
+
+            // --- step 8.3 - bandingkan nilai item dengan snapshot - start ---
+            $expectedCartItem = $expectedCartItems[$cartItem->id] ?? null;
 
             if (
                 $expectedCartItem === null
                 || (string) $cartItem->product_id !== $expectedCartItem['product_id']
                 || (string) $cartItem->user_id_seller !== $expectedCartItem['seller_id']
                 || intval($cartItem->total) !== $expectedCartItem['quantity']
-                || intval($product?->price ?? 0) !== $expectedCartItem['price']
+                || intval($productPrice ?? 0) !== $expectedCartItem['price']
             ) {
                 $snapshotChanged = true;
             }
+            // --- step 8.3 - bandingkan nilai item dengan snapshot - end ---
         }
+        // --- step 8 - periksa item checkout terkunci - end ---
 
+        // --- step 9 - tolak checkout dengan item tidak tersedia - start ---
         if ($invalidCartIds !== []) {
             throw new CheckoutAvailabilityException(
                 'Produk di checkout berubah atau sudah tidak tersedia.',
                 array_values(array_unique($invalidCartIds)),
             );
         }
+        // --- step 9 - tolak checkout dengan item tidak tersedia - end ---
 
+        // --- step 10 - bandingkan alamat aktif buyer - start ---
         $expectedAddress = $checkoutSnapshot['clientComparable'] ?? [];
+
         if (
             ! $this->alamatService->isVerifiedPinpoint($activeBuyerAddress)
-            || (string) ($activeBuyerAddress?->id ?? '') !== (string) ($expectedAddress['alamat_id'] ?? '')
-            || (string) ($activeBuyerAddress?->updated_at?->toJSON() ?? '') !== (string) ($expectedAddress['alamat_updated_at'] ?? '')
+            || (string) ($activeBuyerAddress?->id ?? '')
+                !== (string) ($expectedAddress['alamat_id'] ?? '')
+            || (string) ($activeBuyerAddress?->updated_at?->toJSON() ?? '')
+                !== (string) ($expectedAddress['alamat_updated_at'] ?? '')
         ) {
             $snapshotChanged = true;
         }
+        // --- step 10 - bandingkan alamat aktif buyer - end ---
 
         if ($snapshotChanged) {
             throw new CheckoutChangedException();
         }
-        // --- step 3 - validasi snapshot terhadap state yang sudah dikunci - end ---
     }
 }

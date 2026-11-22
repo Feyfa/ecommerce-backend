@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\OutboxAggregateType;
 use App\Enums\OutboxEventType;
 use App\Enums\OutboxStatus;
+use App\Exceptions\CheckoutAvailabilityException;
 use App\Exceptions\CheckoutChangedException;
 use App\Models\Alamat;
 use App\Models\Company;
@@ -99,6 +100,55 @@ class CheckoutTest extends TestCase
         $checkout = $this->checkoutService->getKeranjangCheckout($buyer->id);
 
         $this->assertSame('SpaceX', $checkout['checkouts'][0]['user_name_seller']);
+    }
+
+    /**
+     * Menjaga bentuk harga lama pada respons checkout yang dipakai halaman buyer.
+     *
+     * @return void Memastikan harga kosong tetap tersedia sebagai null di paket seller.
+     */
+    public function test_checkout_data_preserves_null_item_prices(): void
+    {
+        // --- step 1 - Siapkan checkout buyer terverifikasi - start ---
+        $this->withoutMiddleware();
+        $fixture = $this->createCheckoutLockFixture();
+        $this->enableCheckoutPayment();
+        // --- step 1 - Siapkan checkout buyer terverifikasi - end ---
+
+        // --- step 2 - Tambahkan item lama tanpa harga - start ---
+        // Skema produk mengizinkan harga null pada data yang sudah tersimpan.
+        $legacyProduct = $fixture['product']->replicate();
+        $legacyProduct->price = null;
+        $legacyProduct->save();
+
+        $legacyCart = $fixture['cart']->replicate();
+        $legacyCart->product_id = $legacyProduct->id;
+        $legacyCart->save();
+        // --- step 2 - Tambahkan item lama tanpa harga - end ---
+
+        // --- step 3 - Muat paket checkout buyer - start ---
+        $response = $this->actingAs($fixture['buyer'])
+            ->getJson('/api/checkout/data');
+        // --- step 3 - Muat paket checkout buyer - end ---
+
+        // --- step 4 - Periksa ringkasan checkout - start ---
+        $response->assertOk()
+            ->assertJsonCount(1, 'checkouts')
+            ->assertJsonPath('checkouts.0.user_id_seller', $fixture['seller']->id)
+            ->assertJsonCount(2, 'checkouts.0.keranjangs')
+            ->assertJsonPath('checkouts.0.kurirs.0.price', self::JNT_CHECKOUT_SHIPPING)
+            ->assertJsonPath('totalPrice', (int) $fixture['product']->price);
+        // --- step 4 - Periksa ringkasan checkout - end ---
+
+        // --- step 5 - Periksa harga item lama - start ---
+        $itemsByProduct = array_column($response->json('checkouts.0.keranjangs'), null, 'p_id');
+        $legacyItem = $itemsByProduct[$legacyProduct->id];
+
+        $this->assertArrayHasKey('p_price', $legacyItem);
+        $this->assertArrayHasKey('k_total_price', $legacyItem);
+        $this->assertNull($legacyItem['p_price']);
+        $this->assertNull($legacyItem['k_total_price']);
+        // --- step 5 - Periksa harga item lama - end ---
     }
 
     /**
@@ -400,6 +450,29 @@ class CheckoutTest extends TestCase
     }
 
     /**
+     * Memastikan item yang kehilangan harga setelah snapshot dibuat ditolak saat row dikunci.
+     *
+     * @return void Memverifikasi exception yang dipakai controller untuk melepas pilihan item.
+     */
+    public function test_locked_checkout_rejects_price_that_became_null(): void
+    {
+        // --- step 1 - kosongkan harga produk setelah snapshot - start ---
+        $fixture = $this->createCheckoutLockFixture();
+
+        $fixture['product']->update(['price' => null]);
+        // --- step 1 - kosongkan harga produk setelah snapshot - end ---
+
+        // --- step 2 - verifikasi penolakan pada row terkunci - start ---
+        $this->expectException(CheckoutAvailabilityException::class);
+
+        $this->checkoutService->lockAndValidateCheckoutItems(
+            $fixture['buyer']->id,
+            $fixture['snapshot'],
+        );
+        // --- step 2 - verifikasi penolakan pada row terkunci - end ---
+    }
+
+    /**
      * Memastikan pergantian alamat aktif setelah snapshot dibuat membatalkan checkout sebelum pembayaran.
      *
      * @test
@@ -508,6 +581,49 @@ class CheckoutTest extends TestCase
     }
 
     /**
+     * Memastikan produk lama tanpa harga tidak mencapai pembuatan Virtual Account saat submit.
+     *
+     * @return void Memverifikasi respons penolakan serta cart yang masih tersedia untuk direview.
+     */
+    public function test_null_price_blocks_virtual_account_creation(): void
+    {
+        // --- step 1 - siapkan checkout produk tanpa harga - start ---
+        $this->withoutMiddleware();
+        $fixture = $this->createCheckoutLockFixture();
+        $this->enableCheckoutPayment();
+
+        $fixture['product']->update(['price' => null]);
+        // --- step 1 - siapkan checkout produk tanpa harga - end ---
+
+        // --- step 2 - siapkan mock Xendit - start ---
+        // Permintaan VA yang terjadi sebelum penolakan dapat tercatat di luar transaksi database.
+        $xendit = $this->mock(XenditService::class);
+        $xendit->shouldReceive('createVirtualAccount')->andReturn([
+            'status' => 'error',
+            'message' => 'Unexpected Virtual Account request in the null price test.',
+        ]);
+        // --- step 2 - siapkan mock Xendit - end ---
+
+        $response = $this->processCheckoutFixture($fixture);
+
+        // --- step 3 - periksa respons harga kosong - start ---
+        $response->assertConflict()
+            ->assertJsonPath('code', 'CHECKOUT_INVALID')
+            ->assertJsonPath(
+                'message',
+                'Harga salah satu produk belum tersedia. Silakan cek keranjang.',
+            );
+
+        $xendit->shouldNotHaveReceived('createVirtualAccount');
+        // --- step 3 - periksa respons harga kosong - end ---
+
+        // --- step 4 - periksa state checkout - start ---
+        $this->assertDatabaseCount('transaction_invoices', 0);
+        $this->assertDatabaseHas('keranjangs', ['id' => $fixture['cart']->id, 'checkout' => true]);
+        // --- step 4 - periksa state checkout - end ---
+    }
+
+    /**
      * Verifies rejected provider responses leave the checkout available for review.
      *
      * @param  int  $status  HTTP status supplied by the fake provider.
@@ -611,7 +727,8 @@ class CheckoutTest extends TestCase
     }
 
     /**
-     * Submits the same valid quote for both accepted and rejected provider responses.
+     * Submits the fixture's cart using the quote shown to a buyer before payment.
+     *
      *
      * @param  array{
      *     buyer: User, seller: User, buyerAddress: Alamat, product: Product, cart: Keranjang
@@ -621,9 +738,11 @@ class CheckoutTest extends TestCase
      */
     private function processCheckoutFixture(array $fixture): TestResponse
     {
-        // Use the fixture's product price to quote the same cart the server will validate.
-        $productTotal = $fixture['product']->price;
+        // --- step 1 - Susun snapshot buyer - start ---
+        // The read endpoint counts a missing price as zero in the displayed product total.
+        $productTotal = $fixture['product']->price ?? 0;
         $jntShipping = self::JNT_CHECKOUT_SHIPPING;
+
         $snapshot = [
             'alamat_id' => $fixture['buyerAddress']->id,
             'alamat_updated_at' => $fixture['buyerAddress']->updated_at?->toJSON(),
@@ -632,13 +751,19 @@ class CheckoutTest extends TestCase
             'total_shipping' => $jntShipping,
             'total_all' => $productTotal + $jntShipping,
         ];
+        // --- step 1 - Susun snapshot buyer - end ---
 
-        return $this->actingAs($fixture['buyer'])->postJson('/api/checkout/process', [
+        // --- step 2 - Kirim checkout buyer - start ---
+        $sellerId = $fixture['seller']->id;
+        $response = $this->actingAs($fixture['buyer'])->postJson('/api/checkout/process', [
             'payment_slug' => 'bca',
-            'shipping_options' => [['user_id_seller' => $fixture['seller']->id, 'kurir_name' => 'JNT']],
-            'noteds' => [['user_id_seller' => $fixture['seller']->id, 'noted' => '']],
+            'shipping_options' => [['user_id_seller' => $sellerId, 'kurir_name' => 'JNT']],
+            'noteds' => [['user_id_seller' => $sellerId, 'noted' => '']],
             'client_snapshot' => $snapshot,
         ]);
+        // --- step 2 - Kirim checkout buyer - end ---
+
+        return $response;
     }
 
     /**
