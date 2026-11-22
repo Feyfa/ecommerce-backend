@@ -397,6 +397,11 @@ valid checkout.
 
 The key is stored on `transaction_invoices.checkout_key`.
 
+The hashed JSON uses `JSON_THROW_ON_ERROR`. An encoding failure stops checkout
+with a `JsonException` instead of hashing an empty string that every failed
+encoding would share. The flag does not change successful output, so stored
+keys still match.
+
 When the database driver is PostgreSQL, checkout processing uses:
 
 ```text
@@ -501,6 +506,9 @@ to trust PostgreSQL while the asynchronous search projection catches up. See
 
 - [TOK-79 Checkout Data Contracts](../../qa/tok-79-checkout-data-phpstan.md)
   tracks local coverage for the checkout response and the missing-price guards.
+- [TOK-81 Checkout Persistence PHPStan QA](../../qa/tok-81-checkout-persistence-phpstan.md)
+  tracks local coverage for invoice persistence, the checkout key, and buyer
+  identity on checkout processing.
 - [TOK-8 Pinpoint Address QA](../../qa/tok-8-pinpoint-address.md) tracks backend
   address and checkout verification; the matching frontend checklist is
   available at `frontend-repo:/docs/qa/tok-8-pinpoint-address.md`.

@@ -138,12 +138,18 @@ class CheckoutController extends Controller
     public function processCheckout(Request $request): JsonResponse
     {
         // --- step 1 - validasi buyer terautentikasi - start ---
-        $user_id_buyer = optional(auth()->user())->id;
-        $user = User::where('id', $user_id_buyer)->first();
+        // Model user lokal harus masih ada. Record database tetap dimuat karena namanya dipakai
+        // sebagai nama pemilik Virtual Account.
+        $authenticatedUser = auth()->user();
+        $user = $authenticatedUser instanceof User
+            ? User::where('id', $authenticatedUser->id)->first()
+            : null;
 
         if (! $user) {
             return response()->json(['result' => 'error', 'message' => 'Unauthorized'], 401);
         }
+
+        $user_id_buyer = $user->id;
         // --- step 1 - validasi buyer terautentikasi - end ---
 
         // --- step 2 - validasi payload checkout - start ---
@@ -315,7 +321,7 @@ class CheckoutController extends Controller
                 );
 
                 if ($saveCheckoutToDatabase['status'] == 'error') {
-                    throw new RuntimeException($saveCheckoutToDatabase['message'] ?? 'Save checkout failed');
+                    throw new RuntimeException($saveCheckoutToDatabase['message']);
                 }
                 // --- step 7.4 - simpan invoice checkout - end ---
 
@@ -326,7 +332,7 @@ class CheckoutController extends Controller
                 );
 
                 if ($deleteKeranjangAfterCheckout['status'] == 'error') {
-                    throw new RuntimeException($deleteKeranjangAfterCheckout['message'] ?? 'Delete keranjang failed');
+                    throw new RuntimeException($deleteKeranjangAfterCheckout['message']);
                 }
                 // --- step 7.5 - hapus item keranjang yang diproses - end ---
 
@@ -337,7 +343,7 @@ class CheckoutController extends Controller
 
                 if ($changeStockProductAfterCheckout['status'] == 'error') {
                     throw new CheckoutAvailabilityException(
-                        $changeStockProductAfterCheckout['message'] ?? 'Change stock product failed',
+                        $changeStockProductAfterCheckout['message'],
                         $this->checkoutService->checkoutCartIds(
                             checkouts: $checkoutSnapshot['data']['checkouts'],
                         ),
@@ -350,7 +356,7 @@ class CheckoutController extends Controller
 
                 // Id invoice dikembalikan dari dalam transaksi database supaya frontend dapat menandai
                 // transaksi hasil checkout ini secara langsung, bukan menebak data terbaru buyer.
-                return $saveCheckoutToDatabase['transaction_invoice_id'] ?? '';
+                return $saveCheckoutToDatabase['transaction_invoice_id'];
             });
             // --- step 7 - proses checkout secara atomik - end ---
 
@@ -397,7 +403,7 @@ class CheckoutController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'Pembayaran Berhasil',
-            'transaction_invoice_id' => $transactionInvoiceId ?? '',
+            'transaction_invoice_id' => $transactionInvoiceId,
         ]);
     }
 
@@ -407,7 +413,9 @@ class CheckoutController extends Controller
      * Method dipanggil di dalam transaksi checkout. ID produk dibuat unik agar beberapa baris
      * checkout untuk produk yang sama tidak menghasilkan intent publikasi duplikat.
      *
-     * @param  array<int, array<string, mixed>>  $checkouts  Kelompok checkout authoritative yang sudah diproses.
+     * @param  list<array{
+     *     keranjangs?: list<array{p_id?: string}>
+     * }>  $checkouts  Kelompok checkout authoritative yang sudah diproses.
      *
      * @return void Setiap produk unik dicatat pada outbox transaksi aktif.
      */

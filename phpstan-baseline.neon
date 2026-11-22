@@ -1,26 +1,6 @@
 parameters:
 	ignoreErrors:
 		-
-			message: "#^Argument of an invalid type mixed supplied for foreach, only iterables are supported\\.$#"
-			count: 1
-			path: app/Http/Controllers/CheckoutController.php
-
-		-
-			message: "#^Cannot access offset 'p_id' on mixed\\.$#"
-			count: 1
-			path: app/Http/Controllers/CheckoutController.php
-
-		-
-			message: "#^Cannot access property \\$id on mixed\\.$#"
-			count: 1
-			path: app/Http/Controllers/CheckoutController.php
-
-		-
-			message: "#^Cannot cast mixed to string\\.$#"
-			count: 1
-			path: app/Http/Controllers/CheckoutController.php
-
-		-
 			message: "#^Parameter \\#2 \\$clientSnapshot of method App\\\\Services\\\\CheckoutService\\:\\:checkoutSnapshotChanged\\(\\) expects array, mixed given\\.$#"
 			count: 1
 			path: app/Http/Controllers/CheckoutController.php
@@ -38,11 +18,6 @@ parameters:
 		-
 			message: "#^Parameter \\$shippingOptions of method App\\\\Services\\\\CheckoutService\\:\\:buildCheckoutSnapshot\\(\\) expects array, mixed given\\.$#"
 			count: 2
-			path: app/Http/Controllers/CheckoutController.php
-
-		-
-			message: "#^Variable \\$transactionInvoiceId on left side of \\?\\? always exists and is not nullable\\.$#"
-			count: 1
 			path: app/Http/Controllers/CheckoutController.php
 
 		-
@@ -96,21 +71,6 @@ parameters:
 			path: app/Http/Controllers/TransactionController.php
 
 		-
-			message: "#^Cannot access property \\$alamat on App\\\\Models\\\\Alamat\\|null\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Cannot access property \\$latitude on App\\\\Models\\\\Alamat\\|null\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Cannot access property \\$longitude on App\\\\Models\\\\Alamat\\|null\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
 			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:buildCheckoutSnapshot\\(\\) has parameter \\$noteds with no value type specified in iterable type array\\.$#"
 			count: 1
 			path: app/Services/CheckoutService.php
@@ -121,57 +81,7 @@ parameters:
 			path: app/Services/CheckoutService.php
 
 		-
-			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:changeStockProductAfterCheckout\\(\\) has parameter \\$checkouts with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:changeStockProductAfterCheckout\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
 			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:checkoutSnapshotChanged\\(\\) has parameter \\$clientSnapshot with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:deleteKeranjangAfterCheckoutForBuyer\\(\\) has parameter \\$checkouts with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:deleteKeranjangAfterCheckoutForBuyer\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:saveCheckoutToDatabase\\(\\) has parameter \\$checkouts with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:saveCheckoutToDatabase\\(\\) has parameter \\$dataXendit with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:saveCheckoutToDatabase\\(\\) has parameter \\$kurirs with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:saveCheckoutToDatabase\\(\\) has parameter \\$noteds with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:saveCheckoutToDatabase\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Parameter \\#2 \\$data of function hash expects string, string\\|false given\\.$#"
 			count: 1
 			path: app/Services/CheckoutService.php
 
