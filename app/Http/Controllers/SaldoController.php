@@ -12,6 +12,15 @@ use Illuminate\Support\Str;
 
 class SaldoController extends Controller
 {
+    // Nominal tarik saldo terkecil dalam rupiah, sama dengan frontend yang menolak `<= 0`.
+    private const WITHDRAW_MINIMUM_AMOUNT = 1;
+
+    // Nominal tarik saldo terbesar dalam rupiah untuk satu request.
+    private const WITHDRAW_MAXIMUM_AMOUNT = 1000000;
+
+    // Rupiah ditampilkan tanpa desimal, sama dengan format riwayat di SaldoService.
+    private const RUPIAH_DECIMAL_PLACES = 0;
+
     /**
      * Menyiapkan controller dengan layanan saldo dan pembayaran.
      *
@@ -197,74 +206,143 @@ class SaldoController extends Controller
     /**
      * Memvalidasi dan memproses penarikan saldo pengguna.
      *
-     * Function memvalidasi identitas user, rekening tujuan, nominal minimum serta maksimum, dan
-     * kecukupan saldo sebelum meminta disbursement ke Xendit. Saldo dan riwayatnya baru diperbarui
-     * setelah provider mengonfirmasi pencairan, sehingga kegagalan eksternal tidak mengurangi saldo
-     * pengguna.
+     * Identitas user diperiksa sebelum input. `paymentAccount` yang tidak kosong tetapi bukan teks,
+     * serta `wihtdrawPrice` berbentuk boolean, array, atau objek, ditolak dengan 422. Nominal lalu
+     * dibaca sekali sebagai rupiah bulat: nilai kosong, format bukan bilangan bulat, di bawah
+     * minimum, atau di atas maksimum mendapat 400. Rekening dan kecukupan saldo diperiksa sebelum
+     * disbursement Xendit. Saldo dan riwayatnya baru diperbarui setelah provider mengonfirmasi
+     * pencairan, sehingga kegagalan eksternal tidak mengurangi saldo pengguna.
      *
-     * @param  Request  $request  Request terautentikasi beserta payload dan metadata operasi.
+     * @param  Request  $request  Rekening tujuan dan nominal penarikan dari user terautentikasi.
      *
-     * @return JsonResponse Respons JSON yang memuat hasil operasi atau detail kegagalan yang aman untuk client.
+     * @return JsonResponse Riwayat penarikan yang baru dibuat atau detail kegagalan untuk client.
      */
     public function withdrawSaldo(Request $request): JsonResponse
     {
         // --- step 1 - validasi user - start ---
-        $user_id = optional(auth()->user())->id;
-        $userExists = User::where('id', $user_id)->exists();
+        $user = $request->user();
 
-        if (! $userExists) {
+        if (! $user instanceof User || ! User::where('id', $user->id)->exists()) {
             return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
         }
+
+        $user_id = $user->id;
         // --- step 1 - validasi user - end ---
 
-        // --- step 2 - validasi request - start ---
-        $wihtdrawMaximum = 1000000;
-        $wihtdrawMaximumString = number_format($wihtdrawMaximum, 0, ',', '.');
+        // --- step 2 - validasi rekening tujuan - start ---
+        // `?:` mengubah semua nilai kosong (null, false, 0, [], "0") menjadi '' sehingga tetap
+        // mendapat 400 seperti sebelumnya. Nilai lain yang bukan teks ditolak dengan 422;
+        // sebelumnya array membuat trim() melempar TypeError dan berakhir HTTP 500.
+        $paymentAccount = $request->paymentAccount ?: '';
 
-        $paymentAccount = $request->paymentAccount ?? '';
-        $wihtdrawPrice = $request->wihtdrawPrice ?? '';
+        if (! is_string($paymentAccount)) {
+            return response()->json(
+                ['status' => 'error', 'message' => 'Rekening Bank Harus Berupa Teks'],
+                422,
+            );
+        }
+
         if (empty($paymentAccount) || trim($paymentAccount) == '') {
-            return response()->json(['status' => 'error', 'message' => 'Rekening Bank Tidak Boleh Kosong'], 400);
+            return response()->json(
+                ['status' => 'error', 'message' => 'Rekening Bank Tidak Boleh Kosong'],
+                400,
+            );
         }
-        if (empty($wihtdrawPrice) || trim($wihtdrawPrice) == '') {
-            return response()->json(['status' => 'error', 'message' => 'Nominal Tidak Boleh Kosong'], 400);
-        }
-        if (! is_numeric($wihtdrawPrice)) {
-            return response()->json(['status' => 'error', 'message' => 'Format Nominal Tidak Valid'], 400);
-        }
-        if ($wihtdrawPrice > $wihtdrawMaximum) {
-            return response()->json(['status' => 'error', 'message' => "Nominal Tidak Boleh Lebih Dari Rp$wihtdrawMaximumString"], 400);
+        // --- step 2 - validasi rekening tujuan - end ---
+
+        // --- step 3 - validasi tipe nominal - start ---
+        // Frontend mengirim angka JSON (nilai awal 1) atau teks digit setelah user mengetik,
+        // jadi keduanya diterima. Nilai kosong diubah `?:` menjadi '' seperti rekening di atas.
+        // Boolean, array, dan objek ditolak dengan 422; sebelumnya `true` mendapat 400 format
+        // dan array membuat trim() melempar TypeError.
+        $wihtdrawPriceInput = $request->wihtdrawPrice ?: '';
+
+        if (! is_string($wihtdrawPriceInput) && ! is_numeric($wihtdrawPriceInput)) {
+            return response()->json(
+                ['status' => 'error', 'message' => 'Nominal Harus Berupa Angka Atau Teks'],
+                422,
+            );
         }
 
-        $wihtdrawPriceString = number_format($wihtdrawPrice, 0, ',', '.');
-        // --- step 2 - validasi request - end ---
+        if (is_string($wihtdrawPriceInput) && trim($wihtdrawPriceInput) == '') {
+            return response()->json(
+                ['status' => 'error', 'message' => 'Nominal Tidak Boleh Kosong'],
+                400,
+            );
+        }
+        // --- step 3 - validasi tipe nominal - end ---
 
-        // --- step 3 - ambil data payment - start ---
+        // --- step 4 - baca nominal sebagai rupiah bulat - start ---
+        // Xendit dan SaldoService hanya menerima `int`. Sebelumnya "150000.5" dipotong PHP menjadi
+        // 150000 untuk transfer dan saldo, sedangkan pesan membulatkannya menjadi Rp150.001.
+        $wihtdrawPrice = $this->parseWithdrawAmount($wihtdrawPriceInput);
+
+        if ($wihtdrawPrice === null) {
+            return response()->json(
+                ['status' => 'error', 'message' => 'Format Nominal Tidak Valid'],
+                400,
+            );
+        }
+        // --- step 4 - baca nominal sebagai rupiah bulat - end ---
+
+        // --- step 5 - validasi batas nominal - start ---
+        // Nominal negatif sebelumnya lolos sampai Xendit. Jika provider menerimanya,
+        // saveSaldoAfterDisbursement() justru menambah saldo karena mengurangi angka negatif.
+        // Kelebihan saldo itu bisa ditarik lewat endpoint ini, sehingga perusahaan yang
+        // menanggung. Batas ini harus dicek sebelum lookup rekening dan disbursement.
+        if ($wihtdrawPrice < self::WITHDRAW_MINIMUM_AMOUNT) {
+            $minimumString = $this->formatRupiahAmount(self::WITHDRAW_MINIMUM_AMOUNT);
+
+            return response()->json(
+                ['status' => 'error', 'message' => "Nominal Minimal Rp$minimumString"],
+                400,
+            );
+        }
+
+        if ($wihtdrawPrice > self::WITHDRAW_MAXIMUM_AMOUNT) {
+            $maximumString = $this->formatRupiahAmount(self::WITHDRAW_MAXIMUM_AMOUNT);
+            $maximumMessage = "Nominal Tidak Boleh Lebih Dari Rp$maximumString";
+
+            return response()->json(['status' => 'error', 'message' => $maximumMessage], 400);
+        }
+        // --- step 5 - validasi batas nominal - end ---
+
+        // --- step 6 - ambil data payment - start ---
         $getPayment = $this->paymentService->getWithdrawalPayment($user_id, $paymentAccount);
         $status = $getPayment['status'];
         $message = $getPayment['message'] ?? '';
-        $paymentUserId = isset($getPayment['payment']['id']) ? $getPayment['payment']['id'] : '';
-        $userName = isset($getPayment['payment']['user_name']) ? $getPayment['payment']['user_name'] : '';
-        $paymentSlug = isset($getPayment['payment']['payment_slug']) ? $getPayment['payment']['payment_slug'] : '';
+        $paymentUserId = $getPayment['payment']['id'] ?? '';
+        $userName = $getPayment['payment']['user_name'] ?? '';
+        $paymentSlug = $getPayment['payment']['payment_slug'] ?? '';
         $paymentSlugUpper = strtoupper($paymentSlug);
+
         if ($status == 'error') {
             return response()->json(['status' => 'error', 'message' => $message], 400);
         }
-        // --- step 3 - ambil data payment - end ---
+        // --- step 6 - ambil data payment - end ---
 
-        // --- step 4 - ambil saldo user - start ---
+        // --- step 7 - ambil saldo user - start ---
         $getSaldo = $this->saldoService->getSaldo($user_id);
         $saldoTotal = $getSaldo['saldoTotal'] ?? 0;
-        $saldoTotalString = number_format($saldoTotal, 0, ',', '.');
-        if ($saldoTotal == 0 || empty($saldoTotal)) {
-            return response()->json(['status' => 'error', 'message' => 'Saldo Anda Rp0 Anda Tidak Bisa Tarik Saldo'], 400);
-        }
-        if ($saldoTotal < $wihtdrawPrice) {
-            return response()->json(['status' => 'error', 'message' => "Saldo Anda Hanya Rp$saldoTotalString, Tidak Bisa Tarik Saldo Sebesar $wihtdrawPriceString"], 400);
-        }
-        // --- step 4 - ambil saldo user - end ---
+        $saldoTotalString = $this->formatRupiahAmount($saldoTotal);
+        $wihtdrawPriceString = $this->formatRupiahAmount($wihtdrawPrice);
 
-        // --- step 5 - proses penarikan saldo - start ---
+        if ($saldoTotal == 0 || empty($saldoTotal)) {
+            return response()->json(
+                ['status' => 'error', 'message' => 'Saldo Anda Rp0 Anda Tidak Bisa Tarik Saldo'],
+                400,
+            );
+        }
+
+        if ($saldoTotal < $wihtdrawPrice) {
+            $insufficientMessage = "Saldo Anda Hanya Rp$saldoTotalString, "
+                ."Tidak Bisa Tarik Saldo Sebesar $wihtdrawPriceString";
+
+            return response()->json(['status' => 'error', 'message' => $insufficientMessage], 400);
+        }
+        // --- step 7 - ambil saldo user - end ---
+
+        // --- step 8 - proses penarikan saldo - start ---
         $disbursement = $this->xenditService->disbursement(
             external_id: "dis-$paymentSlug-".uniqid(),
             amount: $wihtdrawPrice,
@@ -281,18 +359,60 @@ class SaldoController extends Controller
                 'message' => $disbursement['message'],
             ], 400);
         }
-        // --- step 5 - proses penarikan saldo - end ---
+        // --- step 8 - proses penarikan saldo - end ---
 
-        // --- step 6 - simpan saldo setelah disbursement - start ---
-        $saveSaldoAfterDisbursement = $this->saldoService->saveSaldoAfterDisbursement($user_id, $paymentUserId, $wihtdrawPrice);
+        // --- step 9 - simpan saldo setelah disbursement - start ---
+        $saveSaldoAfterDisbursement = $this->saldoService->saveSaldoAfterDisbursement(
+            $user_id,
+            $paymentUserId,
+            $wihtdrawPrice,
+        );
         $saldoHistoryId = $saveSaldoAfterDisbursement['saldoHistoryId'] ?? null;
-        // --- step 6 - simpan saldo setelah disbursement - end ---
+        // --- step 9 - simpan saldo setelah disbursement - end ---
 
-        // --- step 7 - ambil satu riwayat saldo - start ---
+        // --- step 10 - ambil satu riwayat saldo - start ---
         $getSaldoById = $this->saldoService->getSaldoById($saldoHistoryId);
         $saldoHistory = $getSaldoById['saldoHistory'] ?? [];
-        // --- step 7 - ambil satu riwayat saldo - end ---
+        // --- step 10 - ambil satu riwayat saldo - end ---
 
         return response()->json(['status' => 'success', 'saldoHistory' => $saldoHistory]);
+    }
+
+    /**
+     * Membaca nominal tarik saldo yang sudah lolos cek tipe sebagai rupiah bulat.
+     *
+     * Angka JSON bulat dipakai apa adanya. Teks hanya diterima jika berisi digit dengan tanda minus
+     * opsional, sehingga nominal negatif tetap sampai ke cek minimum dengan pesan yang tepat.
+     * Desimal, eksponen, tanda plus, dan angka JSON pecahan dianggap format tidak valid.
+     *
+     * @param  int|float|string  $input  Nominal mentah yang tidak kosong dari request.
+     *
+     * @return int|null Nominal dalam rupiah, atau null jika bukan bilangan bulat.
+     */
+    private function parseWithdrawAmount(int|float|string $input): ?int
+    {
+        // Teks digit yang melebihi PHP_INT_MAX dibatasi oleh cast (int) ke PHP_INT_MAX atau
+        // PHP_INT_MIN, sehingga tetap ditolak oleh cek batas nominal di pemanggil.
+        if (is_int($input)) {
+            return $input;
+        }
+
+        if (is_string($input) && preg_match('/\A-?\d+\z/', $input) === 1) {
+            return (int) $input;
+        }
+
+        return null;
+    }
+
+    /**
+     * Memformat nominal untuk pesan dan deskripsi transfer tanpa awalan `Rp`.
+     *
+     * @param  int|float  $amount  Nominal rupiah yang ditampilkan ke user atau dikirim ke Xendit.
+     *
+     * @return string Nominal dengan pemisah ribuan titik, misalnya `1.000.000`.
+     */
+    private function formatRupiahAmount(int|float $amount): string
+    {
+        return number_format($amount, self::RUPIAH_DECIMAL_PLACES, ',', '.');
     }
 }

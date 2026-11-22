@@ -1,41 +1,6 @@
 parameters:
 	ignoreErrors:
 		-
-			message: "#^Cannot access property \\$id on mixed\\.$#"
-			count: 1
-			path: app/Http/Controllers/SaldoController.php
-
-		-
-			message: "#^Parameter \\#1 \\$num of function number_format expects float, float\\|int\\<min, \\-1\\>\\|int\\<1, 1000000\\>\\|string given\\.$#"
-			count: 1
-			path: app/Http/Controllers/SaldoController.php
-
-		-
-			message: "#^Parameter \\#1 \\$string of function trim expects string, mixed given\\.$#"
-			count: 2
-			path: app/Http/Controllers/SaldoController.php
-
-		-
-			message: "#^Parameter \\#2 \\$account of method App\\\\Services\\\\PaymentService\\:\\:getWithdrawalPayment\\(\\) expects string, mixed given\\.$#"
-			count: 1
-			path: app/Http/Controllers/SaldoController.php
-
-		-
-			message: "#^Parameter \\#3 \\$price of method App\\\\Services\\\\SaldoService\\:\\:saveSaldoAfterDisbursement\\(\\) expects int, float\\|int\\<min, \\-1\\>\\|int\\<1, 1000000\\>\\|string given\\.$#"
-			count: 1
-			path: app/Http/Controllers/SaldoController.php
-
-		-
-			message: "#^Parameter \\$account_number of method App\\\\Services\\\\XenditService\\:\\:disbursement\\(\\) expects string, mixed given\\.$#"
-			count: 1
-			path: app/Http/Controllers/SaldoController.php
-
-		-
-			message: "#^Parameter \\$amount of method App\\\\Services\\\\XenditService\\:\\:disbursement\\(\\) expects int, float\\|int\\<min, \\-1\\>\\|int\\<1, 1000000\\>\\|string given\\.$#"
-			count: 1
-			path: app/Http/Controllers/SaldoController.php
-
-		-
 			message: "#^Cannot access property \\$saldo_income on App\\\\Models\\\\SaldoUser\\|null\\.$#"
 			count: 2
 			path: app/Services/SaldoService.php
