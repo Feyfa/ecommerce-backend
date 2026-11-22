@@ -47,6 +47,37 @@ use Illuminate\Support\Facades\DB;
  *     keranjangs: list<CheckoutItem>,
  *     kurirs: list<CheckoutCourier>
  * }
+ * @phpstan-type CheckoutSelectedCourier array{
+ *     user_id_seller: string,
+ *     name: string,
+ *     price: int,
+ *     estimation: string
+ * }
+ * @phpstan-type CheckoutSellerNote array{user_id_seller: string, noted: string}
+ * @phpstan-type CheckoutComparable array{
+ *     alamat_id: string,
+ *     alamat_updated_at: string|null,
+ *     cart_item_ids: list<string>,
+ *     total_product: int|float,
+ *     total_shipping: int,
+ *     total_all: int|float
+ * }
+ * @phpstan-type CheckoutSnapshotResult (
+ *     array{
+ *         status: 'success',
+ *         data: array{
+ *             alamat: Alamat,
+ *             checkouts: list<CheckoutGroup>,
+ *             kurirs: list<CheckoutSelectedCourier>,
+ *             noteds: list<CheckoutSellerNote>,
+ *             payment: array{method: string|null, slug: string|null, name: string|null},
+ *             totals: array{product: int|float, shipping: int, all: int|float}
+ *         },
+ *         clientComparable: CheckoutComparable
+ *     }
+ *     |array{status: 'invalid', code: string, message: string}
+ *     |array{status: 'error', message: string}
+ * )
  */
 class CheckoutService
 {
@@ -132,13 +163,13 @@ class CheckoutService
     }
 
     /**
-     * ID cart diekstrak dari issue ketersediaan, dinormalisasi menjadi string unik, dan dipakai untuk
-     * read-repair selection. Nilai kosong dibuang agar update berikutnya tidak menyasar row yang tidak
-     * valid.
+     * Mengambil ID cart dari paket checkout yang gagal diproses.
      *
-     * @param  array  $checkouts  Kumpulan item checkout yang telah dimuat dan divalidasi.
+     * Controller memakai ID ini untuk melepas pilihan item terkait setelah rollback checkout.
      *
-     * @return array<int, string> Data terstruktur yang dihasilkan oleh proses ini.
+     * @param  list<array{keranjangs?: list<array{k_id?: string}>}>  $checkouts  Paket checkout.
+     *
+     * @return list<string> ID cart unik untuk melepas pilihan item.
      */
     public function checkoutCartIds(array $checkouts): array
     {
@@ -382,10 +413,14 @@ class CheckoutService
      * @param  array  $noteds  Catatan buyer yang dipetakan untuk setiap grup seller.
      * @param  string  $paymentSlug  Slug metode pembayaran yang dipilih.
      *
-     * @return array Snapshot yang siap dibayar atau alasan checkout ditolak.
+     * @return CheckoutSnapshotResult Snapshot yang siap dibayar atau alasan checkout ditolak.
      */
-    public function buildCheckoutSnapshot(string $user_id_buyer = '', array $shippingOptions = [], array $noteds = [], string $paymentSlug = ''): array
-    {
+    public function buildCheckoutSnapshot(
+        string $user_id_buyer = '',
+        array $shippingOptions = [],
+        array $noteds = [],
+        string $paymentSlug = '',
+    ): array {
         // --- step 1 - sinkronkan availability produk checkout - start ---
         $cartState = $this->reconcileCheckoutCart($user_id_buyer);
 
@@ -615,15 +650,27 @@ class CheckoutService
     }
 
     /**
-     * mengubah snapshot backend menjadi bentuk data yang bisa dipakai frontend untuk refresh checkout.
+     * Menyiapkan snapshot backend untuk ditinjau kembali oleh buyer.
      *
-     * Snapshot authoritative diproyeksikan hanya ke field yang perlu dibandingkan dan ditampilkan
-     * frontend. Detail internal serta bentuk relasi database tidak dibocorkan ke kontrak refresh
-     * checkout.
+     * Nilai default menjaga bentuk respons saat data snapshot hanya tersedia sebagian.
      *
-     * @param  array  $checkoutSnapshot  Snapshot checkout authoritative yang akan diproses.
+     * @param  array{data?: array{
+     *     alamat?: Alamat|null,
+     *     checkouts?: list<CheckoutGroup>,
+     *     kurirs?: list<CheckoutSelectedCourier>,
+     *     noteds?: list<CheckoutSellerNote>,
+     *     totals?: array{product?: int|float, shipping?: int, all?: int|float}
+     * }}  $checkoutSnapshot  Data backend untuk memuat ulang halaman checkout.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return array{
+     *     alamat: Alamat|null,
+     *     checkouts: list<CheckoutGroup>,
+     *     kurirs: list<CheckoutSelectedCourier>,
+     *     noteds: list<CheckoutSellerNote>,
+     *     totalPrice: int|float,
+     *     totalShipping: int,
+     *     totalAll: int|float
+     * } Data alamat, paket, dan total yang dipakai frontend untuk meninjau checkout.
      */
     public function formatCheckoutSnapshotForFrontend(array $checkoutSnapshot = []): array
     {
@@ -642,16 +689,22 @@ class CheckoutService
     }
 
     /**
-     * membandingkan snapshot backend dan snapshot yang terakhir dilihat user di frontend.
+     * Memeriksa apakah data yang dilihat buyer masih cocok dengan snapshot backend.
      *
-     * Kedua snapshot dinormalisasi sebelum dibandingkan agar perbedaan urutan atau tipe representasi
-     * yang tidak bermakna tidak memicu penolakan. Perubahan harga, stok, alamat, ongkir, atau pilihan
-     * pembayaran tetap terdeteksi.
+     * ID cart diurutkan dan total dibandingkan sebagai bilangan bulat sesuai nominal pembayaran.
+     * Buyer perlu meninjau ulang checkout jika alamat, item, atau total berbeda.
      *
-     * @param  array  $backendSnapshot  Snapshot terbaru yang dihitung ulang oleh backend.
+     * @param  array{clientComparable?: array{
+     *     alamat_id?: string,
+     *     alamat_updated_at?: string|null,
+     *     cart_item_ids?: list<string>,
+     *     total_product?: int|float,
+     *     total_shipping?: int,
+     *     total_all?: int|float
+     * }}  $backendSnapshot  Alamat, ID cart, dan total yang dibentuk backend.
      * @param  array  $clientSnapshot  Snapshot terakhir yang telah dilihat atau dikonfirmasi frontend.
      *
-     * @return bool True ketika kondisi checkout snapshot changed terpenuhi; false jika tidak.
+     * @return bool True jika ID cart, identitas atau versi alamat, atau salah satu total berbeda.
      */
     public function checkoutSnapshotChanged(array $backendSnapshot = [], array $clientSnapshot = []): bool
     {
@@ -671,12 +724,17 @@ class CheckoutService
     }
 
     /**
-     * membuat key idempotency dari buyer dan baris keranjang checkout yang sama.
+     * Membentuk checkout key dari buyer dan kumpulan item cart yang akan dibayar.
      *
-     * @param  string  $user_id_buyer  ID buyer pemilik cart, alamat, atau transaksi.
-     * @param  array  $checkoutSnapshot  Snapshot checkout authoritative yang akan diproses.
+     * Pengurutan ID menghasilkan key yang sama untuk kumpulan item yang sama. Checkout memakai
+     * key tersebut untuk advisory lock PostgreSQL dan pencarian invoice yang sudah dibuat.
      *
-     * @return string Nilai teks yang telah dinormalisasi untuk kebutuhan pemanggil.
+     * @param  string  $user_id_buyer  ID buyer yang menjadi bagian dari checkout key.
+     * @param  array{clientComparable?: array{
+     *     cart_item_ids?: list<string>
+     * }}  $checkoutSnapshot  ID cart yang dipakai untuk membentuk checkout key.
+     *
+     * @return string Hash SHA-256 yang dipakai untuk lock dan pencarian invoice.
      */
     public function generateCheckoutKey(string $user_id_buyer = '', array $checkoutSnapshot = []): string
     {
@@ -1018,7 +1076,20 @@ class CheckoutService
      * Perubahan yang masih dapat dibayar meminta buyer meninjau ulang snapshot checkout.
      *
      * @param  string  $buyerId  ID buyer pemilik item yang akan dikunci.
-     * @param  array  $checkoutSnapshot  Snapshot backend sebelum transaksi dimulai.
+     * @param  array{
+     *     data?: array{
+     *         checkouts?: list<array{
+     *             user_id_seller?: string,
+     *             keranjangs?: list<array{
+     *                 k_id?: string,
+     *                 p_id?: string,
+     *                 k_total?: int|numeric-string,
+     *                 p_price?: CheckoutPrice
+     *             }>
+     *         }>
+     *     },
+     *     clientComparable?: array{alamat_id?: string, alamat_updated_at?: string|null}
+     * }  $checkoutSnapshot  Item dan versi alamat sebelum transaksi dimulai.
      *
      * @return void Pembayaran dapat diteruskan setelah seluruh pemeriksaan lolos.
      *
