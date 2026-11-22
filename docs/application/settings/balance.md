@@ -91,19 +91,42 @@ Withdraws balance to one saved withdrawal bank account.
 
 Required request fields:
 
-- `paymentAccount`
-- `wihtdrawPrice`
+- `paymentAccount`: the saved account number, as text.
+- `wihtdrawPrice`: the amount in whole rupiah, as a JSON integer or digit text.
 
 The request field is currently spelled `wihtdrawPrice`. Keep the spelling unless both frontend and backend are changed together.
 
-Validation rules:
+The frontend sends the JSON number `1` until the user types an amount, and
+digit text after that. Both shapes are accepted.
 
-- `paymentAccount` must not be empty.
-- `wihtdrawPrice` must not be empty.
-- `wihtdrawPrice` must be numeric.
-- `wihtdrawPrice` must be at most `1000000`.
-- The payment account must exist for the authenticated user.
-- The authenticated user must have enough total balance.
+Validation runs in this order. Each rejection returns `status: "error"` and a
+string `message`:
+
+1. A missing or deleted local user returns HTTP 401 `Unauthorized`.
+2. A nonempty `paymentAccount` that is not text, such as a number, boolean,
+   or list, returns HTTP 422 `Rekening Bank Harus Berupa Teks`.
+3. A missing or empty account (`null`, `false`, `0`, `"0"`, `[]`, or blank
+   text) returns HTTP 400 `Rekening Bank Tidak Boleh Kosong`.
+4. A nonempty `wihtdrawPrice` that is neither a JSON number nor text, such as
+   a boolean, list, or object, returns HTTP 422
+   `Nominal Harus Berupa Angka Atau Teks`.
+5. A missing or empty amount, using the same empty values as the account,
+   returns HTTP 400 `Nominal Tidak Boleh Kosong`.
+6. An amount that is not a whole number returns HTTP 400
+   `Format Nominal Tidak Valid`. This covers decimals (`"150000.5"` or
+   `150000.5`), exponents (`"1e5"`), a leading `+`, grouping separators
+   (`"1.000"`), and other text. Digit text may start with `-`, so negative
+   amounts reach the minimum check instead.
+7. An amount below `1` returns HTTP 400 `Nominal Minimal Rp1`.
+8. An amount above `1000000` returns HTTP 400
+   `Nominal Tidak Boleh Lebih Dari Rp1.000.000`.
+9. The payment account must exist for the authenticated user.
+10. The authenticated user must have a nonzero total balance of at least the
+    amount.
+
+Every rejection happens before the Xendit request and before any balance or
+history change. The parsed integer is the only amount used for the response
+messages, the Xendit request, and the balance deduction.
 
 Side effects:
 
@@ -115,6 +138,10 @@ Side effects:
 An Xendit rejection returns HTTP 400 with the message from the
 [Xendit adapter](../integrations/xendit.md#adapter-result-contract) before the
 controller attempts to change the balance or write a history row.
+
+Known gap: the balance check, the Xendit request, and the balance deduction
+do not run inside a database transaction or row lock. Concurrent withdrawals
+can each pass the balance check before either one deducts.
 
 The returned history item uses the same description and amount representation
 as the history list.
