@@ -274,20 +274,34 @@ The buyer frontend sends a larger page size for `pending_payment`, but does not 
 
 Required body data:
 
-- `transaction_user_id`: transaction row being approved.
-- `user_type`: must be `seller`.
+- `transaction_user_id`: transaction row being approved, as a string.
+- `user_type`: must be exactly the string `seller`.
 
 High-level behavior:
 
-1. Reads the authenticated seller.
-2. Rejects unauthenticated users with `401`.
-3. Rejects non-seller requests with `400`.
-4. Rejects empty `transaction_user_id` with `400`.
-5. Finds a `transaction_users` row owned by the seller with `status = approved_seller`.
-6. Rejects missing rows with `404`.
-7. Updates the transaction row status to `done`.
-8. Transfers seller product income into saldo through `TransactionService::transferSaldo()`.
-9. Returns refreshed transactions, counts, and pagination.
+1. Reads the authenticated seller and checks that the local user still exists.
+2. Rejects unauthenticated or deleted users with `401`.
+3. Rejects every `user_type` other than the string `seller` with `400`,
+   including the JSON boolean `true`.
+4. Rejects a nonempty `transaction_user_id` that is not a string, such as an
+   array, number, or boolean, with `422` and
+   `{"status":"error","message":"Transaction User ID Must Be A String"}`.
+5. Rejects a missing, null, blank, or falsy `transaction_user_id` (`false`, `0`,
+   `"0"`, `[]`) with `400`.
+6. Finds a `transaction_users` row owned by the seller with `status = approved_seller`.
+7. Rejects missing rows with `404`.
+8. Updates the transaction row status to `done`.
+9. Transfers seller product income into saldo through `TransactionService::transferSaldo()`.
+10. Returns refreshed transactions, counts, and pagination.
+
+All rejections happen before the transaction row or balance changes. The
+identifier is not checked for UUID format. A non-UUID string still reaches the
+query, where PostgreSQL rejects it with SQLSTATE `22P02` and the endpoint
+returns HTTP `500`.
+
+Known gap: the status update and the saldo transfer do not run inside a
+database transaction or row lock. Two concurrent approvals of the same row can
+both read `approved_seller` before either saves.
 
 Seller income uses `transaction_users.product_price`, not invoice total price, because the buyer invoice total can include shipping and other invoice-level amounts.
 
