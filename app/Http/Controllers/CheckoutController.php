@@ -16,8 +16,49 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use RuntimeException;
 
+/**
+ * Menerima payload checkout buyer dan mengoordinasikan pembayaran.
+ *
+ * @phpstan-import-type CheckoutShippingOptionInput from CheckoutService
+ * @phpstan-import-type CheckoutSellerNoteInput from CheckoutService
+ * @phpstan-import-type CheckoutClientSnapshotInput from CheckoutService
+ *
+ * @phpstan-type CheckoutRequestPayload array{
+ *     payment_slug: string,
+ *     shipping_options: array<array-key, CheckoutShippingOptionInput>,
+ *     noteds?: array<array-key, CheckoutSellerNoteInput>,
+ *     client_snapshot: CheckoutClientSnapshotInput
+ * }
+ */
 class CheckoutController extends Controller
 {
+    private const PROCESS_CHECKOUT_RULES = [
+        // Metode pembayaran.
+        'payment_slug' => ['required', 'string'],
+
+        // Pilihan kurir per seller.
+        'shipping_options' => ['required', 'array'],
+        'shipping_options.*' => ['array'],
+        'shipping_options.*.user_id_seller' => ['required', 'string'],
+        'shipping_options.*.kurir_name' => ['required', 'string'],
+
+        // Catatan kosong dapat menjadi null setelah middleware memproses request.
+        'noteds' => ['required', 'array'],
+        'noteds.*' => ['array'],
+        'noteds.*.user_id_seller' => ['sometimes', 'nullable', 'string'],
+        'noteds.*.noted' => ['sometimes', 'nullable', 'string'],
+
+        // Snapshot ini hanya dipakai untuk mendeteksi perubahan sebelum membuat Virtual Account.
+        'client_snapshot' => ['required', 'array'],
+        'client_snapshot.alamat_id' => ['required', 'string'],
+        'client_snapshot.alamat_updated_at' => ['required', 'string'],
+        'client_snapshot.cart_item_ids' => ['required', 'array'],
+        'client_snapshot.cart_item_ids.*' => ['required', 'string'],
+        'client_snapshot.total_product' => ['required', 'numeric'],
+        'client_snapshot.total_shipping' => ['required', 'numeric'],
+        'client_snapshot.total_all' => ['required', 'numeric'],
+    ];
+
     /**
      * Menyiapkan controller dengan layanan checkout dan ketersediaan produk.
      *
@@ -127,6 +168,7 @@ class CheckoutController extends Controller
     /**
      * Memproses pembayaran setelah checkout aktual cocok dengan snapshot yang dilihat buyer.
      *
+     * Tipe payload diperiksa sebelum snapshot dibangun karena rekonsiliasi bisa mengubah cart.
      * Snapshot frontend dibandingkan sebelum lock checkout diambil. Cart, produk, dan alamat
      * diperiksa kembali pada baris yang terkunci sebelum Xendit diminta membuat Virtual Account.
      * Jika ketersediaan berubah, transaksi di-rollback sebelum pilihan item dilepas.
@@ -153,34 +195,30 @@ class CheckoutController extends Controller
         // --- step 1 - validasi buyer terautentikasi - end ---
 
         // --- step 2 - validasi payload checkout - start ---
-        $validator = Validator::make($request->all(), [
-            'payment_slug' => ['required'],
-            'shipping_options' => ['required', 'array'],
-            'shipping_options.*.user_id_seller' => ['required'],
-            'shipping_options.*.kurir_name' => ['required'],
-            'noteds' => ['required', 'array'],
-            'client_snapshot' => ['required', 'array'],
-            'client_snapshot.alamat_id' => ['required', 'string'],
-            'client_snapshot.alamat_updated_at' => ['required', 'string'],
-            'client_snapshot.cart_item_ids' => ['required', 'array'],
-            'client_snapshot.total_product' => ['required', 'numeric'],
-            'client_snapshot.total_shipping' => ['required', 'numeric'],
-            'client_snapshot.total_all' => ['required', 'numeric'],
-        ]);
+        $validator = Validator::make($request->all(), self::PROCESS_CHECKOUT_RULES);
 
         if ($validator->fails()) {
-            return response()->json(['status' => 'error', 'message' => $validator->messages()], 422);
+            return response()->json([
+                'status' => 'error',
+                'message' => $validator->messages(),
+            ], 422);
         }
+
+        // Baris catatan tanpa field yang dipakai service dapat terbuang saat mengambil hasil.
+        /** @var CheckoutRequestPayload $validated */
+        $validated = $validator->validated();
         // --- step 2 - validasi payload checkout - end ---
 
-        // --- step 3 - bangun dan bandingkan snapshot checkout backend - start ---
+        // --- step 3 - bangun snapshot checkout backend - start ---
         $checkoutSnapshot = $this->checkoutService->buildCheckoutSnapshot(
             user_id_buyer: $user_id_buyer,
-            shippingOptions: $request->shipping_options ?? [],
-            noteds: $request->noteds ?? [],
-            paymentSlug: $request->payment_slug ?? '',
+            shippingOptions: $validated['shipping_options'],
+            noteds: $validated['noteds'] ?? [],
+            paymentSlug: $validated['payment_slug'],
         );
+        // --- step 3 - bangun snapshot checkout backend - end ---
 
+        // --- step 4 - periksa status snapshot checkout - start ---
         if ($checkoutSnapshot['status'] === 'invalid') {
             return response()->json([
                 'status' => 'error',
@@ -195,29 +233,38 @@ class CheckoutController extends Controller
                 'message' => $checkoutSnapshot['message'],
             ], 400);
         }
+        // --- step 4 - periksa status snapshot checkout - end ---
 
-        if ($this->checkoutService->checkoutSnapshotChanged($checkoutSnapshot, $request->client_snapshot ?? [])) {
+        // --- step 5 - bandingkan snapshot buyer - start ---
+        $snapshotChanged = $this->checkoutService->checkoutSnapshotChanged(
+            $checkoutSnapshot,
+            $validated['client_snapshot'],
+        );
+
+        if ($snapshotChanged) {
             return response()->json([
                 'status' => 'error',
                 'code' => 'CHECKOUT_CHANGED',
                 'message' => 'Checkout berubah, silakan cek ulang sebelum membayar',
-                'checkout' => $this->checkoutService->formatCheckoutSnapshotForFrontend($checkoutSnapshot),
+                'checkout' => $this->checkoutService->formatCheckoutSnapshotForFrontend(
+                    $checkoutSnapshot,
+                ),
             ], 409);
         }
-        // --- step 3 - bangun dan bandingkan snapshot checkout backend - end ---
+        // --- step 5 - bandingkan snapshot buyer - end ---
 
         $checkoutKey = '';
 
         try {
-            // --- step 4 - kunci proses checkout yang sama - start ---
+            // --- step 6 - kunci proses checkout yang sama - start ---
             $checkoutKey = $this->checkoutService->generateCheckoutKey(
                 user_id_buyer: $user_id_buyer,
                 checkoutSnapshot: $checkoutSnapshot,
             );
             $this->checkoutService->lockCheckoutKey($checkoutKey);
-            // --- step 4 - kunci proses checkout yang sama - end ---
+            // --- step 6 - kunci proses checkout yang sama - end ---
 
-            // --- step 5 - cegah checkout yang sudah diproses - start ---
+            // --- step 7 - cegah checkout yang sudah diproses - start ---
             $existingCheckoutInvoice = $this->checkoutService->getExistingCheckoutInvoice(
                 user_id_buyer: $user_id_buyer,
                 checkout_key: $checkoutKey,
@@ -230,9 +277,9 @@ class CheckoutController extends Controller
                     'message' => 'Checkout ini sudah diproses, silakan cek transaksi Anda',
                 ], 409);
             }
-            // --- step 5 - cegah checkout yang sudah diproses - end ---
+            // --- step 7 - cegah checkout yang sudah diproses - end ---
 
-            // --- step 6 - siapkan data payment - start ---
+            // --- step 8 - siapkan data payment - start ---
             $now = Carbon::now()->timestamp;
             $uniqid = uniqid();
             $external_id = "{$checkoutSnapshot['data']['payment']['method']}-{$checkoutSnapshot['data']['payment']['slug']}-{$user_id_buyer}-{$now}-{$uniqid}";
@@ -247,9 +294,9 @@ class CheckoutController extends Controller
             $expired_at = Carbon::now()->addDay()->setMinutes(0)->setSeconds(0)->setMicroseconds(0);
             $expired_at_xendit = $expired_at->toIso8601String();
             $expired_at_transaction = $expired_at->format('Y-m-d H:i:s');
-            // --- step 6 - siapkan data payment - end ---
+            // --- step 8 - siapkan data payment - end ---
 
-            // --- step 7 - proses checkout secara atomik - start ---
+            // --- step 9 - proses checkout secara atomik - start ---
             $transactionInvoiceId = DB::transaction(function () use (
                 $user_id_buyer,
                 $checkoutSnapshot,
@@ -265,16 +312,16 @@ class CheckoutController extends Controller
                 $expected_amount,
                 $expired_at_xendit,
             ) {
-                // --- step 7.1 - kunci item checkout - start ---
+                // --- step 9.1 - kunci item checkout - start ---
                 // Data dikunci dan diverifikasi lagi karena seller dapat mengubah produk
                 // setelah buyer membuka halaman checkout atau setelah snapshot awal dibuat.
                 $this->checkoutService->lockAndValidateCheckoutItems(
                     $user_id_buyer,
                     $checkoutSnapshot,
                 );
-                // --- step 7.1 - kunci item checkout - end ---
+                // --- step 9.1 - kunci item checkout - end ---
 
-                // --- step 7.2 - buat virtual account - start ---
+                // --- step 9.2 - buat virtual account - start ---
                 // Payment baru dibuat setelah data checkout lolos validasi row-lock,
                 // sehingga item invalid tidak menghasilkan virtual account yatim.
                 $resultXendit = $this->xenditService->createVirtualAccount(
@@ -288,9 +335,9 @@ class CheckoutController extends Controller
                     expected_amount: $expected_amount,
                     expiration_date: $expired_at_xendit,
                 );
-                // --- step 7.2 - buat virtual account - end ---
+                // --- step 9.2 - buat virtual account - end ---
 
-                // --- step 7.3 - validasi respons Xendit - start ---
+                // --- step 9.3 - validasi respons Xendit - start ---
                 // Tolak payload skalar sebelum penyimpanan invoice, cart, dan stok.
                 // Data null tetap mengikuti validasi payload kosong di service.
                 if ($resultXendit['status'] === 'error') {
@@ -302,9 +349,9 @@ class CheckoutController extends Controller
                 if (! is_array($dataXendit)) {
                     throw new RuntimeException('Payment creation failed');
                 }
-                // --- step 7.3 - validasi respons Xendit - end ---
+                // --- step 9.3 - validasi respons Xendit - end ---
 
-                // --- step 7.4 - simpan invoice checkout - start ---
+                // --- step 9.4 - simpan invoice checkout - start ---
                 $saveCheckoutToDatabase = $this->checkoutService->saveCheckoutToDatabase(
                     user_id_buyer: $user_id_buyer,
                     checkouts: $checkoutSnapshot['data']['checkouts'],
@@ -323,9 +370,9 @@ class CheckoutController extends Controller
                 if ($saveCheckoutToDatabase['status'] == 'error') {
                     throw new RuntimeException($saveCheckoutToDatabase['message']);
                 }
-                // --- step 7.4 - simpan invoice checkout - end ---
+                // --- step 9.4 - simpan invoice checkout - end ---
 
-                // --- step 7.5 - hapus item keranjang yang diproses - start ---
+                // --- step 9.5 - hapus item keranjang yang diproses - start ---
                 $deleteKeranjangAfterCheckout = $this->checkoutService->deleteKeranjangAfterCheckoutForBuyer(
                     user_id_buyer: $user_id_buyer,
                     checkouts: $checkoutSnapshot['data']['checkouts']
@@ -334,9 +381,9 @@ class CheckoutController extends Controller
                 if ($deleteKeranjangAfterCheckout['status'] == 'error') {
                     throw new RuntimeException($deleteKeranjangAfterCheckout['message']);
                 }
-                // --- step 7.5 - hapus item keranjang yang diproses - end ---
+                // --- step 9.5 - hapus item keranjang yang diproses - end ---
 
-                // --- step 7.6 - kurangi stok produk - start ---
+                // --- step 9.6 - kurangi stok produk - start ---
                 $changeStockProductAfterCheckout = $this->checkoutService->changeStockProductAfterCheckout(
                     checkouts: $checkoutSnapshot['data']['checkouts']
                 );
@@ -349,7 +396,7 @@ class CheckoutController extends Controller
                         ),
                     );
                 }
-                // --- step 7.6 - kurangi stok produk - end ---
+                // --- step 9.6 - kurangi stok produk - end ---
 
                 // Catat sinkronisasi katalog di transaksi yang sama dengan perubahan stok.
                 $this->recordCheckoutProductOutbox($checkoutSnapshot['data']['checkouts']);
@@ -358,7 +405,7 @@ class CheckoutController extends Controller
                 // transaksi hasil checkout ini secara langsung, bukan menebak data terbaru buyer.
                 return $saveCheckoutToDatabase['transaction_invoice_id'];
             });
-            // --- step 7 - proses checkout secara atomik - end ---
+            // --- step 9 - proses checkout secara atomik - end ---
 
         } catch (CheckoutAvailabilityException $e) {
             // Transaksi database sudah rollback pada titik ini, sehingga perubahan cart
@@ -371,11 +418,12 @@ class CheckoutController extends Controller
                 'message' => $e->getMessage(),
             ], 409);
         } catch (CheckoutChangedException $e) {
+            // Setelah rollback, bangun ulang opsi yang sama dari payload yang sudah diperiksa.
             $currentSnapshot = $this->checkoutService->buildCheckoutSnapshot(
                 user_id_buyer: $user_id_buyer,
-                shippingOptions: $request->shipping_options ?? [],
-                noteds: $request->noteds ?? [],
-                paymentSlug: $request->payment_slug ?? '',
+                shippingOptions: $validated['shipping_options'],
+                noteds: $validated['noteds'] ?? [],
+                paymentSlug: $validated['payment_slug'],
             );
 
             if ($currentSnapshot['status'] !== 'success') {
@@ -390,7 +438,9 @@ class CheckoutController extends Controller
                 'status' => 'error',
                 'code' => 'CHECKOUT_CHANGED',
                 'message' => $e->getMessage(),
-                'checkout' => $this->checkoutService->formatCheckoutSnapshotForFrontend($currentSnapshot),
+                'checkout' => $this->checkoutService->formatCheckoutSnapshotForFrontend(
+                    $currentSnapshot,
+                ),
             ], 409);
         } catch (RuntimeException $e) {
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 400);

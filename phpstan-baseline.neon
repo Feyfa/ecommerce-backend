@@ -1,26 +1,6 @@
 parameters:
 	ignoreErrors:
 		-
-			message: "#^Parameter \\#2 \\$clientSnapshot of method App\\\\Services\\\\CheckoutService\\:\\:checkoutSnapshotChanged\\(\\) expects array, mixed given\\.$#"
-			count: 1
-			path: app/Http/Controllers/CheckoutController.php
-
-		-
-			message: "#^Parameter \\$noteds of method App\\\\Services\\\\CheckoutService\\:\\:buildCheckoutSnapshot\\(\\) expects array, mixed given\\.$#"
-			count: 2
-			path: app/Http/Controllers/CheckoutController.php
-
-		-
-			message: "#^Parameter \\$paymentSlug of method App\\\\Services\\\\CheckoutService\\:\\:buildCheckoutSnapshot\\(\\) expects string, mixed given\\.$#"
-			count: 2
-			path: app/Http/Controllers/CheckoutController.php
-
-		-
-			message: "#^Parameter \\$shippingOptions of method App\\\\Services\\\\CheckoutService\\:\\:buildCheckoutSnapshot\\(\\) expects array, mixed given\\.$#"
-			count: 2
-			path: app/Http/Controllers/CheckoutController.php
-
-		-
 			message: "#^Cannot access property \\$id on mixed\\.$#"
 			count: 1
 			path: app/Http/Controllers/SaldoController.php
@@ -69,21 +49,6 @@ parameters:
 			message: "#^Parameter \\#2 \\$user_type of method App\\\\Services\\\\TransactionService\\:\\:getTransaction\\(\\) expects string, mixed given\\.$#"
 			count: 1
 			path: app/Http/Controllers/TransactionController.php
-
-		-
-			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:buildCheckoutSnapshot\\(\\) has parameter \\$noteds with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:buildCheckoutSnapshot\\(\\) has parameter \\$shippingOptions with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\CheckoutService\\:\\:checkoutSnapshotChanged\\(\\) has parameter \\$clientSnapshot with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/CheckoutService.php
 
 		-
 			message: "#^Cannot access property \\$saldo_income on App\\\\Models\\\\SaldoUser\\|null\\.$#"

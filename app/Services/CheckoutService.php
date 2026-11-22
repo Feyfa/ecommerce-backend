@@ -55,6 +55,22 @@ use JsonException;
  *     estimation: string
  * }
  * @phpstan-type CheckoutSellerNote array{user_id_seller: string, noted: string}
+ * @phpstan-type CheckoutShippingOptionInput array{
+ *     user_id_seller?: string|null,
+ *     kurir_name?: string|null
+ * }
+ * @phpstan-type CheckoutSellerNoteInput array{
+ *     user_id_seller?: string|null,
+ *     noted?: string|null
+ * }
+ * @phpstan-type CheckoutClientSnapshotInput array{
+ *     alamat_id?: string,
+ *     alamat_updated_at?: string|null,
+ *     cart_item_ids?: array<array-key, string>,
+ *     total_product?: int|float|numeric-string,
+ *     total_shipping?: int|float|numeric-string,
+ *     total_all?: int|float|numeric-string
+ * }
  * @phpstan-type CheckoutComparable array{
  *     alamat_id: string,
  *     alamat_updated_at: string|null,
@@ -410,8 +426,8 @@ class CheckoutService
      * Harga satuan serta subtotal wajib tersedia sebelum snapshot dapat dipakai untuk pembayaran.
      *
      * @param  string  $user_id_buyer  ID buyer pemilik cart, alamat, atau transaksi.
-     * @param  array  $shippingOptions  Pilihan kurir per seller yang dikirim untuk penyusunan snapshot.
-     * @param  array  $noteds  Catatan buyer yang dipetakan untuk setiap grup seller.
+     * @param  array<array-key, CheckoutShippingOptionInput>  $shippingOptions  Kurir per seller.
+     * @param  array<array-key, CheckoutSellerNoteInput>  $noteds  Catatan buyer per seller.
      * @param  string  $paymentSlug  Slug metode pembayaran yang dipilih.
      *
      * @return CheckoutSnapshotResult Snapshot yang siap dibayar atau alasan checkout ditolak.
@@ -703,7 +719,7 @@ class CheckoutService
      *     total_shipping?: int,
      *     total_all?: int|float
      * }}  $backendSnapshot  Alamat, ID cart, dan total yang dibentuk backend.
-     * @param  array  $clientSnapshot  Snapshot terakhir yang telah dilihat atau dikonfirmasi frontend.
+     * @param  CheckoutClientSnapshotInput  $clientSnapshot  Snapshot yang ditinjau buyer.
      *
      * @return bool True jika ID cart, identitas atau versi alamat, atau salah satu total berbeda.
      */
