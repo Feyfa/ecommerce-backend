@@ -31,7 +31,7 @@ Current supported actions:
   Handles request authentication, query parameter collection, transaction response shape, and seller approval.
 
 - `app/Services/TransactionService.php`
-  Builds the transaction query, applies user type filters, applies search/date/status filters, paginates results, maps date formatting, loads transaction products, and transfers seller saldo.
+  Builds the transaction query, applies user type filters, applies search/date/status filters, paginates results, maps date formatting, loads transaction products, approves seller transactions, and transfers seller saldo.
 
 - `app/Models/TransactionInvoice.php`
   Stores invoice-level payment status, payment method, virtual account, buyer address, expiry date, and total invoice price.
@@ -288,24 +288,46 @@ High-level behavior:
    `{"status":"error","message":"Transaction User ID Must Be A String"}`.
 5. Rejects a missing, null, blank, or falsy `transaction_user_id` (`false`, `0`,
    `"0"`, `[]`) with `400`.
-6. Finds a `transaction_users` row owned by the seller with `status = approved_seller`.
-7. Rejects missing rows with `404`.
-8. Updates the transaction row status to `done`.
-9. Transfers seller product income into saldo through `TransactionService::transferSaldo()`.
-10. Returns refreshed transactions, counts, and pagination.
+6. Calls `TransactionService::approveSellerTransaction()`, which runs steps 7-10
+   in one database transaction.
+7. Locks the `transaction_users` row owned by the seller with
+   `status = approved_seller` (`FOR UPDATE`). Missing rows, rows owned by another
+   seller, and rows that are no longer `approved_seller` receive `404`.
+8. Rejects the row with `400` when its invoice is not `done` or it has no
+   invoice:
+
+   ```json
+   {"status":"error","message":"Transaksi Belum Dibayar Pembeli"}
+   ```
+
+9. Updates the transaction row status to `done`.
+10. Credits the product price to the seller's income through
+    `TransactionService::transferSaldo()`.
+11. Returns refreshed transactions, counts, and pagination.
 
 All rejections happen before the transaction row or balance changes. The
 identifier is not checked for UUID format. A non-UUID string still reaches the
 query, where PostgreSQL rejects it with SQLSTATE `22P02` and the endpoint
 returns HTTP `500`.
 
-The saldo transfer runs in its own database transaction and locks the seller's
-`saldo_users` row, so a credit cannot overwrite a concurrent withdrawal
-deduction. See [Balance](settings/balance.md#post-apisaldo-withdraw).
+Payment check: checkout creates `transaction_users` rows with the default
+status `approved_seller` while the invoice is still `pending`. The endpoint
+therefore checks the invoice itself. Hiding the approve button in the frontend
+does not stop a direct API call. The invoice is read without a lock because its
+only writer, the virtual account payment endpoint, moves it from `pending` to
+`done` and never back.
 
-Known gap: the status update and the saldo transfer do not share one
-transaction, and the `transaction_users` row is not locked. Two concurrent
-approvals of the same row can both read `approved_seller` before either saves.
+Concurrency: the transaction row stays locked until the status and the credit
+commit. A second approval of the same row waits, then re-reads the row as
+`done` and receives `404` without a credit. When the credit fails, the status
+update rolls back with it, the row stays `approved_seller`, and the seller can
+approve again; the request ends as HTTP `500`. The credit locks the seller's
+`saldo_users` row after the transaction row, so it cannot overwrite a
+concurrent withdrawal deduction. See
+[Balance](settings/balance.md#post-apisaldo-withdraw). SQLite ignores the lock
+clauses; the opt-in
+`tests/Integration/PostgresTransactionApprovalLockingTest.php` verifies the
+wait on PostgreSQL.
 
 Seller income uses `transaction_users.product_price`, not invoice total price, because the buyer invoice total can include shipping and other invoice-level amounts.
 
@@ -331,5 +353,5 @@ The transaction read API currently does not receive Xendit events directly. Paym
 - Filters, search, sort, date range, and pagination are backend-side.
 - The default buyer history should show paid transaction rows only.
 - Pending payment is treated as a buyer action queue, not ordinary history.
-- Seller approval is currently a direct status transition from `approved_seller` to `done`.
-- Seller saldo transfer happens during seller approval.
+- Seller approval is a direct status transition from `approved_seller` to `done`, allowed only after the invoice is `done`.
+- Seller saldo transfer happens during seller approval, in the same database transaction as the status change.
