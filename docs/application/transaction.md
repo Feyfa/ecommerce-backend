@@ -299,9 +299,13 @@ identifier is not checked for UUID format. A non-UUID string still reaches the
 query, where PostgreSQL rejects it with SQLSTATE `22P02` and the endpoint
 returns HTTP `500`.
 
-Known gap: the status update and the saldo transfer do not run inside a
-database transaction or row lock. Two concurrent approvals of the same row can
-both read `approved_seller` before either saves.
+The saldo transfer runs in its own database transaction and locks the seller's
+`saldo_users` row, so a credit cannot overwrite a concurrent withdrawal
+deduction. See [Balance](settings/balance.md#post-apisaldo-withdraw).
+
+Known gap: the status update and the saldo transfer do not share one
+transaction, and the `transaction_users` row is not locked. Two concurrent
+approvals of the same row can both read `approved_seller` before either saves.
 
 Seller income uses `transaction_users.product_price`, not invoice total price, because the buyer invoice total can include shipping and other invoice-level amounts.
 
