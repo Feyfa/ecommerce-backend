@@ -41,7 +41,7 @@ class PaymentReturnCallerCompatibilityTest extends TestCase
             $mock->shouldReceive('getWithdrawalPayment')->with($user->id, '001234')->once()->andReturn(['status' => 'success', 'payment' => ['id' => 'account-id', 'user_name' => 'Jidan', 'payment_slug' => 'bca']]);
         });
         $this->mock(SaldoService::class, function (MockInterface $mock) use ($user): void {
-            $mock->shouldReceive('getSaldo')->with($user->id)->once()->andReturn(['status' => 'success', 'saldoTotal' => 0]);
+            $mock->shouldReceive('lockSaldoTotal')->with($user->id)->once()->andReturn(0);
             $mock->shouldNotReceive('saveSaldoAfterDisbursement');
         });
 
@@ -90,10 +90,10 @@ class PaymentReturnCallerCompatibilityTest extends TestCase
             $user,
             $withdrawalAmount,
         ): void {
-            $mock->shouldReceive('getSaldo')
+            $mock->shouldReceive('lockSaldoTotal')
                 ->with($user->id)
                 ->once()
-                ->andReturn(['status' => 'success', 'saldoTotal' => $withdrawalAmount]);
+                ->andReturn($withdrawalAmount);
             $mock->shouldNotReceive('saveSaldoAfterDisbursement');
         });
         // --- step 3 - Set the balance before payout - end ---

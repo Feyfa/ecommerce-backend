@@ -5,8 +5,10 @@ namespace Tests\Feature;
 use App\Http\Middleware\AuthenticateApiRequest;
 use App\Models\PaymentList;
 use App\Models\PaymentUser;
+use App\Models\SaldoHistory;
 use App\Models\SaldoUser;
 use App\Models\User;
+use App\Services\SaldoService;
 use App\Services\XenditService;
 use GuzzleHttp\Client;
 use GuzzleHttp\Handler\MockHandler;
@@ -14,12 +16,17 @@ use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Mockery\MockInterface;
 use Psr\Http\Message\RequestInterface;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\Response as HttpStatus;
 use Tests\TestCase;
 
 /**
- * Verifies withdrawal input parsing and the boundary before Xendit disbursement and balance writes.
+ * Verifies withdrawal input parsing, the locked balance check before Xendit disbursement, and
+ * the balance write after it.
  */
 class SaldoWithdrawInputTest extends TestCase
 {
@@ -47,6 +54,11 @@ class SaldoWithdrawInputTest extends TestCase
     private const MINIMUM_MESSAGE = 'Nominal Minimal Rp1';
 
     private const MAXIMUM_MESSAGE = 'Nominal Tidak Boleh Lebih Dari Rp1.000.000';
+
+    private const UNSAVED_WITHDRAWAL_MESSAGE = 'Penarikan Sudah Diproses Tetapi Saldo Gagal '
+        .'Diperbarui, Jangan Ulangi Penarikan';
+
+    private const WITHDRAWAL_AMOUNT = 100000;
 
     private User $user;
 
@@ -323,6 +335,106 @@ class SaldoWithdrawInputTest extends TestCase
     }
 
     /**
+     * Returns 500 and logs a critical event when the deduction is rejected after Xendit accepted.
+     *
+     * @return void The balance stays unchanged and the log carries the provider external ID.
+     */
+    public function test_rejected_deduction_after_disbursement_returns_500_and_is_logged(): void
+    {
+        // --- step 1 - Reject the deduction after the real balance check - start ---
+        // The partial mock keeps lockSaldoTotal() real, so the request reaches Xendit.
+        $this->partialMock(SaldoService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('saveSaldoAfterDisbursement')
+                ->once()
+                ->andReturn(['status' => 'error', 'message' => 'saldo is not enough']);
+        });
+        Log::spy();
+        $this->actingAs($this->user);
+        // --- step 1 - Reject the deduction after the real balance check - end ---
+
+        // --- step 2 - Request the withdrawal - start ---
+        $expectedResponse = ['status' => 'error', 'message' => self::UNSAVED_WITHDRAWAL_MESSAGE];
+
+        $this->postJson(self::WITHDRAW_ENDPOINT, $this->amountPayload(self::WITHDRAWAL_AMOUNT))
+            ->assertStatus(HttpStatus::HTTP_INTERNAL_SERVER_ERROR)
+            ->assertExactJson($expectedResponse);
+        // --- step 2 - Request the withdrawal - end ---
+
+        // --- step 3 - Check the unsaved disbursement - start ---
+        $this->assertBalanceUnchangedAfterDisbursement();
+        $this->assertCriticalWithdrawalLog();
+        // --- step 3 - Check the unsaved disbursement - end ---
+    }
+
+    /**
+     * Logs a critical event and rolls back the balance when the history write fails after Xendit.
+     *
+     * @return void The exception still ends as HTTP 500 through the framework handler.
+     */
+    public function test_failed_deduction_after_disbursement_is_logged_and_rolled_back(): void
+    {
+        // --- step 1 - Make the history write fail - start ---
+        // The listener runs after the balance row was saved inside the same transaction.
+        SaldoHistory::creating(function (): never {
+            throw new RuntimeException('History write failed.');
+        });
+        Log::spy();
+        $this->actingAs($this->user);
+        // --- step 1 - Make the history write fail - end ---
+
+        // --- step 2 - Request the withdrawal - start ---
+        $this->postJson(self::WITHDRAW_ENDPOINT, $this->amountPayload(self::WITHDRAWAL_AMOUNT))
+            ->assertStatus(HttpStatus::HTTP_INTERNAL_SERVER_ERROR);
+        // --- step 2 - Request the withdrawal - end ---
+
+        // --- step 3 - Check the rolled-back disbursement - start ---
+        $this->assertBalanceUnchangedAfterDisbursement();
+        $this->assertCriticalWithdrawalLog();
+        // --- step 3 - Check the rolled-back disbursement - end ---
+    }
+
+    /**
+     * Confirms every balance read during a withdrawal uses FOR UPDATE on PostgreSQL.
+     *
+     * @return void SQLite drops the lock clause, so the check only runs on PostgreSQL.
+     */
+    public function test_withdrawal_reads_the_balance_only_with_a_row_lock(): void
+    {
+        // --- step 1 - Skip drivers without row locks - start ---
+        if (DB::getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('The FOR UPDATE clause is verified on isolated PostgreSQL.');
+        }
+        // --- step 1 - Skip drivers without row locks - end ---
+
+        // --- step 2 - Record the withdrawal queries - start ---
+        $this->actingAs($this->user);
+        DB::enableQueryLog();
+
+        $this->postJson(self::WITHDRAW_ENDPOINT, $this->amountPayload(self::WITHDRAWAL_AMOUNT))
+            ->assertOk();
+
+        $queries = array_column(DB::getQueryLog(), 'query');
+
+        DB::disableQueryLog();
+        // --- step 2 - Record the withdrawal queries - end ---
+
+        // --- step 3 - Check every balance read - start ---
+        // An unlocked read before Xendit would let a parallel withdrawal pass the same check.
+        $balanceReads = array_filter(
+            $queries,
+            fn (string $query): bool => str_starts_with($query, 'select')
+                && str_contains($query, 'from "saldo_users"'),
+        );
+
+        $this->assertNotEmpty($balanceReads);
+
+        foreach ($balanceReads as $query) {
+            $this->assertStringEndsWith('for update', $query);
+        }
+        // --- step 3 - Check every balance read - end ---
+    }
+
+    /**
      * Sends each payload as the user and checks the exact rejection without side effects.
      *
      * @param  list<array<string, mixed>>  $payloads  Request bodies that must all be rejected.
@@ -359,6 +471,44 @@ class SaldoWithdrawInputTest extends TestCase
             'saldo_income' => $expectedIncome,
         ]);
         $this->assertDatabaseCount('saldo_histories', 0);
+    }
+
+    /**
+     * Confirms Xendit accepted one disbursement while the balance and history stayed unchanged.
+     *
+     * @return void Fails when the failed deduction left a balance change or a history row.
+     */
+    private function assertBalanceUnchangedAfterDisbursement(): void
+    {
+        $this->assertCount(1, $this->providerRequests);
+        $this->assertDatabaseHas('saldo_users', [
+            'user_id' => $this->user->id,
+            'saldo_income' => self::STARTING_INCOME,
+        ]);
+        $this->assertDatabaseCount('saldo_histories', 0);
+    }
+
+    /**
+     * Confirms one critical log identifies the unsaved disbursement without bank details.
+     *
+     * @return void Fails when the log is missing, repeated, or carries the account number.
+     */
+    private function assertCriticalWithdrawalLog(): void
+    {
+        // The external ID is the only link to the Xendit record during manual reconciliation.
+        $externalId = $this->providerPayload(0)['external_id'];
+
+        Log::shouldHaveReceived('critical')
+            ->once()
+            ->withArgs(function (string $message, array $context) use ($externalId): bool {
+                $identifiesDisbursement = str_starts_with($message, 'Withdrawal was disbursed')
+                    && $context['user_id'] === $this->user->id
+                    && $context['amount'] === self::WITHDRAWAL_AMOUNT
+                    && $context['external_id'] === $externalId;
+
+                return $identifiesDisbursement
+                    && ! in_array(self::ACCOUNT_NUMBER, $context, true);
+            });
     }
 
     /**

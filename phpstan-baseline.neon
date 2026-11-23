@@ -1,21 +1,2 @@
 parameters:
-	ignoreErrors:
-		-
-			message: "#^Cannot access property \\$saldo_income on App\\\\Models\\\\SaldoUser\\|null\\.$#"
-			count: 2
-			path: app/Services/SaldoService.php
-
-		-
-			message: "#^Cannot access property \\$saldo_refund on App\\\\Models\\\\SaldoUser\\|null\\.$#"
-			count: 2
-			path: app/Services/SaldoService.php
-
-		-
-			message: "#^Cannot call method save\\(\\) on App\\\\Models\\\\SaldoUser\\|null\\.$#"
-			count: 1
-			path: app/Services/SaldoService.php
-
-		-
-			message: "#^Method App\\\\Services\\\\SaldoService\\:\\:saveSaldoAfterDisbursement\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: app/Services/SaldoService.php
+	ignoreErrors: []
