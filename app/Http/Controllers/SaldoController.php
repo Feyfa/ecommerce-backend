@@ -8,8 +8,19 @@ use App\Services\SaldoService;
 use App\Services\XenditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Throwable;
 
+/**
+ * Melayani ringkasan saldo, riwayat mutasi, dan tarik saldo milik user terautentikasi.
+ *
+ * @phpstan-type WithdrawalResult array{status: 'error', httpCode: int, message: string}|array{
+ *     status: 'success',
+ *     saldoHistoryId: string
+ * }
+ */
 class SaldoController extends Controller
 {
     // Nominal tarik saldo terkecil dalam rupiah, sama dengan frontend yang menolak `<= 0`.
@@ -206,16 +217,20 @@ class SaldoController extends Controller
     /**
      * Memvalidasi dan memproses penarikan saldo pengguna.
      *
-     * Identitas user diperiksa sebelum input. `paymentAccount` yang tidak kosong tetapi bukan teks,
-     * serta `wihtdrawPrice` berbentuk boolean, array, atau objek, ditolak dengan 422. Nominal lalu
-     * dibaca sekali sebagai rupiah bulat: nilai kosong, format bukan bilangan bulat, di bawah
-     * minimum, atau di atas maksimum mendapat 400. Rekening dan kecukupan saldo diperiksa sebelum
-     * disbursement Xendit. Saldo dan riwayatnya baru diperbarui setelah provider mengonfirmasi
-     * pencairan, sehingga kegagalan eksternal tidak mengurangi saldo pengguna.
+     * Identitas user diperiksa sebelum input. `paymentAccount` yang tidak kosong tetapi bukan
+     * teks, serta `wihtdrawPrice` berbentuk boolean, array, atau objek, ditolak dengan 422.
+     * Nominal lalu dibaca sekali sebagai rupiah bulat: nilai kosong, format bukan bilangan bulat,
+     * di bawah minimum, atau di atas maksimum mendapat 400. Setelah rekening ditemukan, cek saldo,
+     * disbursement Xendit, dan pengurangan saldo berjalan dalam satu transaksi yang mengunci row
+     * saldo, sehingga penarikan bersamaan milik user yang sama diproses satu per satu. Saldo
+     * kurang atau penolakan provider mendapat 400 tanpa perubahan saldo. Pengurangan yang gagal
+     * setelah provider menerima pencairan dicatat sebagai log critical dan berakhir HTTP 500.
      *
      * @param  Request  $request  Rekening tujuan dan nominal penarikan dari user terautentikasi.
      *
      * @return JsonResponse Riwayat penarikan yang baru dibuat atau detail kegagalan untuk client.
+     *
+     * @throws Throwable Jika query saldo gagal; perubahan saldo dan riwayat di-rollback.
      */
     public function withdrawSaldo(Request $request): JsonResponse
     {
@@ -314,68 +329,212 @@ class SaldoController extends Controller
         $paymentUserId = $getPayment['payment']['id'] ?? '';
         $userName = $getPayment['payment']['user_name'] ?? '';
         $paymentSlug = $getPayment['payment']['payment_slug'] ?? '';
-        $paymentSlugUpper = strtoupper($paymentSlug);
 
         if ($status == 'error') {
             return response()->json(['status' => 'error', 'message' => $message], 400);
         }
         // --- step 6 - ambil data payment - end ---
 
-        // --- step 7 - ambil saldo user - start ---
-        $getSaldo = $this->saldoService->getSaldo($user_id);
-        $saldoTotal = $getSaldo['saldoTotal'] ?? 0;
-        $saldoTotalString = $this->formatRupiahAmount($saldoTotal);
-        $wihtdrawPriceString = $this->formatRupiahAmount($wihtdrawPrice);
+        // --- step 7 - tarik saldo dengan row saldo terkunci - start ---
+        // Sebelumnya cek saldo, disbursement, dan pengurangan berjalan tanpa transaksi. Dua
+        // request bersamaan bisa sama-sama lolos cek saldo sebelum salah satunya mengurangi,
+        // lalu Xendit mengirim keduanya dan perusahaan menanggung kelebihannya. Sekarang request
+        // kedua menunggu lock row `saldo_users` sampai transaksi pertama selesai, lalu membaca
+        // saldo yang sudah berkurang.
+        //
+        // Lock sengaja ditahan selama request HTTP ke Xendit. Client Guzzle di XenditService
+        // belum memakai timeout, jadi request yang menggantung ikut menahan penarikan lain milik
+        // user yang sama. Rekening dicari sebelum transaksi agar lock tidak ditahan lebih lama.
+        // Generic DB::transaction melebarkan literal status menjadi string biasa.
+        /** @var WithdrawalResult $withdrawal */
+        $withdrawal = DB::transaction(
+            fn (): array => $this->withdrawWithLockedSaldo(
+                user_id: $user_id,
+                amount: $wihtdrawPrice,
+                paymentAccount: $paymentAccount,
+                paymentUserId: $paymentUserId,
+                holderName: $userName,
+                paymentSlug: $paymentSlug,
+            )
+        );
+        // --- step 7 - tarik saldo dengan row saldo terkunci - end ---
 
-        if ($saldoTotal == 0 || empty($saldoTotal)) {
+        // --- step 8 - kirim respons penarikan yang gagal - start ---
+        if ($withdrawal['status'] === 'error') {
             return response()->json(
-                ['status' => 'error', 'message' => 'Saldo Anda Rp0 Anda Tidak Bisa Tarik Saldo'],
-                400,
+                ['status' => 'error', 'message' => $withdrawal['message']],
+                $withdrawal['httpCode'],
             );
         }
+        // --- step 8 - kirim respons penarikan yang gagal - end ---
 
-        if ($saldoTotal < $wihtdrawPrice) {
-            $insufficientMessage = "Saldo Anda Hanya Rp$saldoTotalString, "
-                ."Tidak Bisa Tarik Saldo Sebesar $wihtdrawPriceString";
+        // --- step 9 - ambil satu riwayat saldo - start ---
+        $getSaldoById = $this->saldoService->getSaldoById($withdrawal['saldoHistoryId']);
+        $saldoHistory = $getSaldoById['saldoHistory'] ?? [];
+        // --- step 9 - ambil satu riwayat saldo - end ---
 
-            return response()->json(['status' => 'error', 'message' => $insufficientMessage], 400);
+        return response()->json(['status' => 'success', 'saldoHistory' => $saldoHistory]);
+    }
+
+    /**
+     * Memeriksa saldo, mengirim disbursement, lalu mengurangi saldo pada row yang terkunci.
+     *
+     * Hanya dipanggil dari DB::transaction milik withdrawSaldo(). Row saldo dikunci sebelum cek
+     * kecukupan dan tetap terkunci sampai pengurangan tersimpan, sehingga penarikan lain milik
+     * user yang sama tidak bisa membaca saldo lama di antaranya. Hasil error dikembalikan tanpa
+     * exception agar transaksi tetap commit tanpa perubahan dan lock segera dilepas.
+     *
+     * @param  string  $user_id  ID pemilik saldo yang menarik dana.
+     * @param  int  $amount  Nominal penarikan dalam rupiah bulat yang sudah lolos batas.
+     * @param  string  $paymentAccount  Nomor rekening tujuan, termasuk nol di awal.
+     * @param  string  $paymentUserId  ID rekening tujuan yang dicatat di riwayat.
+     * @param  string  $holderName  Nama pemilik rekening yang dikirim ke Xendit.
+     * @param  string  $paymentSlug  Slug bank tujuan, misalnya `bca`.
+     *
+     * @return WithdrawalResult ID riwayat penarikan, atau status HTTP dan pesan kegagalan.
+     *
+     * @throws Throwable Jika query saldo gagal; kegagalan setelah disbursement sudah dicatat.
+     */
+    private function withdrawWithLockedSaldo(
+        string $user_id,
+        int $amount,
+        string $paymentAccount,
+        string $paymentUserId,
+        string $holderName,
+        string $paymentSlug,
+    ): array {
+        // --- step 1 - cek saldo user yang terkunci - start ---
+        $saldoTotal = $this->saldoService->lockSaldoTotal($user_id);
+        $shortageMessage = $this->findSaldoShortageMessage($saldoTotal, $amount);
+
+        if ($shortageMessage !== null) {
+            return ['status' => 'error', 'httpCode' => 400, 'message' => $shortageMessage];
         }
-        // --- step 7 - ambil saldo user - end ---
+        // --- step 1 - cek saldo user yang terkunci - end ---
 
-        // --- step 8 - proses penarikan saldo - start ---
+        // --- step 2 - siapkan data disbursement - start ---
+        // External ID dipakai ulang di log critical jika pengurangan gagal setelah transfer.
+        $paymentSlugUpper = strtoupper($paymentSlug);
+        $amountString = $this->formatRupiahAmount($amount);
+        $externalId = "dis-$paymentSlug-".uniqid();
+        // --- step 2 - siapkan data disbursement - end ---
+
+        // --- step 3 - kirim disbursement ke Xendit - start ---
         $disbursement = $this->xenditService->disbursement(
-            external_id: "dis-$paymentSlug-".uniqid(),
-            amount: $wihtdrawPrice,
+            external_id: $externalId,
+            amount: $amount,
             bank_code: $paymentSlugUpper,
-            account_holder_name: $userName,
+            account_holder_name: $holderName,
             account_number: $paymentAccount,
-            description: "Transfer Rekening $paymentSlugUpper Sebesar Rp$wihtdrawPriceString"
+            description: "Transfer Rekening $paymentSlugUpper Sebesar Rp$amountString"
         );
 
         // Penolakan provider harus keluar sebelum saldo atau riwayat diubah.
         if ($disbursement['status'] === 'error') {
-            return response()->json([
+            return [
                 'status' => 'error',
+                'httpCode' => 400,
                 'message' => $disbursement['message'],
-            ], 400);
+            ];
         }
-        // --- step 8 - proses penarikan saldo - end ---
+        // --- step 3 - kirim disbursement ke Xendit - end ---
 
-        // --- step 9 - simpan saldo setelah disbursement - start ---
-        $saveSaldoAfterDisbursement = $this->saldoService->saveSaldoAfterDisbursement(
-            $user_id,
-            $paymentUserId,
-            $wihtdrawPrice,
-        );
-        $saldoHistoryId = $saveSaldoAfterDisbursement['saldoHistoryId'] ?? null;
-        // --- step 9 - simpan saldo setelah disbursement - end ---
+        // --- step 4 - kurangi saldo setelah disbursement - start ---
+        $saved = $this->saveDisbursedWithdrawal($user_id, $paymentUserId, $amount, $externalId);
+        // --- step 4 - kurangi saldo setelah disbursement - end ---
 
-        // --- step 10 - ambil satu riwayat saldo - start ---
-        $getSaldoById = $this->saldoService->getSaldoById($saldoHistoryId);
-        $saldoHistory = $getSaldoById['saldoHistory'] ?? [];
-        // --- step 10 - ambil satu riwayat saldo - end ---
+        return $saved;
+    }
 
-        return response()->json(['status' => 'success', 'saldoHistory' => $saldoHistory]);
+    /**
+     * Menyusun pesan penolakan ketika saldo yang terkunci tidak cukup untuk penarikan.
+     *
+     * @param  int  $saldoTotal  Total saldo yang dibaca dengan lock.
+     * @param  int  $amount  Nominal penarikan dalam rupiah bulat.
+     *
+     * @return string|null Pesan saldo nol atau saldo kurang, atau null jika saldo cukup.
+     */
+    private function findSaldoShortageMessage(int $saldoTotal, int $amount): ?string
+    {
+        // Pesan dipertahankan sama dengan sebelum lock ditambahkan.
+        if ($saldoTotal === 0) {
+            return 'Saldo Anda Rp0 Anda Tidak Bisa Tarik Saldo';
+        }
+
+        if ($saldoTotal < $amount) {
+            $saldoTotalString = $this->formatRupiahAmount($saldoTotal);
+            $amountString = $this->formatRupiahAmount($amount);
+
+            return "Saldo Anda Hanya Rp$saldoTotalString, "
+                ."Tidak Bisa Tarik Saldo Sebesar $amountString";
+        }
+
+        return null;
+    }
+
+    /**
+     * Menyimpan pengurangan saldo untuk disbursement yang sudah diterima Xendit.
+     *
+     * Saat method ini berjalan, provider sudah menerima pencairan. Kegagalan di sini berarti dana
+     * keluar tanpa saldo berkurang, dan perusahaan menanggung selisihnya sampai direkonsiliasi.
+     * Karena itu kegagalan dicatat sebagai log critical bersama external ID Xendit. Log hanya
+     * memuat ID user, nominal, dan external ID, tanpa nomor rekening atau nama pemilik. Hasil
+     * error dari service menjadi HTTP 500, sedangkan exception dilempar ulang agar transaksi luar
+     * di-rollback. Rekonsiliasi otomatis berada di luar cakupan method ini.
+     *
+     * @param  string  $user_id  ID pemilik saldo yang menarik dana.
+     * @param  string  $paymentUserId  ID rekening tujuan yang dicatat di riwayat.
+     * @param  int  $amount  Nominal yang sudah diterima provider.
+     * @param  string  $externalId  External ID disbursement untuk mencari transaksi di Xendit.
+     *
+     * @return WithdrawalResult ID riwayat penarikan, atau HTTP 500 jika service menolak.
+     *
+     * @throws Throwable Jika query saldo atau riwayat gagal; exception sudah dicatat.
+     */
+    private function saveDisbursedWithdrawal(
+        string $user_id,
+        string $paymentUserId,
+        int $amount,
+        string $externalId,
+    ): array {
+        // --- step 1 - simpan pengurangan saldo - start ---
+        $logContext = ['user_id' => $user_id, 'amount' => $amount, 'external_id' => $externalId];
+
+        try {
+            $saved = $this->saldoService->saveSaldoAfterDisbursement(
+                $user_id,
+                $paymentUserId,
+                $amount,
+            );
+        } catch (Throwable $exception) {
+            Log::critical('Withdrawal was disbursed but the balance deduction failed.', [
+                ...$logContext,
+                'exception' => $exception->getMessage(),
+            ]);
+
+            throw $exception;
+        }
+        // --- step 1 - simpan pengurangan saldo - end ---
+
+        // --- step 2 - laporkan pengurangan yang ditolak - start ---
+        // Cek saldo di bawah lock yang sama membuat penolakan ini tidak diharapkan terjadi.
+        if ($saved['status'] === 'error') {
+            Log::critical('Withdrawal was disbursed but the balance deduction was rejected.', [
+                ...$logContext,
+                'reason' => $saved['message'],
+            ]);
+
+            // Dana mungkin sudah keluar. User diminta tidak mengulang agar tidak dikirim dua kali.
+            return [
+                'status' => 'error',
+                'httpCode' => 500,
+                'message' => 'Penarikan Sudah Diproses Tetapi Saldo Gagal Diperbarui, '
+                    .'Jangan Ulangi Penarikan',
+            ];
+        }
+        // --- step 2 - laporkan pengurangan yang ditolak - end ---
+
+        return ['status' => 'success', 'saldoHistoryId' => $saved['saldoHistoryId']];
     }
 
     /**

@@ -459,31 +459,75 @@ class TransactionService
     }
 
     /**
-     * Memindahkan nilai transaksi ke saldo seller secara atomik.
+     * Menambahkan nilai transaksi ke saldo income seller dan mencatat riwayatnya.
      *
-     * Row transaksi dan saldo dikunci dalam transaksi database sebelum nominal dipindahkan. Function
-     * mencegah pemrosesan ganda dan mencatat saldo sebelum serta sesudah agar riwayat tetap dapat
-     * diaudit.
+     * Pembacaan saldo, penambahan income, dan row riwayat berjalan dalam satu transaksi database,
+     * sehingga tersimpan bersama atau di-rollback bersama. Row saldo dikunci agar kredit ini dan
+     * penarikan saldo milik user yang sama diproses bergantian. Status transaksi tidak dikunci di
+     * sini; pemanggil tetap bertanggung jawab agar transaksi yang sama tidak dikredit dua kali.
      *
-     * @param  string  $user_id  ID user yang menjadi scope data atau mutasi.
+     * @param  string  $user_id  ID seller pemilik saldo yang dikredit.
      * @param  string  $transaction_user_id  ID transaksi seller yang menjadi sumber mutasi.
-     * @param  float  $price  Nominal uang yang digunakan oleh operasi.
-     * @param  string  $type  Nilai type yang diperlukan untuk menjalankan proses ini.
+     * @param  float  $price  Nominal yang ditambahkan; income menyimpan bagian bulatnya.
+     * @param  string  $type  Jenis mutasi yang dicatat di riwayat, misalnya `incoming`.
      *
-     * @return void Tidak mengembalikan nilai; proses dinyatakan berhasil ketika selesai tanpa exception.
+     * @return void Tidak mengembalikan nilai; proses berhasil ketika selesai tanpa exception.
+     *
+     * @throws \Throwable Jika query gagal; perubahan saldo dan riwayat di-rollback bersama.
      */
-    public function transferSaldo(string $user_id = '', string $transaction_user_id = '', float $price = 0, string $type = ''): void
-    {
+    public function transferSaldo(
+        string $user_id = '',
+        string $transaction_user_id = '',
+        float $price = 0,
+        string $type = '',
+    ): void {
+        // Sebelumnya saldo dan riwayat ditulis tanpa transaksi, sehingga riwayat yang gagal
+        // meninggalkan income yang sudah bertambah tanpa catatan.
+        DB::transaction(function () use ($user_id, $transaction_user_id, $price, $type): void {
+            $this->creditLockedSaldo($user_id, $transaction_user_id, $price, $type);
+        });
+    }
+
+    /**
+     * Mengunci row saldo seller, menambah income, lalu mencatat riwayat di transaksi aktif.
+     *
+     * Hanya dipanggil dari dalam DB::transaction milik transferSaldo(). Seller tanpa row saldo
+     * mendapat row baru tanpa lock karena belum ada row yang bisa dikunci; dua kredit pertama
+     * yang bersamaan masih bisa bertabrakan pada unique `user_id` dan berada di luar cakupan ini.
+     *
+     * @param  string  $user_id  ID seller pemilik saldo yang dikredit.
+     * @param  string  $transaction_user_id  ID transaksi seller yang menjadi sumber mutasi.
+     * @param  float  $price  Nominal yang ditambahkan; income menyimpan bagian bulatnya.
+     * @param  string  $type  Jenis mutasi yang dicatat di riwayat, misalnya `incoming`.
+     *
+     * @return void Tidak mengembalikan nilai; saldo dan riwayat ditulis di transaksi pemanggil.
+     */
+    private function creditLockedSaldo(
+        string $user_id,
+        string $transaction_user_id,
+        float $price,
+        string $type,
+    ): void {
         // --- step 1 - siapkan variabel proses - start ---
         $saldo_before = 0;
         $saldo_after = 0;
         // --- step 1 - siapkan variabel proses - end ---
 
-        // --- step 2 - perbarui saldo user - start ---
+        // --- step 2 - kunci row saldo seller - start ---
+        // Tanpa `FOR UPDATE`, PostgreSQL membaca income lama tanpa menunggu penarikan yang sedang
+        // mengunci row. Setelah penarikan commit, UPDATE di step 3 menulis nilai absolut dari
+        // bacaan lama, sehingga pengurangan penarikan hilang dan seller bisa menarik dana yang
+        // sama lagi. Perusahaan menanggung kelebihan itu. Dengan lock, kredit menunggu lalu
+        // membaca saldo yang baru.
         $saldoUser = SaldoUser::where('user_id', $user_id)
+            ->lockForUpdate()
             ->first();
+        // --- step 2 - kunci row saldo seller - end ---
+
+        // --- step 3 - tambah income seller - start ---
         if (empty($saldoUser)) {
             $saldo_after = $price;
+
             SaldoUser::create([
                 'user_id' => $user_id,
                 'balance' => $price,
@@ -498,9 +542,9 @@ class TransactionService
 
             $saldo_after = (int) $saldoUser->saldo_income + (int) $saldoUser->saldo_refund;
         }
-        // --- step 2 - perbarui saldo user - end ---
+        // --- step 3 - tambah income seller - end ---
 
-        // --- step 3 - simpan riwayat saldo - start ---
+        // --- step 4 - simpan riwayat saldo - start ---
         SaldoHistory::create([
             'user_id' => $user_id,
             'transaction_user_id' => $transaction_user_id,
@@ -510,6 +554,6 @@ class TransactionService
             'saldo_before' => $saldo_before,
             'saldo_after' => $saldo_after,
         ]);
-        // --- step 3 - simpan riwayat saldo - end ---
+        // --- step 4 - simpan riwayat saldo - end ---
     }
 }

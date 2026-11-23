@@ -415,6 +415,18 @@ It verifies that concurrent publishers use `FOR UPDATE SKIP LOCKED` to claim
 different outbox rows. It skips automatically when the active testing driver is
 not PostgreSQL.
 
+The saldo locking integration test uses the same opt-in PostgreSQL boundary:
+
+```bash
+php artisan test tests/Integration/PostgresSaldoLockingTest.php
+```
+
+A second connection locks a seller's `saldo_users` row. The test then checks
+that a withdrawal and an income credit wait on the locked balance read. The
+withdrawal must not reach the mocked Xendit client while it waits. The
+application connection sets a 1-second `lock_timeout`, so each run ends in a
+few seconds.
+
 Run the local suite normally:
 
 ```bash

@@ -12,6 +12,7 @@ Buyer and seller authenticated users.
 - `app/Http/Controllers/SaldoController.php`
 - `app/Services/SaldoService.php`
 - `app/Services/PaymentService.php`
+- `app/Services/TransactionService.php`
 - `app/Services/XenditService.php`
 
 ## Routes
@@ -122,7 +123,8 @@ string `message`:
    `Nominal Tidak Boleh Lebih Dari Rp1.000.000`.
 9. The payment account must exist for the authenticated user.
 10. The authenticated user must have a nonzero total balance of at least the
-    amount.
+    amount. The balance is read under the row lock described below. A user
+    without a balance row has a total of Rp0.
 
 Every rejection happens before the Xendit request and before any balance or
 history change. The parsed integer is the only amount used for the response
@@ -131,7 +133,7 @@ messages, the Xendit request, and the balance deduction.
 Side effects:
 
 - Calls Xendit disbursement using the saved payment account.
-- Deducts balance after successful disbursement.
+- Deducts balance after successful disbursement, refund first and then income.
 - Creates a withdrawal balance history row.
 - Returns the new balance history item.
 
@@ -139,9 +141,33 @@ An Xendit rejection returns HTTP 400 with the message from the
 [Xendit adapter](../integrations/xendit.md#adapter-result-contract) before the
 controller attempts to change the balance or write a history row.
 
-Known gap: the balance check, the Xendit request, and the balance deduction
-do not run inside a database transaction or row lock. Concurrent withdrawals
-can each pass the balance check before either one deducts.
+Concurrency:
+
+- After the account lookup, the balance check, the Xendit request, and the
+  balance deduction run inside one database transaction. The transaction locks
+  the user's `saldo_users` row with `FOR UPDATE`.
+- A second withdrawal for the same user waits until the first transaction
+  ends, then reads the reduced balance.
+- A seller income credit from transaction approval
+  (`TransactionService::transferSaldo()`) locks the same row. It waits for a
+  running withdrawal instead of overwriting the deduction with a stale
+  income value.
+- The lock is held during the Xendit HTTP request. The Xendit client has no
+  timeout, so a hanging request also delays other balance writes for that
+  user.
+- SQLite ignores the lock clause. The opt-in
+  `tests/Integration/PostgresSaldoLockingTest.php` verifies the wait on
+  PostgreSQL.
+
+Failure after disbursement: when the balance deduction fails after Xendit
+accepted the disbursement, the transaction rolls back and the balance and
+history stay unchanged, although the provider may still send the money. The
+endpoint logs a critical event with the user ID, the amount, and the Xendit
+external ID, without the account number or holder name. A rejected deduction
+returns HTTP 500 with
+`Penarikan Sudah Diproses Tetapi Saldo Gagal Diperbarui, Jangan Ulangi Penarikan`.
+A database error returns the framework's HTTP 500 response. Reconciliation
+with Xendit is manual.
 
 The returned history item uses the same description and amount representation
 as the history list.

@@ -18,12 +18,19 @@ use Illuminate\Support\Collection;
  *     price: float|numeric-string|null,
  *     description: string
  * }
+ * @phpstan-type SaldoDeductionResult array{status: 'error', message: string}|array{
+ *     status: 'success',
+ *     saldoHistoryId: string
+ * }
  */
 class SaldoService
 {
     private const HISTORY_PAGE_SIZE = 30;
 
     private const RUPIAH_DECIMAL_PLACES = 0;
+
+    // Nominal pengurangan terkecil dalam rupiah, sama dengan minimum tarik saldo di controller.
+    private const MINIMUM_DEDUCTION_AMOUNT = 1;
 
     /**
      * Mengambil saldo milik user berdasarkan ID.
@@ -60,6 +67,31 @@ class SaldoService
             'saldoIncome' => $saldoIncome,
             'saldoRefund' => $saldoRefund,
         ];
+    }
+
+    /**
+     * Mengunci row saldo user dan mengembalikan total refund ditambah income.
+     *
+     * Harus dipanggil di dalam DB::transaction. Lock bertahan sampai transaksi selesai, sehingga
+     * request lain yang mengunci row yang sama menunggu lalu membaca saldo yang sudah berubah.
+     * User tanpa row saldo mendapat nol dan tidak ada row yang dikunci. SQLite mengabaikan
+     * klausa lock ini.
+     *
+     * @param  string  $user_id  ID pemilik saldo yang dikunci.
+     *
+     * @return int Total saldo dalam rupiah bulat, dengan cast yang sama seperti getSaldo().
+     */
+    public function lockSaldoTotal(string $user_id): int
+    {
+        // Cast yang sama dengan getSaldo() menjaga pesan saldo di controller tetap sama.
+        $saldoUser = SaldoUser::where('user_id', $user_id)
+            ->lockForUpdate()
+            ->first();
+
+        $saldoIncome = (int) ($saldoUser->saldo_income ?? 0);
+        $saldoRefund = (int) ($saldoUser->saldo_refund ?? 0);
+
+        return $saldoIncome + $saldoRefund;
     }
 
     /**
@@ -294,59 +326,107 @@ class SaldoService
     }
 
     /**
-     * Memperbarui saldo dan riwayatnya setelah disbursement berhasil.
+     * Mengurangi saldo dan mencatat riwayat penarikan setelah disbursement berhasil.
      *
-     * Saldo yang relevan dikunci dan dikurangi berdasarkan jenis balance yang digunakan. Perubahan
-     * saldo serta row histori disimpan dalam transaksi yang sama agar pencairan tidak menghasilkan
-     * catatan tanpa perubahan balance atau sebaliknya.
+     * Nominal harus minimal Rp1 dan user harus ada. Row `saldo_users` lalu dikunci di dalam
+     * transaksi, sehingga pengurangan saldo dan row riwayat tersimpan bersama atau tidak sama
+     * sekali. Row saldo yang tidak ada atau saldo yang kurang ditolak tanpa perubahan. Jika
+     * dipanggil dari transaksi lain, transaksi ini menjadi savepoint dan lock baru dilepas saat
+     * transaksi luar selesai.
      *
-     * @param  string|null  $user_id  ID user yang menjadi scope data atau mutasi.
-     * @param  string|null  $payment_user_id  ID rekening user yang terkait dengan mutasi saldo.
-     * @param  int  $price  Nominal uang yang digunakan oleh operasi.
+     * @param  string|null  $user_id  ID pemilik saldo yang dikurangi.
+     * @param  string|null  $payment_user_id  ID rekening tujuan yang dicatat di riwayat.
+     * @param  int  $price  Nominal penarikan dalam rupiah bulat.
      *
-     * @return array Data terstruktur yang dihasilkan oleh proses ini.
+     * @return SaldoDeductionResult ID riwayat penarikan, atau pesan jika tidak ada yang disimpan.
+     *
+     * @throws \Throwable Jika query gagal; perubahan saldo dan riwayat di-rollback bersama.
      */
-    public function saveSaldoAfterDisbursement(?string $user_id = null, ?string $payment_user_id = null, int $price = 0): array
-    {
-        // --- step 1 - ambil data user - start ---
-        $userExists = User::where('id', $user_id)
-            ->exists();
-        if (! $userExists) {
+    public function saveSaldoAfterDisbursement(
+        ?string $user_id = null,
+        ?string $payment_user_id = null,
+        int $price = 0,
+    ): array {
+        // --- step 1 - validasi nominal - start ---
+        // Mengurangi angka negatif justru menambah saldo, dan kelebihannya bisa ditarik lagi
+        // lewat /api/saldo-withdraw. Penjaga ini tetap ada walaupun controller sudah membatasi.
+        if ($price < self::MINIMUM_DEDUCTION_AMOUNT) {
+            return ['status' => 'error', 'message' => 'price must be at least 1'];
+        }
+        // --- step 1 - validasi nominal - end ---
+
+        // --- step 2 - validasi user - start ---
+        if ($user_id === null || ! User::where('id', $user_id)->exists()) {
             return ['status' => 'error', 'message' => 'user not found'];
         }
-        // --- step 1 - ambil data user - end ---
+        // --- step 2 - validasi user - end ---
 
-        // --- step 2 - ambil saldo user - start ---
+        // --- step 3 - kurangi saldo dalam transaksi - start ---
+        // Generic DB::transaction melebarkan literal status menjadi string biasa.
+        /** @var SaldoDeductionResult $deduction */
+        $deduction = DB::transaction(
+            fn (): array => $this->deductLockedSaldo($user_id, $payment_user_id, $price)
+        );
+        // --- step 3 - kurangi saldo dalam transaksi - end ---
+
+        return $deduction;
+    }
+
+    /**
+     * Mengurangi row saldo yang dikunci lalu menulis riwayat penarikan di transaksi aktif.
+     *
+     * Hanya dipanggil dari dalam DB::transaction. `FOR UPDATE` membuat penarikan lain milik user
+     * yang sama menunggu sampai transaksi ini selesai. Tanpa lock, dua penarikan bisa membaca
+     * saldo yang sama dan keduanya lolos cek kecukupan. SQLite mengabaikan klausa lock ini.
+     *
+     * @param  string  $user_id  ID pemilik saldo yang sudah divalidasi.
+     * @param  string|null  $payment_user_id  ID rekening tujuan yang dicatat di riwayat.
+     * @param  int  $price  Nominal penarikan positif dalam rupiah bulat.
+     *
+     * @return SaldoDeductionResult ID riwayat penarikan, atau pesan jika saldo tidak ada/kurang.
+     */
+    private function deductLockedSaldo(
+        string $user_id,
+        ?string $payment_user_id,
+        int $price,
+    ): array {
+        // --- step 1 - kunci row saldo user - start ---
         $saldoUser = SaldoUser::where('user_id', $user_id)
+            ->lockForUpdate()
             ->first();
+
+        if ($saldoUser === null) {
+            return ['status' => 'error', 'message' => 'saldo not found'];
+        }
+        // --- step 1 - kunci row saldo user - end ---
+
+        // --- step 2 - cek kecukupan saldo - start ---
+        // Sebelumnya kekurangan dipotong diam-diam menjadi nol. Provider sudah mengirim
+        // nominal penuh, sedangkan saldo hanya berkurang sebagian, sehingga perusahaan
+        // menanggung selisihnya.
         $saldoRefund = (int) ($saldoUser->saldo_refund ?? 0);
         $saldoIncome = (int) ($saldoUser->saldo_income ?? 0);
         $saldoBefore = $saldoRefund + $saldoIncome;
-        // --- step 2 - ambil saldo user - end ---
 
-        // --- step 3 - kurangi saldo - start ---
-        if ($saldoRefund >= $price) {
-            $saldoRefund -= $price;
-            $saldoUser->saldo_refund = $saldoRefund;
-        } else {
-            $remainingPrice = $price - $saldoRefund;
-            $saldoRefund = 0;
-            $saldoUser->saldo_refund = $saldoRefund;
-
-            if ($saldoIncome >= $remainingPrice) {
-                $saldoIncome -= $remainingPrice;
-                $saldoUser->saldo_income = $saldoIncome;
-            } else {
-                $saldoIncome = 0;
-                $saldoUser->saldo_income = $saldoIncome;
-            }
+        if ($saldoBefore < $price) {
+            return ['status' => 'error', 'message' => 'saldo is not enough'];
         }
-        $saldoUser->save();
+        // --- step 2 - cek kecukupan saldo - end ---
 
-        $saldoRefund = (int) ($saldoUser->saldo_refund ?? 0);
-        $saldoIncome = (int) ($saldoUser->saldo_income ?? 0);
-        $saldoAfter = $saldoRefund + $saldoIncome;
-        // --- step 3 - kurangi saldo - end ---
+        // --- step 3 - kurangi saldo mulai dari refund - start ---
+        // Refund tetap dipakai lebih dulu. Income hanya ditulis ketika ikut terpotong, sama
+        // dengan perilaku sebelumnya.
+        $refundDeduction = min($saldoRefund, $price);
+        $incomeDeduction = $price - $refundDeduction;
+
+        $saldoUser->saldo_refund = $saldoRefund - $refundDeduction;
+
+        if ($incomeDeduction > 0) {
+            $saldoUser->saldo_income = $saldoIncome - $incomeDeduction;
+        }
+
+        $saldoUser->save();
+        // --- step 3 - kurangi saldo mulai dari refund - end ---
 
         // --- step 4 - buat riwayat saldo - start ---
         $saldoHistory = SaldoHistory::create([
@@ -356,11 +436,10 @@ class SaldoService
             'type' => 'withdrawal',
             'price' => $price,
             'saldo_before' => $saldoBefore,
-            'saldo_after' => $saldoAfter,
+            'saldo_after' => $saldoBefore - $price,
         ]);
-        $saldoHistoryId = $saldoHistory->id;
         // --- step 4 - buat riwayat saldo - end ---
 
-        return ['status' => 'success', 'saldoHistoryId' => $saldoHistoryId];
+        return ['status' => 'success', 'saldoHistoryId' => $saldoHistory->id];
     }
 }
