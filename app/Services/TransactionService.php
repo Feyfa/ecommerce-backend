@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use stdClass;
+use Throwable;
 
 /**
  * Menyusun daftar transaksi buyer/seller dan menerapkan pencatatan saldo transaksi seller.
@@ -36,6 +37,21 @@ use stdClass;
  */
 class TransactionService
 {
+    /**
+     * Hasil approve: transaksi sudah ditandai selesai dan income seller sudah dikredit.
+     */
+    public const APPROVAL_APPROVED = 'approved';
+
+    /**
+     * Hasil approve: transaksi tidak ada, milik seller lain, atau tidak lagi menunggu seller.
+     */
+    public const APPROVAL_NOT_FOUND = 'not_found';
+
+    /**
+     * Hasil approve: invoice transaksi belum dibayar buyer atau transaksi tidak punya invoice.
+     */
+    public const APPROVAL_UNPAID = 'unpaid';
+
     /**
      * Mengambil daftar transaksi dari perspektif buyer atau seller beserta counts dan pagination.
      *
@@ -459,12 +475,116 @@ class TransactionService
     }
 
     /**
+     * Menyelesaikan transaksi seller dan mengkredit income-nya dalam satu DB transaction.
+     *
+     * Dipakai oleh endpoint approve seller. Perubahan status ke `done` dan kredit income tersimpan
+     * bersama atau di-rollback bersama. Sebelumnya status disimpan lebih dulu di luar transaksi
+     * kredit, sehingga kredit yang gagal meninggalkan transaksi `done` tanpa income dan approve
+     * ulang mendapat 404; seller kehilangan income itu. Kepemilikan, status, dan pembayaran
+     * invoice diperiksa pada row yang sudah dikunci, lihat approveLockedTransaction().
+     *
+     * @param  string  $user_id  ID seller terautentikasi; hanya transaksi miliknya yang diproses.
+     * @param  string  $transaction_user_id  ID transaksi seller yang akan diselesaikan.
+     *
+     * @return self::APPROVAL_* Hasil approve yang dipetakan controller ke respons HTTP.
+     *
+     * @throws Throwable Jika query gagal; status, saldo, dan riwayat di-rollback bersama.
+     */
+    public function approveSellerTransaction(string $user_id, string $transaction_user_id): string
+    {
+        // Generic DB::transaction melebarkan literal hasil menjadi string biasa.
+        /** @var self::APPROVAL_* $approval */
+        $approval = DB::transaction(
+            fn (): string => $this->approveLockedTransaction($user_id, $transaction_user_id)
+        );
+
+        return $approval;
+    }
+
+    /**
+     * Mengunci transaksi yang menunggu seller, menandainya selesai, lalu mengkredit income.
+     *
+     * Hanya dipanggil dari DB::transaction milik approveSellerTransaction(). Row
+     * `transaction_users` tetap terkunci sampai status dan kredit commit, sehingga approve lain
+     * untuk row yang sama menunggu lalu melihat status `done`. Transaksi hanya diselesaikan bila
+     * invoice-nya sudah `done`. Hasil not found dan unpaid dikembalikan tanpa exception agar
+     * transaksi commit tanpa perubahan dan lock segera dilepas.
+     *
+     * @param  string  $user_id  ID seller terautentikasi pemilik transaksi.
+     * @param  string  $transaction_user_id  ID transaksi seller yang akan diselesaikan.
+     *
+     * @return self::APPROVAL_* Approved setelah kredit tersimpan; not found/unpaid tanpa mutasi.
+     */
+    private function approveLockedTransaction(string $user_id, string $transaction_user_id): string
+    {
+        // --- step 1 - kunci transaksi yang menunggu persetujuan seller - start ---
+        // Lock ini satu-satunya penjaga agar satu transaksi tidak dikredit dua kali. Tanpa
+        // `FOR UPDATE`, dua approve bersamaan sama-sama membaca `approved_seller`, income seller
+        // bertambah dua kali, dan kelebihannya bisa ditarik lewat /api/saldo-withdraw atas biaya
+        // perusahaan. Lock saldo di creditLockedSaldo() tidak mencegahnya karena hanya membuat dua
+        // kredit berjalan bergantian. Dengan lock ini, approve kedua menunggu; setelah approve
+        // pertama commit, PostgreSQL (READ COMMITTED, default yang tidak diubah aplikasi)
+        // mengevaluasi ulang filter status pada versi row terbaru sehingga approve kedua mendapat
+        // null tanpa kredit.
+        // Urutan lock selalu `transaction_users` lalu `saldo_users`. Penarikan saldo hanya
+        // mengunci `saldo_users` dan tidak ada kode lain yang mengunci `transaction_users`, jadi
+        // tidak ada siklus deadlock. SQLite mengabaikan klausa lock ini.
+        $transactionUser = TransactionUser::where('id', $transaction_user_id)
+            ->where('user_id_seller', $user_id)
+            ->where('status', 'approved_seller')
+            ->lockForUpdate()
+            ->first();
+
+        if ($transactionUser === null) {
+            return self::APPROVAL_NOT_FOUND;
+        }
+        // --- step 1 - kunci transaksi yang menunggu persetujuan seller - end ---
+
+        // --- step 2 - pastikan invoice sudah dibayar - start ---
+        // Checkout membuat row transaksi dengan status default `approved_seller` saat invoice
+        // masih `pending`. Sebelumnya endpoint hanya memeriksa status itu, sehingga seller bisa
+        // memanggil API langsung untuk mengkredit income dari pesanan yang belum dibayar lalu
+        // menariknya; perusahaan menanggung dana itu. Tombol approve di frontend hanya
+        // disembunyikan dan bukan pengaman. Transaksi tanpa invoice juga ditolak karena tidak ada
+        // bukti pembayaran.
+        // Invoice cukup dibaca tanpa lock: satu-satunya penulis statusnya (PaymentController)
+        // hanya mengubah `pending` menjadi `done`, jadi invoice `done` tidak bisa kembali belum
+        // dibayar selama transaksi ini berjalan.
+        $invoiceStatus = $transactionUser->invoice()->value('status');
+
+        if ($invoiceStatus !== 'done') {
+            return self::APPROVAL_UNPAID;
+        }
+        // --- step 2 - pastikan invoice sudah dibayar - end ---
+
+        // --- step 3 - tandai transaksi selesai - start ---
+        $transactionUser->status = 'done';
+        $transactionUser->save();
+        // --- step 3 - tandai transaksi selesai - end ---
+
+        // --- step 4 - kredit income seller - start ---
+        // transferSaldo() membuka transaksi bersarang (savepoint). Exception dari kredit naik ke
+        // transaksi luar, sehingga status `done` di step 3 ikut di-rollback dan seller bisa
+        // approve ulang.
+        $this->transferSaldo(
+            user_id: $user_id,
+            transaction_user_id: $transactionUser->id,
+            price: (float) $transactionUser->product_price,
+            type: 'incoming'
+        );
+        // --- step 4 - kredit income seller - end ---
+
+        return self::APPROVAL_APPROVED;
+    }
+
+    /**
      * Menambahkan nilai transaksi ke saldo income seller dan mencatat riwayatnya.
      *
      * Pembacaan saldo, penambahan income, dan row riwayat berjalan dalam satu transaksi database,
      * sehingga tersimpan bersama atau di-rollback bersama. Row saldo dikunci agar kredit ini dan
      * penarikan saldo milik user yang sama diproses bergantian. Status transaksi tidak dikunci di
-     * sini; pemanggil tetap bertanggung jawab agar transaksi yang sama tidak dikredit dua kali.
+     * sini. Approve seller memanggil method ini dari dalam transaksi approveSellerTransaction(),
+     * yang sudah mengunci row transaksi agar transaksi yang sama tidak dikredit dua kali.
      *
      * @param  string  $user_id  ID seller pemilik saldo yang dikredit.
      * @param  string  $transaction_user_id  ID transaksi seller yang menjadi sumber mutasi.
@@ -473,7 +593,7 @@ class TransactionService
      *
      * @return void Tidak mengembalikan nilai; proses berhasil ketika selesai tanpa exception.
      *
-     * @throws \Throwable Jika query gagal; perubahan saldo dan riwayat di-rollback bersama.
+     * @throws Throwable Jika query gagal; perubahan saldo dan riwayat di-rollback bersama.
      */
     public function transferSaldo(
         string $user_id = '',
