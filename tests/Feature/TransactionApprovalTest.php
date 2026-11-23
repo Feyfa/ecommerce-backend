@@ -3,9 +3,13 @@
 namespace Tests\Feature;
 
 use App\Http\Middleware\AuthenticateApiRequest;
+use App\Models\SaldoHistory;
+use App\Models\TransactionInvoice;
 use App\Models\TransactionUser;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use RuntimeException;
 use Tests\TestCase;
 
 /**
@@ -24,6 +28,10 @@ class TransactionApprovalTest extends TestCase
     private const EMPTY_ID_MESSAGE = 'Transaction User ID Cannot Be Empty';
 
     private const NON_STRING_ID_MESSAGE = 'Transaction User ID Must Be A String';
+
+    private const UNPAID_MESSAGE = 'Transaksi Belum Dibayar Pembeli';
+
+    private const PAID_INVOICE_STATUS = 'done';
 
     /**
      * Bypasses only Clerk transport authentication and keeps request normalization middleware.
@@ -273,25 +281,176 @@ class TransactionApprovalTest extends TestCase
     }
 
     /**
+     * Rejects approval while the buyer has not paid, including a row without an invoice.
+     *
+     * @return void Each request receives 400 before the status or balance changes.
+     */
+    public function test_unpaid_transactions_are_rejected_with_400(): void
+    {
+        // --- step 1 - Prepare unpaid seller transactions - start ---
+        $seller = User::factory()->create();
+        $pendingInvoiceTransaction = $this->createTransaction($seller, invoiceStatus: 'pending');
+        $transactionWithoutInvoice = $this->createTransaction($seller, invoiceStatus: null);
+
+        $this->actingAs($seller);
+        // --- step 1 - Prepare unpaid seller transactions - end ---
+
+        // --- step 2 - Reject each unpaid transaction - start ---
+        foreach ([$pendingInvoiceTransaction, $transactionWithoutInvoice] as $transaction) {
+            $this->postJson(self::APPROVAL_ENDPOINT, [
+                'user_type' => 'seller',
+                'transaction_user_id' => $transaction->id,
+            ])
+                ->assertBadRequest()
+                ->assertExactJson(['status' => 'error', 'message' => self::UNPAID_MESSAGE]);
+
+            $this->assertTransactionWasNotApproved($transaction);
+        }
+        // --- step 2 - Reject each unpaid transaction - end ---
+    }
+
+    /**
+     * Rolls the approval back when the income credit fails, so the seller can approve again.
+     *
+     * @return void The failed request keeps the row waiting; the retry credits exactly once.
+     */
+    public function test_failed_credit_rolls_back_the_approval(): void
+    {
+        // --- step 1 - Prepare an approvable seller transaction - start ---
+        $seller = User::factory()->create();
+        $transaction = $this->createTransaction($seller);
+        $payload = ['user_type' => 'seller', 'transaction_user_id' => $transaction->id];
+
+        $this->actingAs($seller);
+        // --- step 1 - Prepare an approvable seller transaction - end ---
+
+        // --- step 2 - Make only the first history write fail - start ---
+        // The history row is written after the status and the balance were saved, so the failure
+        // proves both are rolled back together.
+        $historyWriteFailed = false;
+
+        SaldoHistory::creating(function () use (&$historyWriteFailed): void {
+            if ($historyWriteFailed) {
+                return;
+            }
+
+            $historyWriteFailed = true;
+
+            throw new RuntimeException('History write failed.');
+        });
+        // --- step 2 - Make only the first history write fail - end ---
+
+        // --- step 3 - Request the approval while the credit fails - start ---
+        $failedResponse = $this->postJson(self::APPROVAL_ENDPOINT, $payload);
+        // --- step 3 - Request the approval while the credit fails - end ---
+
+        // --- step 4 - Check the failed approval left no change - start ---
+        $failedResponse->assertInternalServerError();
+
+        $this->assertTransactionWasNotApproved($transaction);
+        // --- step 4 - Check the failed approval left no change - end ---
+
+        // --- step 5 - Retry the approval - start ---
+        $retryResponse = $this->postJson(self::APPROVAL_ENDPOINT, $payload);
+        // --- step 5 - Retry the approval - end ---
+
+        // --- step 6 - Check the retry credited once - start ---
+        $retryResponse->assertOk()->assertJsonPath('status', 'success');
+
+        $this->assertSame('done', $transaction->fresh()?->status);
+        $this->assertDatabaseHas('saldo_users', [
+            'user_id' => $seller->id,
+            'saldo_income' => self::PRODUCT_PRICE,
+        ]);
+        $this->assertDatabaseCount('saldo_histories', 1);
+        // --- step 6 - Check the retry credited once - end ---
+    }
+
+    /**
+     * Confirms the approval reads the transaction row with FOR UPDATE on PostgreSQL.
+     *
+     * @return void SQLite drops the lock clause, so the check only runs on PostgreSQL.
+     */
+    public function test_approval_reads_the_transaction_row_with_a_row_lock(): void
+    {
+        // --- step 1 - Skip drivers without row locks - start ---
+        if (DB::getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('The FOR UPDATE clause is verified on isolated PostgreSQL.');
+        }
+        // --- step 1 - Skip drivers without row locks - end ---
+
+        // --- step 2 - Prepare an approvable seller transaction - start ---
+        $seller = User::factory()->create();
+        $transaction = $this->createTransaction($seller);
+
+        $this->actingAs($seller);
+        // --- step 2 - Prepare an approvable seller transaction - end ---
+
+        // --- step 3 - Record the approval queries - start ---
+        DB::enableQueryLog();
+
+        $this->postJson(self::APPROVAL_ENDPOINT, [
+            'user_type' => 'seller',
+            'transaction_user_id' => $transaction->id,
+        ])->assertOk();
+
+        $queries = array_column(DB::getQueryLog(), 'query');
+
+        DB::disableQueryLog();
+        // --- step 3 - Record the approval queries - end ---
+
+        // --- step 4 - Check the locked read - start ---
+        // The refreshed transaction list also reads transaction_users, but without a lock.
+        $lockedReads = array_filter(
+            $queries,
+            fn (string $query): bool => str_contains($query, 'from "transaction_users"')
+                && str_ends_with($query, 'for update'),
+        );
+
+        $this->assertCount(1, $lockedReads);
+        // --- step 4 - Check the locked read - end ---
+    }
+
+    /**
      * Creates the minimal seller transaction row read by the approval endpoint.
      *
      * @param  User  $seller  Seller who owns the transaction and would receive the income.
      * @param  string  $status  Starting status; only `approved_seller` can be approved.
+     * @param  string|null  $invoiceStatus  Parent invoice status; null creates no invoice.
      *
      * @return TransactionUser Persisted transaction with a known product price.
      */
     private function createTransaction(
         User $seller,
         string $status = 'approved_seller',
+        ?string $invoiceStatus = self::PAID_INVOICE_STATUS,
     ): TransactionUser {
-        // Approval only reads ownership, status, and product price, so no invoice is needed.
-        return TransactionUser::create([
+        // --- step 1 - Create the buyer invoice - start ---
+        // Approval only credits a transaction whose invoice the buyer already paid.
+        $buyer = User::factory()->create();
+        $invoiceId = null;
+
+        if ($invoiceStatus !== null) {
+            $invoiceId = TransactionInvoice::create([
+                'user_id_buyer' => $buyer->id,
+                'price' => self::PRODUCT_PRICE,
+                'status' => $invoiceStatus,
+            ])->id;
+        }
+        // --- step 1 - Create the buyer invoice - end ---
+
+        // --- step 2 - Create the seller transaction - start ---
+        $transaction = TransactionUser::create([
             'user_id_seller' => $seller->id,
-            'user_id_buyer' => User::factory()->create()->id,
+            'user_id_buyer' => $buyer->id,
+            'transaction_invoice_id' => $invoiceId,
             'transaction_number' => 'TRX-TEST-'.uniqid(),
             'product_price' => self::PRODUCT_PRICE,
             'status' => $status,
         ]);
+        // --- step 2 - Create the seller transaction - end ---
+
+        return $transaction;
     }
 
     /**

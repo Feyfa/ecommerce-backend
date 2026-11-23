@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\TransactionUser;
 use App\Models\User;
 use App\Services\TransactionService;
 use Illuminate\Http\JsonResponse;
@@ -117,8 +116,10 @@ class TransactionController extends Controller
      *
      * Identitas user diperiksa sebelum input. `user_type` harus persis string `seller`, dan
      * `transaction_user_id` yang tidak kosong tetapi bukan string ditolak dengan 422 sebelum query
-     * transaksi dijalankan. Service menerapkan perpindahan status serta saldo yang relevan,
-     * kemudian controller mengembalikan hasil terbaru atau error bisnis tanpa mutasi tambahan.
+     * transaksi dijalankan. Service mengunci row transaksi, lalu menyimpan status `done` dan
+     * kredit income dalam satu DB transaction. Transaksi yang tidak menunggu seller mendapat 404,
+     * dan transaksi yang invoice-nya belum dibayar mendapat 400; keduanya tanpa mutasi. Setelah
+     * approve berhasil, controller mengembalikan daftar transaksi terbaru.
      *
      * @param  Request  $request  Data transaksi yang disetujui.
      *
@@ -176,48 +177,40 @@ class TransactionController extends Controller
         }
         // --- step 3 - validasi ID transaksi - end ---
 
-        // --- step 4 - cari transaksi yang menunggu persetujuan - start ---
-        // Filter `approved_seller` adalah satu-satunya penjaga agar satu transaksi tidak
-        // dikredit dua kali: transaksi yang sudah `done` mendapat 404 sebelum transfer saldo.
-        // Pembacaan ini tidak memakai DB transaction atau lock baris, sehingga dua request
-        // bersamaan masih bisa sama-sama membaca `approved_seller`. Saldo seller lalu
-        // bertambah dua kali, dan kelebihannya bisa ditarik lewat /api/saldo-withdraw.
-        $transactionUser = TransactionUser::where('id', $transaction_user_id)
-            ->where('user_id_seller', $user_id)
-            ->where('status', 'approved_seller')
-            ->first();
+        // --- step 4 - jalankan approve di service - start ---
+        // Lock row transaksi, perubahan status, dan kredit income berjalan di satu DB transaction
+        // di service, sehingga approve bersamaan tidak mengkredit dua kali dan kredit yang gagal
+        // ikut membatalkan status. Exception dari kredit tetap menjadi respons 500.
+        $approval = $this->transactionService->approveSellerTransaction(
+            user_id: $user_id,
+            transaction_user_id: $transaction_user_id,
+        );
+        // --- step 4 - jalankan approve di service - end ---
 
-        if (empty($transactionUser)) {
+        // --- step 5 - kirim respons approve yang ditolak - start ---
+        if ($approval === TransactionService::APPROVAL_NOT_FOUND) {
             return response()->json(
                 ['status' => 'error', 'message' => 'Transaksi Tidak Ditemukan'],
                 404,
             );
         }
-        // --- step 4 - cari transaksi yang menunggu persetujuan - end ---
 
-        // --- step 5 - tandai transaksi selesai - start ---
-        $transactionUser->status = 'done';
-        $transactionUser->save();
-        // --- step 5 - tandai transaksi selesai - end ---
+        // Transaksi milik seller ini sendiri, jadi alasan penolakan aman untuk ditampilkan.
+        if ($approval === TransactionService::APPROVAL_UNPAID) {
+            return response()->json(
+                ['status' => 'error', 'message' => 'Transaksi Belum Dibayar Pembeli'],
+                400,
+            );
+        }
+        // --- step 5 - kirim respons approve yang ditolak - end ---
 
-        // --- step 6 - transfer saldo ke seller - start ---
-        // Status disimpan lebih dulu agar request berikutnya yang datang setelah save()
-        // mendapat 404 dan tidak mengkredit saldo lagi.
-        $this->transactionService->transferSaldo(
-            user_id: $user_id,
-            transaction_user_id: $transactionUser->id,
-            price: (float) $transactionUser->product_price,
-            type: 'incoming'
-        );
-        // --- step 6 - transfer saldo ke seller - end ---
-
-        // --- step 7 - ambil transaksi - start ---
+        // --- step 6 - ambil transaksi - start ---
         $getTransaction = $this->transactionService->getTransaction($user_id, $user_type);
 
         $transactions = $getTransaction['transactions'] ?? [];
         $counts = $getTransaction['counts'] ?? [];
         $pagination = $getTransaction['pagination'] ?? [];
-        // --- step 7 - ambil transaksi - end ---
+        // --- step 6 - ambil transaksi - end ---
 
         return response()->json([
             'status' => 'success',

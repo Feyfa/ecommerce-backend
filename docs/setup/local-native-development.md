@@ -427,6 +427,16 @@ withdrawal must not reach the mocked Xendit client while it waits. The
 application connection sets a 1-second `lock_timeout`, so each run ends in a
 few seconds.
 
+The seller approval locking integration test uses the same boundary:
+
+```bash
+php artisan test tests/Integration/PostgresTransactionApprovalLockingTest.php
+```
+
+A second connection locks a paid `transaction_users` row. The test then checks
+that `POST /api/transaction/approved` waits on the locked transaction read and
+leaves the status and balance unchanged after the 1-second `lock_timeout`.
+
 Run the local suite normally:
 
 ```bash

@@ -151,7 +151,10 @@ Concurrency:
 - A seller income credit from transaction approval
   (`TransactionService::transferSaldo()`) locks the same row. It waits for a
   running withdrawal instead of overwriting the deduction with a stale
-  income value.
+  income value. The credit runs inside the approval transaction after the
+  `transaction_users` row is locked, so locks are always taken in the order
+  `transaction_users`, then `saldo_users`. See
+  [Seller Approval](../transaction.md#seller-approval).
 - The lock is held during the Xendit HTTP request. The Xendit client has no
   timeout, so a hanging request also delays other balance writes for that
   user.
