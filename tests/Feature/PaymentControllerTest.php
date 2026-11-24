@@ -8,6 +8,11 @@ use App\Models\PaymentUser;
 use App\Models\TransactionInvoice;
 use App\Models\User;
 use App\Services\XenditService;
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ConnectException;
+use GuzzleHttp\Handler\MockHandler;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Psr7\Request;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery\MockInterface;
 use Tests\TestCase;
@@ -248,5 +253,47 @@ class PaymentControllerTest extends TestCase
         $this->assertSame('pending', $invoice->fresh()->status);
         $this->postJson('/api/payment/simulate/charge-virtual-account', $input)->assertOk()->assertJsonPath('message', 'Success Charge Virtual Account');
         $this->assertSame('done', $invoice->fresh()->status);
+    }
+
+    /**
+     * Confirms an unanswered simulation keeps the invoice pending behind a safe message.
+     *
+     * @return void Checks the 400 response and the unchanged invoice status.
+     */
+    public function test_simulation_reports_an_unanswered_payment_provider(): void
+    {
+        // --- step 1 - Prepare a pending invoice - start ---
+        $user = User::factory()->create();
+        $this->actingAs($user);
+        $invoice = $this->invoice($user);
+        // --- step 1 - Prepare a pending invoice - end ---
+
+        // --- step 2 - Make the fake provider time out - start ---
+        // Guzzle raises ConnectException for cURL 28 when the request timeout expires.
+        $url = 'https://api.xendit.co/callback_virtual_accounts/'
+            .'external_id=reference/simulate_payment';
+        $timeout = new ConnectException(
+            "cURL error 28: Operation timed out for {$url}",
+            new Request('POST', $url),
+        );
+        $handler = HandlerStack::create(new MockHandler([$timeout]));
+        $client = new Client(['handler' => $handler]);
+        $this->instance(XenditService::class, new XenditService('test-key', $client));
+        // --- step 2 - Make the fake provider time out - end ---
+
+        // --- step 3 - Simulate the payment - start ---
+        $response = $this->postJson(
+            '/api/payment/simulate/charge-virtual-account',
+            ['payment_slug' => 'bca', 'payment_account' => '001234'],
+        );
+        // --- step 3 - Simulate the payment - end ---
+
+        // --- step 4 - Check the rejection left the invoice unpaid - start ---
+        $response->assertStatus(400)->assertExactJson([
+            'status' => 'error',
+            'message' => XenditService::PROVIDER_UNAVAILABLE_MESSAGE,
+        ]);
+        $this->assertSame('pending', $invoice->fresh()->status);
+        // --- step 4 - Check the rejection left the invoice unpaid - end ---
     }
 }

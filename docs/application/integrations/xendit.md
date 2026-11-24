@@ -59,11 +59,47 @@ The Xendit adapter returns a result with keys determined by its status:
   a string from the provider, including an empty string, is returned as received.
   A missing or non-string message, an empty body, or a non-JSON body yields
   `Unknown error`.
+- For the virtual account operations (creation and both payment simulations),
+  a failure without a usable answer returns
+  `Layanan Pembayaran Sedang Bermasalah, Silakan Coba Lagi`. This covers a
+  timeout, a refused or failed connection, a 5xx response, and any other Guzzle
+  transfer error after 4xx handling. The adapter writes a `warning` log with the
+  operation, exception class, HTTP status, and cURL error code and text. It does
+  not log the exception message, because Guzzle copies part of a 5xx body into it
+  and transport messages carry the Xendit URL.
+- Disbursement keeps its earlier behavior: other failures return the exception
+  message.
 
 Checkout requires a payload containing `account_number` and `external_id` as
 non-blank strings before saving the invoice. Missing or invalid fields are
 handled as a payment error within the checkout transaction. See
 [Buyer Checkout](../buyer/checkout.md#payment-behavior).
+
+### Request Timeouts
+
+Virtual account requests send a connect timeout and a total request timeout:
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `XENDIT_CONNECT_TIMEOUT_SECONDS` | 5 | Time allowed to open the connection |
+| `XENDIT_REQUEST_TIMEOUT_SECONDS` | 20 | Time allowed for the whole request |
+
+The defaults live in `XenditService` and apply when the variables are unset.
+Container registration rejects zero, negative, and non-numeric values with a
+`RuntimeException`. Guzzle reads `0` as "wait forever", and a blank or mistyped
+value would otherwise cast to `0`.
+
+Without these limits Guzzle waits forever for an answer. Checkout calls the
+provider inside its database transaction while it holds row locks on the cart,
+products, and addresses, so a hanging request would also block other checkouts
+of the same products. Neither nginx layer overrides its 60-second read timeout,
+so 20 seconds leaves room for the checkout queries before the buyer would see a
+504. The values are starting points, not measured Xendit latency.
+
+Disbursement does not use these limits. Its balance is deducted only after a
+successful answer, so a lost answer is treated as a rejection while the money
+may already be sent. A timeout would make that case more frequent until
+withdrawals can stay pending and be checked against Xendit later.
 
 ## Fixed Virtual Account Simulation
 
@@ -86,6 +122,12 @@ by this change.
 Provider business failure retains HTTP 400 and the invoice status. Success marks
 the invoice `done` and returns `Success Charge Virtual Account`. Automated
 verification uses provider mocks; no live simulation or payment is performed.
+
+A simulation without a usable answer also returns HTTP 400 with the adapter's
+safe message and leaves the invoice `pending`. If Xendit processed the
+simulation but the answer was lost, the local invoice stays `pending` while the
+virtual account is already paid at Xendit. Nothing reconciles that state yet;
+the FVA paid webhook below is the intended fix.
 
 ## Disbursement
 

@@ -8,6 +8,7 @@ use Illuminate\Database\ConfigurationUrlParser;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 use Meilisearch\Client;
+use Psr\Log\LoggerInterface;
 use RuntimeException;
 
 class AppServiceProvider extends ServiceProvider
@@ -15,15 +16,29 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Mendaftarkan singleton service pembayaran dan client Meilisearch yang dikonfigurasi aplikasi.
      *
+     * Service pembayaran menerima API key, batas waktu request virtual account, dan logger
+     * aplikasi. Batas waktu divalidasi saat service pertama kali dibuat.
+     *
      * @return void Dependency tersedia melalui service container setelah registrasi selesai.
      */
     public function register(): void
     {
-        $this->app->singleton(
-            XenditService::class,
-            fn () => new XenditService($this->configurationString('xendit.key')),
-        );
+        // --- step 1 - daftarkan service pembayaran Xendit - start ---
+        $this->app->singleton(XenditService::class, function (): XenditService {
+            // Nilai nol atau teks tidak valid ditolak agar request VA tidak menunggu tanpa batas.
+            $connectTimeout = $this->positiveSecondsConfiguration('xendit.connect_timeout_seconds');
+            $requestTimeout = $this->positiveSecondsConfiguration('xendit.request_timeout_seconds');
 
+            return new XenditService(
+                api_key: $this->configurationString('xendit.key'),
+                connectTimeoutSeconds: $connectTimeout,
+                requestTimeoutSeconds: $requestTimeout,
+                logger: $this->app->make(LoggerInterface::class),
+            );
+        });
+        // --- step 1 - daftarkan service pembayaran Xendit - end ---
+
+        // --- step 2 - daftarkan client Meilisearch - start ---
         $this->app->singleton(
             Client::class,
             fn () => new Client(
@@ -31,6 +46,7 @@ class AppServiceProvider extends ServiceProvider
                 $this->nullableConfigurationString('meilisearch.key'),
             ),
         );
+        // --- step 2 - daftarkan client Meilisearch - end ---
     }
 
     /**
@@ -201,6 +217,32 @@ class AppServiceProvider extends ServiceProvider
         }
 
         return (string) $value;
+    }
+
+    /**
+     * Mengambil konfigurasi durasi dalam detik yang wajib lebih besar dari nol.
+     *
+     * Guzzle memperlakukan batas waktu 0 sebagai "tunggu selamanya", dan cast float dari teks yang
+     * tidak valid juga menghasilkan 0. Nilai seperti itu ditolak agar salah ketik di env tidak
+     * diam-diam menghapus batas waktu request Xendit.
+     *
+     * @param  string  $key  Key konfigurasi Laravel yang berisi jumlah detik.
+     *
+     * @return float Jumlah detik yang valid.
+     *
+     * @throws RuntimeException Ketika nilai bukan angka atau tidak lebih besar dari nol.
+     */
+    private function positiveSecondsConfiguration(string $key): float
+    {
+        $value = config($key);
+
+        if (! is_numeric($value) || (float) $value <= 0) {
+            throw new RuntimeException(
+                "Configuration [{$key}] must be a number of seconds greater than zero."
+            );
+        }
+
+        return (float) $value;
     }
 
     /**
