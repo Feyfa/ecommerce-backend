@@ -323,7 +323,9 @@ commit. A second approval of the same row waits, then re-reads the row as
 update rolls back with it, the row stays `approved_seller`, and the seller can
 approve again; the request ends as HTTP `500`. The credit locks the seller's
 `saldo_users` row after the transaction row, so it cannot overwrite a
-concurrent withdrawal deduction. See
+concurrent withdrawal deduction. A seller's first credit creates that row
+before locking it, so two concurrent approvals of different rows for a new
+seller both succeed. See
 [Balance](settings/balance.md#post-apisaldo-withdraw). SQLite ignores the lock
 clauses; the opt-in
 `tests/Integration/PostgresTransactionApprovalLockingTest.php` verifies the
