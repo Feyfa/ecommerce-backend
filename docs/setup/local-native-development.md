@@ -427,6 +427,17 @@ withdrawal must not reach the mocked Xendit client while it waits. The
 application connection sets a 1-second `lock_timeout`, so each run ends in a
 few seconds.
 
+The first income credit locking integration test uses the same boundary:
+
+```bash
+php artisan test tests/Integration/PostgresSaldoFirstCreditLockingTest.php
+```
+
+A second connection inserts a seller's first `saldo_users` row without
+committing. The test then checks that an income credit waits on the
+`insert ... on conflict do nothing` statement and leaves no balance or history
+row after the 1-second `lock_timeout`.
+
 The seller approval locking integration test uses the same boundary:
 
 ```bash

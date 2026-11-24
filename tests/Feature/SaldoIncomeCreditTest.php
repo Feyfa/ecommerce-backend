@@ -166,6 +166,111 @@ class SaldoIncomeCreditTest extends TestCase
     }
 
     /**
+     * Confirms the first credit of a seller without a balance row creates exactly one row.
+     *
+     * @return void The new row holds only the credit and the history starts from zero.
+     */
+    public function test_first_credit_creates_one_balance_row(): void
+    {
+        // --- step 1 - Credit a seller without a balance row - start ---
+        $newSeller = $this->creditSellerWithoutBalance();
+        // --- step 1 - Credit a seller without a balance row - end ---
+
+        // --- step 2 - Check the new balance row - start ---
+        // insertOrIgnore bypasses Eloquent, so the service must fill the id and timestamps.
+        $balanceRows = SaldoUser::where('user_id', $newSeller->id)->get();
+        $balanceRow = $balanceRows->first();
+
+        $this->assertCount(1, $balanceRows);
+        $this->assertEquals(self::CREDIT_AMOUNT, $balanceRow?->saldo_income);
+        $this->assertEquals(0, $balanceRow?->saldo_refund);
+        $this->assertTrue(Str::isUuid((string) $balanceRow?->id));
+        $this->assertNotNull($balanceRow?->created_at);
+        $this->assertNotNull($balanceRow?->updated_at);
+        // --- step 2 - Check the new balance row - end ---
+
+        // --- step 3 - Check the history row - start ---
+        $this->assertDatabaseCount('saldo_histories', 1);
+        $this->assertDatabaseHas('saldo_histories', [
+            'user_id' => $newSeller->id,
+            'transaction_user_id' => $this->transactionUserId,
+            'type' => 'incoming',
+            'price' => self::CREDIT_AMOUNT,
+            'saldo_before' => 0,
+            'saldo_after' => self::CREDIT_AMOUNT,
+        ]);
+        // --- step 3 - Check the history row - end ---
+    }
+
+    /**
+     * Confirms the first credit creates the balance row before the locked read on PostgreSQL.
+     *
+     * @return void The insert must come first, otherwise the lock finds no row to wait on.
+     */
+    public function test_first_credit_creates_the_row_before_locking_it(): void
+    {
+        // --- step 1 - Skip drivers without row locks - start ---
+        if (DB::getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('The FOR UPDATE clause is verified on isolated PostgreSQL.');
+        }
+        // --- step 1 - Skip drivers without row locks - end ---
+
+        // --- step 2 - Record the credit queries - start ---
+        DB::enableQueryLog();
+
+        $this->creditSellerWithoutBalance();
+
+        $queries = array_column(DB::getQueryLog(), 'query');
+
+        DB::disableQueryLog();
+        // --- step 2 - Record the credit queries - end ---
+
+        // --- step 3 - Find the idempotent row insert - start ---
+        // The old code read first and only then ran a plain INSERT, which two first credits
+        // could both reach.
+        $rowInserts = array_keys(array_filter(
+            $queries,
+            fn (string $query): bool => str_starts_with($query, 'insert into "saldo_users"')
+                && str_ends_with($query, 'on conflict do nothing'),
+        ));
+        // --- step 3 - Find the idempotent row insert - end ---
+
+        // --- step 4 - Find the locked balance read - start ---
+        $lockedReads = array_keys(array_filter(
+            $queries,
+            fn (string $query): bool => str_contains($query, 'from "saldo_users"')
+                && str_ends_with($query, 'for update'),
+        ));
+        // --- step 4 - Find the locked balance read - end ---
+
+        // --- step 5 - Check the query order - start ---
+        $this->assertCount(1, $rowInserts);
+        $this->assertCount(1, $lockedReads);
+        $this->assertLessThan($lockedReads[0], $rowInserts[0]);
+        // --- step 5 - Check the query order - end ---
+    }
+
+    /**
+     * Credits a freshly created seller that has no balance row yet.
+     *
+     * @return User The credited seller, used to look up the new balance and history rows.
+     */
+    private function creditSellerWithoutBalance(): User
+    {
+        // setUp gives $this->seller a balance row, so the first-credit path needs another user.
+        $newSeller = User::factory()->create();
+
+        $this->transactionService->transferSaldo(
+            user_id: $newSeller->id,
+            transaction_user_id: $this->transactionUserId,
+            price: self::CREDIT_AMOUNT,
+            type: 'incoming',
+        );
+
+        return $newSeller;
+    }
+
+    /**
      * Credits the seller with the fixed amount from the same approved transaction.
      *
      * @return void The service writes the balance and history or throws.
