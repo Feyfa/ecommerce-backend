@@ -8,8 +8,10 @@ use App\Models\TransactionProduct;
 use App\Models\TransactionUser;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use stdClass;
 use Throwable;
 
@@ -609,11 +611,12 @@ class TransactionService
     }
 
     /**
-     * Mengunci row saldo seller, menambah income, lalu mencatat riwayat di transaksi aktif.
+     * Memastikan row saldo seller ada, menguncinya, menambah income, lalu mencatat riwayat.
      *
      * Hanya dipanggil dari dalam DB::transaction milik transferSaldo(). Seller tanpa row saldo
-     * mendapat row baru tanpa lock karena belum ada row yang bisa dikunci; dua kredit pertama
-     * yang bersamaan masih bisa bertabrakan pada unique `user_id` dan berada di luar cakupan ini.
+     * lebih dulu mendapat row kosong, sehingga kredit pertama ikut mengantre pada lock yang sama
+     * dengan kredit berikutnya dan penarikan saldo. Kredit pertama yang bersamaan menunggu,
+     * bukan gagal pada unique `user_id`.
      *
      * @param  string  $user_id  ID seller pemilik saldo yang dikredit.
      * @param  string  $transaction_user_id  ID transaksi seller yang menjadi sumber mutasi.
@@ -621,6 +624,9 @@ class TransactionService
      * @param  string  $type  Jenis mutasi yang dicatat di riwayat, misalnya `incoming`.
      *
      * @return void Tidak mengembalikan nilai; saldo dan riwayat ditulis di transaksi pemanggil.
+     *
+     * @throws ModelNotFoundException Jika row saldo tetap tidak ada setelah dibuat; transaksi
+     *                                pemanggil di-rollback.
      */
     private function creditLockedSaldo(
         string $user_id,
@@ -628,40 +634,48 @@ class TransactionService
         float $price,
         string $type,
     ): void {
-        // --- step 1 - siapkan variabel proses - start ---
-        $saldo_before = 0;
-        $saldo_after = 0;
-        // --- step 1 - siapkan variabel proses - end ---
+        // --- step 1 - buat row saldo kosong bila belum ada - start ---
+        // `FOR UPDATE` di step 2 hanya mengunci row yang sudah ada. Sebelumnya seller tanpa row
+        // saldo tidak punya apa pun untuk dikunci: dua approve bersamaan untuk transaksi berbeda
+        // sama-sama membaca null lalu membuat row, unique `user_id` menolak yang kalah, approve
+        // itu di-rollback, dan seller mendapat HTTP 500 lalu harus approve ulang.
+        // Insert ini dijalankan sebelum lock agar kredit pertama ikut mengantre. Bila request
+        // lain sedang membuat row yang sama dan belum commit, PostgreSQL menahan insert ini
+        // sampai request itu selesai lalu mengabaikannya (`ON CONFLICT DO NOTHING`; SQLite
+        // memakai `INSERT OR IGNORE`). Insert hanya menunggu pembuat row saldo user yang sama,
+        // jadi urutan lock `transaction_users` lalu `saldo_users` tidak berubah.
+        // insertOrIgnore melewati Eloquent, jadi `id` (format HasUuids) dan timestamps diisi di
+        // sini.
+        $timestamp = now();
+
+        SaldoUser::query()->insertOrIgnore([
+            'id' => (string) Str::orderedUuid(),
+            'user_id' => $user_id,
+            'saldo_income' => 0,
+            'saldo_refund' => 0,
+            'created_at' => $timestamp,
+            'updated_at' => $timestamp,
+        ]);
+        // --- step 1 - buat row saldo kosong bila belum ada - end ---
 
         // --- step 2 - kunci row saldo seller - start ---
         // Tanpa `FOR UPDATE`, PostgreSQL membaca income lama tanpa menunggu penarikan yang sedang
         // mengunci row. Setelah penarikan commit, UPDATE di step 3 menulis nilai absolut dari
         // bacaan lama, sehingga pengurangan penarikan hilang dan seller bisa menarik dana yang
         // sama lagi. Perusahaan menanggung kelebihan itu. Dengan lock, kredit menunggu lalu
-        // membaca saldo yang baru.
+        // membaca saldo yang baru. Step 1 menjamin row ada, sehingga query ini selalu mengunci.
         $saldoUser = SaldoUser::where('user_id', $user_id)
             ->lockForUpdate()
-            ->first();
+            ->firstOrFail();
         // --- step 2 - kunci row saldo seller - end ---
 
         // --- step 3 - tambah income seller - start ---
-        if (empty($saldoUser)) {
-            $saldo_after = $price;
+        $saldo_before = (int) $saldoUser->saldo_income + (int) $saldoUser->saldo_refund;
 
-            SaldoUser::create([
-                'user_id' => $user_id,
-                'balance' => $price,
-                'saldo_income' => $saldo_after,
-                'saldo_refund' => 0,
-            ]);
-        } else {
-            $saldo_before = (int) $saldoUser->saldo_income + (int) $saldoUser->saldo_refund;
+        $saldoUser->saldo_income += (int) $price;
+        $saldoUser->save();
 
-            $saldoUser->saldo_income += (int) $price;
-            $saldoUser->save();
-
-            $saldo_after = (int) $saldoUser->saldo_income + (int) $saldoUser->saldo_refund;
-        }
+        $saldo_after = (int) $saldoUser->saldo_income + (int) $saldoUser->saldo_refund;
         // --- step 3 - tambah income seller - end ---
 
         // --- step 4 - simpan riwayat saldo - start ---

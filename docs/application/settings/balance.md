@@ -155,12 +155,21 @@ Concurrency:
   `transaction_users` row is locked, so locks are always taken in the order
   `transaction_users`, then `saldo_users`. See
   [Seller Approval](../transaction.md#seller-approval).
+- `FOR UPDATE` only locks a row that exists. Before the locked read, the
+  credit inserts an empty `saldo_users` row for a seller who has none, with
+  `insertOrIgnore` (`INSERT ... ON CONFLICT DO NOTHING` on PostgreSQL). When
+  another approval is creating the same seller's first row and has not
+  committed, the insert waits for it and then does nothing, so the first
+  credits also queue on the row lock. Before this, the losing approval of two
+  concurrent first credits failed on the unique `user_id` and returned HTTP
+  `500`. Withdrawals never create the row.
 - The lock is held during the Xendit HTTP request. The Xendit client has no
   timeout, so a hanging request also delays other balance writes for that
   user.
 - SQLite ignores the lock clause. The opt-in
   `tests/Integration/PostgresSaldoLockingTest.php` verifies the wait on
-  PostgreSQL.
+  PostgreSQL, and `tests/Integration/PostgresSaldoFirstCreditLockingTest.php`
+  verifies that a first credit waits for a concurrent first row.
 
 Failure after disbursement: when the balance deduction fails after Xendit
 accepted the disbursement, the transaction rolls back and the balance and
