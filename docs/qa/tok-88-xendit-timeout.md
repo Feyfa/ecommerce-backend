@@ -80,3 +80,124 @@ still leaves the local invoice `pending`; nothing reconciles it yet.
 
 The frontend, the controllers, and the deploy repository were not changed. The
 frontend already shows `response.data.message` for checkout errors.
+
+## Batch 2: Withdrawals Held As Processing
+
+Batch 2 holds the withdrawal balance before Xendit is called and records the
+withdrawal in the new `saldo_withdrawals` table with status `processing`. The
+disbursement request now uses the batch 1 timeouts and sends the stored
+`external_id` as `X-IDEMPOTENCY-KEY`, and no database lock is held during it.
+A clear 4xx rejection returns the balance through a `withdrawal_refund` history
+row. A lost answer keeps the balance held. `withdrawal:check` runs every minute
+and reads the Xendit status of due withdrawals with per-withdrawal delays.
+`withdrawal:status` is the read-only command for the internal manual check.
+
+### Scenarios
+
+- **TOK-88-BE-12 — Confirm the disbursement API shapes in Xendit Test Mode.**
+  Passed. A scratch PHP script used `vendor/` Guzzle and the local Test Mode
+  key, which it refused to run without the `xnd_development_` prefix and never
+  printed. It masked the account fields in its output. An unknown external ID
+  returned `404 DIRECT_DISBURSEMENT_NOT_FOUND_ERROR`. One Rp10.000 disbursement
+  to a sandbox BCA account returned HTTP 200 with `status: PENDING`. Sending it
+  again with the same key returned `400 DUPLICATE_TRANSACTION_ERROR`, so Xendit
+  rejects a reused key instead of replaying the first answer. Lookups by
+  external ID returned a JSON array with `PENDING` for a few minutes and then
+  `COMPLETED`.
+- **TOK-88-BE-13 — Classify disbursement answers in the adapter.** Passed.
+  `XenditServiceTest` checked that both disbursement requests carry the
+  timeouts and that the create request carries the idempotency key. A 2xx
+  returns `success` with the ID, status, and failure code. A 400 or 429 returns
+  `error` with the Xendit message and code. A timeout, a 503, a connection
+  reset, and a reused key return `unknown` with one `warning`. A lookup returns
+  `found`, `not_found` only for the 404 not-found code, and `unknown` for a bare
+  404, a 401, an empty list, an object, or a timeout.
+- **TOK-88-BE-14 — Hold the balance before Xendit is called.** Passed.
+  `SaldoWithdrawInputTest` showed an accepted withdrawal returns
+  `withdrawal_status: processing`, keeps the deduction, and stores the Xendit
+  ID. The stored `external_id` matches `dis-bca-{ulid}`, the body field, and
+  the idempotency header. A Guzzle tap showed Xendit was called at the test's
+  own transaction depth, outside the balance transaction.
+- **TOK-88-BE-15 — Keep the balance held when the answer is lost.** Passed. A
+  timeout returned HTTP 200 with `processing`. The balance stayed deducted and
+  no refund row was written.
+- **TOK-88-BE-16 — Return the balance when Xendit rejects the request.**
+  Passed. A 400 returned the Xendit message with HTTP 400. The withdrawal was
+  `failed` with `API_VALIDATION_ERROR`, a `withdrawal_refund` row was written,
+  and the income was back to its starting value. `PaymentReturnCallerCompatibilityTest`
+  kept the `Unknown error` message for a non-string provider message.
+- **TOK-88-BE-17 — Keep the withdrawal processing when its outcome cannot be
+  saved.** Passed. With the withdrawal update failing, the endpoint returned
+  HTTP 200 with `processing` and wrote one `error` log naming the withdrawal and
+  external ID without the account number.
+- **TOK-88-BE-18 — Deduct and refund per balance bucket.** Passed.
+  `SaldoWithdrawalDeductionTest` showed the deduction reports its refund and
+  income portions, and the refund restores each bucket and continues the
+  `saldo_before`/`saldo_after` chain. A refund without a balance row throws.
+- **TOK-88-BE-19 — Report the withdrawal status in history.** Passed.
+  `SaldoHistoryTest` showed a tracked withdrawal reports its status, while a
+  refund row and a withdrawal without a status row report `null`. The refund
+  row has the title `Pengembalian Saldo` and a description naming the bank.
+- **TOK-88-BE-20 — Settle due withdrawals with `withdrawal:check`.** Passed.
+  `WithdrawalCheckCommandTest` covered every lookup result: `COMPLETED`
+  completes the withdrawal, and `FAILED` fails it and returns the balance.
+  `PENDING` stays `processing` with checks spaced 1, 2, 5, 15, 60, and
+  60 minutes. Not-found keeps the balance held inside the 10-minute grace and
+  returns it with `NOT_FOUND` after it. A timeout stays `processing`. Two
+  disbursements for one external ID stay `processing` with one `critical`
+  log.
+- **TOK-88-BE-21 — Limit what one run touches.** Passed. Withdrawals that
+  were not due or were already settled were not looked up. `--limit=2` checked
+  two of three due withdrawals, and `--limit=0` exited with `INVALID`.
+- **TOK-88-BE-22 — Never settle a withdrawal twice.** Passed. Failing the same
+  withdrawal twice and then applying `COMPLETED` kept the first `failed`
+  result and wrote one refund only.
+- **TOK-88-BE-23 — Log overdue withdrawals once.** Passed. A withdrawal still
+  `processing` 24 hours after the hold wrote one `critical` log across two
+  checks and kept the balance held.
+- **TOK-88-BE-24 — Show the internal status.** Passed. `withdrawal:status`
+  printed the count per status and listed only the overdue withdrawal by
+  external ID, without the account number.
+- **TOK-88-BE-25 — Schedule the check without overlap.** Passed. A test
+  confirmed `withdrawal:check` runs every minute with `withoutOverlapping`.
+  `php artisan schedule:list` on the temporary PostgreSQL database listed it
+  next to the outbox commands. On that empty table, `withdrawal:check` reported
+  `claimed=0` and `withdrawal:status` printed zero counts.
+- **TOK-88-BE-26 — Verify the PostgreSQL locks.** Passed. The opt-in
+  `PostgresWithdrawalClaimTest` held one due withdrawal locked from a second
+  connection. A run with a one-second lock timeout skipped it, claimed the other
+  withdrawal, and looked up only that one. The opt-in `PostgresSaldoLockingTest`
+  still showed a withdrawal waiting on the locked balance read without reaching
+  Xendit or writing a withdrawal row.
+- **TOK-88-BE-27 — Prove the tests catch a regression.** Passed. Three changes
+  were made one at a time and restored. Treating `unknown` as a rejection failed
+  the timeout test with HTTP 400. Removing the `processing` guard in
+  `WithdrawalService::settle()` failed the double-settle test with `completed`.
+  Ignoring the not-found grace failed the not-found test inside the grace
+  period.
+- **TOK-88-BE-28 — Verify static analysis, formatting, and readability.**
+  Passed. `vendor/bin/phpstan analyse --no-progress --memory-limit=1G`, the
+  command behind `composer analyse`, returned `[OK] No errors` with PHP 8.3.
+  `vendor/bin/pint --test` passed for 204 files. The `beberes` pass wrapped long
+  lines, split stages that read two subjects, added WHY comments to new
+  single-stage helpers, and restructured the first
+  `PaymentReturnCallerCompatibilityTest` test into steps. The SQLite suite
+  passed before and after the pass.
+- **TOK-88-BE-29 — Check the full Unit and Feature suites.** Passed. SQLite in
+  memory reported 420 passed and six skips with 5,432 assertions. PostgreSQL
+  16.13 reported 426 tests and 5,450 assertions.
+
+### Local Coverage
+
+The checks ran with PHP 8.3.31 in the backend checkout. PostgreSQL used the same
+temporary loopback-only cluster as batch 1, with the disposable database
+`ecommerce_testing`.
+
+The only requests to Xendit were the probe in TOK-88-BE-12, against the local
+Test Mode business. The tests used Guzzle `MockHandler`. Real Xendit latency,
+the 429 rate limit, and the `FAILED` status were not seen live. The not-found
+grace of 10 minutes is an agreed limit, not a measured Xendit delay.
+
+The local and browser flow, including `withdrawal:check` moving a real Test Mode
+withdrawal from `processing` to `completed`, is covered by the frontend QA after
+the frontend change. Webhooks for disbursements remain out of scope.

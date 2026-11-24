@@ -11,16 +11,39 @@ use GuzzleHttp\Exception\TransferException;
 use GuzzleHttp\RequestOptions;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use Symfony\Component\HttpFoundation\Response as HttpStatus;
 
 /**
  * @phpstan-type XenditError array{status: 'error', message: string}
  * @phpstan-type CreateVirtualAccountResult array{status: 'suceess', data: mixed}|XenditError
  * @phpstan-type XenditResult array{status: 'success', data: mixed}|XenditError
+ * @phpstan-type DisbursementSummary array{
+ *     id: string|null,
+ *     status: string|null,
+ *     failure_code: string|null
+ * }
+ * @phpstan-type DisbursementAccepted array{
+ *     status: 'success',
+ *     disbursement: DisbursementSummary
+ * }
+ * @phpstan-type DisbursementRejected array{
+ *     status: 'error',
+ *     message: string,
+ *     error_code: string|null
+ * }
+ * @phpstan-type DisbursementUnknown array{status: 'unknown'}
+ * @phpstan-type DisbursementResult DisbursementAccepted|DisbursementRejected|DisbursementUnknown
+ * @phpstan-type DisbursementFound array{
+ *     status: 'found',
+ *     disbursements: list<DisbursementSummary>
+ * }
+ * @phpstan-type DisbursementNotFound array{status: 'not_found'}
+ * @phpstan-type DisbursementLookup DisbursementFound|DisbursementNotFound|DisbursementUnknown
  */
 class XenditService
 {
     /*
-     * Batas waktu request virtual account ke Xendit.
+     * Batas waktu setiap request ke Xendit.
      *
      * Tanpa opsi, Guzzle menunggu jawaban selamanya (`timeout` 0) dan mencoba terhubung sampai
      * 300 detik. Checkout memanggil createVirtualAccount() di dalam DB transaction setelah
@@ -34,10 +57,11 @@ class XenditService
      * checkout di bawah 60 detik. Nilai ini titik awal, bukan hasil pengukuran latensi Xendit,
      * dan dapat diubah lewat XENDIT_CONNECT_TIMEOUT_SECONDS dan XENDIT_REQUEST_TIMEOUT_SECONDS.
      *
-     * Disbursement sengaja belum memakai batas ini. Saldo penarikan hanya dipotong setelah Xendit
-     * menjawab sukses, jadi jawaban yang terputus diperlakukan sebagai penolakan padahal dana
-     * mungkin sudah terkirim. Timeout akan membuat kasus itu lebih sering sampai penarikan punya
-     * status pending yang dapat dicek ulang ke Xendit.
+     * Disbursement memakai batas yang sama. Saldo penarikan sudah ditahan sebelum request dikirim,
+     * dan jawaban yang hilang tidak dianggap penolakan: hasilnya `unknown`, penarikan tetap
+     * diproses, lalu `withdrawal:check` membaca statusnya di Xendit. Sebelum TOK-88, jawaban yang
+     * terputus dianggap penolakan tanpa potong saldo padahal dana mungkin sudah terkirim, sehingga
+     * user bisa menarik lagi dan perusahaan membayar dua kali.
      */
     public const DEFAULT_CONNECT_TIMEOUT_SECONDS = 5;
 
@@ -47,6 +71,17 @@ class XenditService
     // menerima pesan ini dan detail teknisnya ditulis ke log.
     public const PROVIDER_UNAVAILABLE_MESSAGE =
         'Layanan Pembayaran Sedang Bermasalah, Silakan Coba Lagi';
+
+    private const DISBURSEMENT_URL = 'https://api.xendit.co/disbursements';
+
+    // Diverifikasi di Xendit Sandbox (TOK-88): idempotency key yang pernah dipakai ditolak dengan
+    // HTTP 400 kode ini, bukan diputar ulang. Artinya request pertama dengan key itu sudah
+    // diterima, jadi hasilnya tidak boleh dianggap penolakan yang mengembalikan saldo.
+    private const DUPLICATE_IDEMPOTENCY_ERROR_CODE = 'DUPLICATE_TRANSACTION_ERROR';
+
+    // Diverifikasi di Xendit Sandbox (TOK-88): external ID yang tidak dikenal menghasilkan HTTP 404
+    // dengan kode ini. 404 tanpa kode ini tidak dianggap bukti bahwa disbursement tidak ada.
+    private const DISBURSEMENT_NOT_FOUND_ERROR_CODE = 'DIRECT_DISBURSEMENT_NOT_FOUND_ERROR';
 
     private string $api_key;
 
@@ -63,8 +98,8 @@ class XenditService
      *
      * @param  string  $api_key  API key Xendit yang digunakan client provider.
      * @param  Client|null  $client  Client untuk pengujian respons HTTP tanpa menghubungi provider.
-     * @param  float  $connectTimeoutSeconds  Batas waktu membuka koneksi request virtual account.
-     * @param  float  $requestTimeoutSeconds  Batas waktu total satu request virtual account.
+     * @param  float  $connectTimeoutSeconds  Batas waktu membuka koneksi setiap request Xendit.
+     * @param  float  $requestTimeoutSeconds  Batas waktu total satu request Xendit.
      * @param  LoggerInterface|null  $logger  Tujuan log kegagalan provider; null membuang log.
      *
      * @return void Tidak mengembalikan nilai; dependency disimpan pada instance.
@@ -117,7 +152,7 @@ class XenditService
         try {
             // --- step 1 - siapkan request pembuatan virtual account - start ---
             $url = 'https://api.xendit.co/callback_virtual_accounts';
-            $parameter = $this->virtualAccountRequestOptions([
+            $parameter = $this->jsonRequestOptions([
                 'external_id' => $external_id,
                 'bank_code' => $bank_code,
                 'name' => $name,
@@ -180,7 +215,7 @@ class XenditService
         try {
             // --- step 1 - siapkan request simulasi pembayaran pool - start ---
             $url = 'https://api.xendit.co/pool_virtual_accounts/simulate_payment';
-            $parameter = $this->virtualAccountRequestOptions([
+            $parameter = $this->jsonRequestOptions([
                 'bank_code' => $bank_code,
                 'bank_account_number' => $bank_account_number,
                 'transfer_amount' => $transfer_amount,
@@ -233,7 +268,7 @@ class XenditService
         try {
             // --- step 1 - siapkan request simulasi pembayaran fixed virtual account - start ---
             $url = "https://api.xendit.co/callback_virtual_accounts/external_id={$external_id}/simulate_payment";
-            $parameter = $this->virtualAccountRequestOptions([
+            $parameter = $this->jsonRequestOptions([
                 'amount' => $amount,
             ]);
             // --- step 1 - siapkan request simulasi pembayaran fixed virtual account - end ---
@@ -268,20 +303,23 @@ class XenditService
     }
 
     /**
-     * Membuat permintaan pencairan dana melalui Xendit.
+     * Mengirim permintaan pencairan dana ke Xendit dan mengelompokkan hasilnya.
      *
-     * Detail rekening tujuan dan nominal disusun menjadi permintaan pencairan provider. Caller hanya
-     * boleh mengubah saldo setelah hasil sukses diterima, sehingga method ini tidak melakukan mutasi
-     * balance lokal.
+     * External ID juga dikirim sebagai header `X-IDEMPOTENCY-KEY`, sehingga Xendit tidak pernah
+     * mengeksekusi dua pencairan untuk penarikan yang sama. Hasil `success` berarti Xendit
+     * menerima permintaan; status awalnya biasanya `PENDING` dan hasil akhirnya dibaca kemudian.
+     * Hasil `error` hanya untuk penolakan 4xx yang jelas, sehingga caller boleh mengembalikan
+     * saldo. Timeout, koneksi gagal, 5xx, key duplikat, dan kegagalan lain menjadi `unknown`
+     * karena dana mungkin sudah dikirim. Method ini tidak mengubah saldo lokal.
      *
-     * @param  string  $external_id  Identifier idempotensi yang dikirim ke provider.
+     * @param  string  $external_id  ID penarikan lokal, sekaligus idempotency key di Xendit.
      * @param  int  $amount  Nominal transaksi yang dikirim ke provider.
      * @param  string  $bank_code  Kode bank tujuan atau virtual account.
      * @param  string  $account_holder_name  Nama pemilik rekening tujuan pencairan.
      * @param  string  $account_number  Nomor rekening tujuan pencairan.
      * @param  string  $description  Deskripsi pencairan yang dikirim kepada provider.
      *
-     * @return XenditResult Payload pencairan atau pesan error.
+     * @return DisbursementResult Ringkasan pencairan, penolakan dengan kode error, atau unknown.
      */
     public function disbursement(
         string $external_id = '',
@@ -293,67 +331,214 @@ class XenditService
     ): array {
         try {
             // --- step 1 - siapkan request disbursement - start ---
-            // Sengaja tanpa batas waktu virtual account; alasannya ada di komentar konstanta
-            // DEFAULT_REQUEST_TIMEOUT_SECONDS.
-            $url = 'https://api.xendit.co/disbursements';
-            $json = [
-                'external_id' => $external_id,
-                'amount' => $amount,
-                'bank_code' => $bank_code,
-                'account_holder_name' => $account_holder_name,
-                'account_number' => $account_number,
-                'description' => $description,
-            ];
-            $headers = [
-                'Authorization' => 'Basic '.base64_encode("{$this->api_key}:"),
-            ];
-            $parameter = [
-                'json' => $json,
-                'headers' => $headers,
-            ];
+            $parameter = $this->jsonRequestOptions(
+                [
+                    'external_id' => $external_id,
+                    'amount' => $amount,
+                    'bank_code' => $bank_code,
+                    'account_holder_name' => $account_holder_name,
+                    'account_number' => $account_number,
+                    'description' => $description,
+                ],
+                ['X-IDEMPOTENCY-KEY' => $external_id],
+            );
             // --- step 1 - siapkan request disbursement - end ---
 
             // --- step 2 - kirim request dan baca response Xendit - start ---
-            $response = $this->client->post($url, $parameter);
-            $response = json_decode($response->getBody(), true);
+            $response = $this->client->post(self::DISBURSEMENT_URL, $parameter);
+            $payload = json_decode($response->getBody(), true);
             // --- step 2 - kirim request dan baca response Xendit - end ---
 
             return [
                 'status' => 'success',
-                'data' => $response,
+                'disbursement' => $this->disbursementSummary($payload),
             ];
         } catch (ClientException $e) {
-            $response = $e->getResponse();
-            $body = $response->getBody()->getContents();
+            return $this->classifyDisbursementRejection($e);
+        } catch (TransferException $e) {
+            $this->logUnusableAnswer('create_disbursement', $e);
 
-            $message = $this->extractErrorMessage($body);
-
-            return [
-                'status' => 'error',
-                'message' => $message,
-            ];
+            return ['status' => 'unknown'];
         } catch (Exception $e) {
-            return [
-                'status' => 'error',
-                'message' => $e->getMessage(),
-            ];
+            // Permintaan mungkin sudah terkirim sebelum kegagalan ini, misalnya saat body dibaca.
+            $this->logger->warning('Xendit disbursement failed with an unexpected exception.', [
+                'operation' => 'create_disbursement',
+                'exception' => $e::class,
+            ]);
+
+            return ['status' => 'unknown'];
         }
     }
 
     /**
-     * Menyusun opsi Guzzle untuk satu request virtual account.
+     * Membaca status pencairan berdasarkan external ID penarikan lokal.
+     *
+     * Dipakai `withdrawal:check` untuk penarikan yang masih diproses. Hasil `not_found` hanya
+     * diberikan untuk HTTP 404 dengan kode not-found Xendit, karena caller dapat mengembalikan
+     * saldo berdasarkan hasil itu. Jawaban lain yang tidak bisa dipakai, termasuk timeout, 5xx,
+     * 4xx lain, dan daftar kosong, menjadi `unknown` dan dicatat sebagai `warning`.
+     *
+     * @param  string  $externalId  External ID yang dikirim saat pencairan dibuat.
+     *
+     * @return DisbursementLookup Daftar pencairan yang cocok, not_found, atau unknown.
+     */
+    public function findDisbursementByExternalId(string $externalId): array
+    {
+        try {
+            // --- step 1 - kirim request pencarian - start ---
+            $parameter = $this->queryRequestOptions(['external_id' => $externalId]);
+            $response = $this->client->get(self::DISBURSEMENT_URL, $parameter);
+            $payload = json_decode($response->getBody(), true);
+            // --- step 1 - kirim request pencarian - end ---
+
+            // --- step 2 - tolak jawaban yang bukan daftar pencairan - start ---
+            // Sandbox menjawab 404 untuk external ID yang tidak dikenal, jadi daftar kosong atau
+            // bentuk lain tidak dipakai sebagai bukti bahwa pencairan tidak ada.
+            if (! is_array($payload) || $payload === [] || ! array_is_list($payload)) {
+                $this->logger->warning('Xendit disbursement lookup returned an unexpected body.', [
+                    'operation' => 'find_disbursement',
+                    'http_status' => $response->getStatusCode(),
+                ]);
+
+                return ['status' => 'unknown'];
+            }
+            // --- step 2 - tolak jawaban yang bukan daftar pencairan - end ---
+
+            return [
+                'status' => 'found',
+                'disbursements' => array_map($this->disbursementSummary(...), $payload),
+            ];
+        } catch (ClientException $e) {
+            return $this->classifyLookupRejection($e);
+        } catch (TransferException $e) {
+            $this->logUnusableAnswer('find_disbursement', $e);
+
+            return ['status' => 'unknown'];
+        }
+    }
+
+    /**
+     * Mengelompokkan respons 4xx pembuatan pencairan menjadi penolakan atau hasil tidak pasti.
+     *
+     * @param  ClientException  $exception  Respons 4xx dari Xendit.
+     *
+     * @return DisbursementRejected|DisbursementUnknown Penolakan, atau unknown untuk key duplikat.
+     */
+    private function classifyDisbursementRejection(ClientException $exception): array
+    {
+        // --- step 1 - baca pesan dan kode error - start ---
+        $body = $exception->getResponse()->getBody()->getContents();
+        $errorCode = $this->extractErrorCode($body);
+        // --- step 1 - baca pesan dan kode error - end ---
+
+        // --- step 2 - perlakukan key duplikat sebagai hasil tidak pasti - start ---
+        // Key duplikat berarti pencairan dengan external ID ini sudah pernah diterima.
+        if ($errorCode === self::DUPLICATE_IDEMPOTENCY_ERROR_CODE) {
+            $this->logUnusableAnswer('create_disbursement', $exception);
+
+            return ['status' => 'unknown'];
+        }
+        // --- step 2 - perlakukan key duplikat sebagai hasil tidak pasti - end ---
+
+        return [
+            'status' => 'error',
+            'message' => $this->extractErrorMessage($body),
+            'error_code' => $errorCode,
+        ];
+    }
+
+    /**
+     * Mengelompokkan respons 4xx pencarian pencairan menjadi not_found atau unknown.
+     *
+     * @param  ClientException  $exception  Respons 4xx dari Xendit.
+     *
+     * @return DisbursementNotFound|DisbursementUnknown not_found hanya untuk 404 not-found Xendit.
+     */
+    private function classifyLookupRejection(ClientException $exception): array
+    {
+        // --- step 1 - kenali jawaban not-found dari Xendit - start ---
+        $response = $exception->getResponse();
+        $errorCode = $this->extractErrorCode($response->getBody()->getContents());
+
+        $isNotFound = $response->getStatusCode() === HttpStatus::HTTP_NOT_FOUND
+            && $errorCode === self::DISBURSEMENT_NOT_FOUND_ERROR_CODE;
+
+        if ($isNotFound) {
+            return ['status' => 'not_found'];
+        }
+        // --- step 1 - kenali jawaban not-found dari Xendit - end ---
+
+        // --- step 2 - catat 4xx lain sebagai hasil tidak pasti - start ---
+        // Contohnya 401 karena key salah atau 429 karena rate limit; keduanya tidak membuktikan
+        // apa pun tentang pencairan.
+        $this->logUnusableAnswer('find_disbursement', $exception);
+        // --- step 2 - catat 4xx lain sebagai hasil tidak pasti - end ---
+
+        return ['status' => 'unknown'];
+    }
+
+    /**
+     * Mengambil ID, status, dan kode gagal dari satu pencairan Xendit.
+     *
+     * @param  mixed  $payload  Objek pencairan hasil decode JSON.
+     *
+     * @return DisbursementSummary Field yang dipakai caller; nilai yang bukan teks menjadi null.
+     */
+    private function disbursementSummary(mixed $payload): array
+    {
+        // Data rekening sengaja tidak diambil agar tidak ikut tersimpan atau tercatat di log.
+        $fields = is_array($payload) ? $payload : [];
+
+        return [
+            'id' => is_string($fields['id'] ?? null) ? $fields['id'] : null,
+            'status' => is_string($fields['status'] ?? null) ? $fields['status'] : null,
+            'failure_code' => is_string($fields['failure_code'] ?? null)
+                ? $fields['failure_code']
+                : null,
+        ];
+    }
+
+    /**
+     * Menyusun opsi Guzzle untuk request Xendit yang mengirim body JSON.
      *
      * @param  array<string, mixed>  $json  Body JSON yang dikirim ke Xendit.
+     * @param  array<string, string>  $headers  Header tambahan, misalnya idempotency key.
      *
      * @return array<string, mixed> Body, autentikasi, serta batas waktu koneksi dan request.
      */
-    private function virtualAccountRequestOptions(array $json): array
+    private function jsonRequestOptions(array $json, array $headers = []): array
     {
-        // Batas waktu dipasang di sini agar setiap operasi virtual account memakainya.
+        // Body ditambahkan di atas opsi dasar agar tidak ada request tanpa batas waktu.
+        return [RequestOptions::JSON => $json, ...$this->baseRequestOptions($headers)];
+    }
+
+    /**
+     * Menyusun opsi Guzzle untuk request Xendit yang membawa query string.
+     *
+     * @param  array<string, string>  $query  Parameter query yang dikirim ke Xendit.
+     *
+     * @return array<string, mixed> Query, autentikasi, serta batas waktu koneksi dan request.
+     */
+    private function queryRequestOptions(array $query): array
+    {
+        // Guzzle meng-encode query, sehingga external ID tidak perlu disusun manual di URL.
+        return [RequestOptions::QUERY => $query, ...$this->baseRequestOptions()];
+    }
+
+    /**
+     * Menyusun autentikasi dan batas waktu yang dipakai setiap request Xendit.
+     *
+     * @param  array<string, string>  $headers  Header tambahan di samping Authorization.
+     *
+     * @return array<string, mixed> Header serta batas waktu koneksi dan request.
+     */
+    private function baseRequestOptions(array $headers = []): array
+    {
+        // Batas waktu dipasang di sini agar tidak ada request Xendit yang menunggu selamanya.
         return [
-            RequestOptions::JSON => $json,
             RequestOptions::HEADERS => [
                 'Authorization' => 'Basic '.base64_encode("{$this->api_key}:"),
+                ...$headers,
             ],
             RequestOptions::CONNECT_TIMEOUT => $this->connectTimeoutSeconds,
             RequestOptions::TIMEOUT => $this->requestTimeoutSeconds,
@@ -363,10 +548,8 @@ class XenditService
     /**
      * Mencatat kegagalan provider yang tidak membawa jawaban terpakai, lalu menyiapkan pesan aman.
      *
-     * Dipakai untuk timeout, koneksi gagal, 5xx, dan kegagalan transport lain setelah 4xx
-     * ditangani terpisah. Log hanya memuat operasi, kelas exception, status HTTP, serta kode dan
-     * teks error cURL. Pesan exception tidak dicatat karena pesan 5xx Guzzle menyalin potongan body
-     * respons dan pesan transport memuat URL Xendit.
+     * Dipakai operasi virtual account untuk timeout, koneksi gagal, 5xx, dan kegagalan transport
+     * lain setelah 4xx ditangani terpisah.
      *
      * @param  string  $operation  Nama operasi Xendit untuk log.
      * @param  TransferException  $exception  Kegagalan transport atau respons 5xx dari Guzzle.
@@ -374,6 +557,29 @@ class XenditService
      * @return XenditError Pesan aman untuk diteruskan caller ke buyer.
      */
     private function providerUnavailable(string $operation, TransferException $exception): array
+    {
+        // Buyer hanya melihat pesan aman; detail teknis cukup ada di log.
+        $this->logUnusableAnswer($operation, $exception);
+
+        return [
+            'status' => 'error',
+            'message' => self::PROVIDER_UNAVAILABLE_MESSAGE,
+        ];
+    }
+
+    /**
+     * Menulis `warning` untuk jawaban Xendit yang tidak bisa dipakai, tanpa body maupun URL.
+     *
+     * Log hanya memuat operasi, kelas exception, status HTTP, serta kode dan teks error cURL.
+     * Pesan exception tidak dicatat karena pesan 4xx dan 5xx Guzzle menyalin potongan body
+     * respons, dan pesan transport memuat URL Xendit beserta external ID di query string.
+     *
+     * @param  string  $operation  Nama operasi Xendit untuk log.
+     * @param  TransferException  $exception  Kegagalan transport atau respons HTTP dari Guzzle.
+     *
+     * @return void Hanya menulis log.
+     */
+    private function logUnusableAnswer(string $operation, TransferException $exception): void
     {
         // --- step 1 - ambil detail teknis kegagalan - start ---
         // Hanya dua exception Guzzle ini yang membawa konteks handler cURL.
@@ -395,11 +601,6 @@ class XenditService
             'curl_error' => $handlerContext['error'] ?? null,
         ]);
         // --- step 2 - catat kegagalan tanpa body maupun URL - end ---
-
-        return [
-            'status' => 'error',
-            'message' => self::PROVIDER_UNAVAILABLE_MESSAGE,
-        ];
     }
 
     /**
@@ -417,5 +618,22 @@ class XenditService
         $message = $fields['message'] ?? null;
 
         return is_string($message) ? $message : 'Unknown error';
+    }
+
+    /**
+     * Mengambil kode error Xendit, misalnya `DUPLICATE_TRANSACTION_ERROR`, dari body penolakan.
+     *
+     * @param  string  $body  Isi respons ketika provider menolak permintaan.
+     *
+     * @return string|null Kode error, atau null jika body tidak membawa kode berbentuk teks.
+     */
+    private function extractErrorCode(string $body): ?string
+    {
+        // Kode menentukan apakah saldo boleh dikembalikan, jadi bentuk lain tidak ditebak.
+        $decoded = json_decode($body, true);
+        $fields = is_array($decoded) ? $decoded : [];
+        $errorCode = $fields['error_code'] ?? null;
+
+        return is_string($errorCode) ? $errorCode : null;
     }
 }

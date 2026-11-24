@@ -34,6 +34,24 @@ class XenditServiceTest extends TestCase
         'simulate_virtual_account_fixed',
     ];
 
+    private const EXTERNAL_ID = 'dis-bca-01jtestexternalid';
+
+    // Shape of the Sandbox answer seen in the TOK-88 probe, with the bank fields left out.
+    private const PENDING_DISBURSEMENT_BODY = '{"id":"disb-1","external_id":"'
+        .self::EXTERNAL_ID.'","amount":10000,"status":"PENDING"}';
+
+    private const PENDING_DISBURSEMENT_SUMMARY = [
+        'id' => 'disb-1',
+        'status' => 'PENDING',
+        'failure_code' => null,
+    ];
+
+    private const DUPLICATE_KEY_BODY = '{"error_code":"DUPLICATE_TRANSACTION_ERROR",'
+        .'"message":"Request failed because idempotency key has been seen before"}';
+
+    private const NOT_FOUND_BODY = '{"error_code":"DIRECT_DISBURSEMENT_NOT_FOUND_ERROR",'
+        .'"message":"Direct disbursement not found"}';
+
     /**
      * Locks the result keys, status spelling, and unmodified provider payload.
      *
@@ -49,7 +67,7 @@ class XenditServiceTest extends TestCase
             new Response(HttpStatus::HTTP_OK, [], json_encode($account, JSON_THROW_ON_ERROR)),
             new Response(HttpStatus::HTTP_OK, [], 'true'),
             new Response(HttpStatus::HTTP_OK, [], 'null'),
-            new Response(HttpStatus::HTTP_OK, [], '{"status":"PENDING"}'),
+            new Response(HttpStatus::HTTP_OK, [], self::PENDING_DISBURSEMENT_BODY),
         );
         // --- step 1 - Supply successful responses for every operation - end ---
 
@@ -67,7 +85,7 @@ class XenditServiceTest extends TestCase
             $service->simulateVirtualAccountFixed(),
         );
         $this->assertSame(
-            ['status' => 'success', 'data' => ['status' => 'PENDING']],
+            ['status' => 'success', 'disbursement' => self::PENDING_DISBURSEMENT_SUMMARY],
             $service->disbursement(),
         );
         // --- step 2 - Check the successful envelopes - end ---
@@ -79,7 +97,8 @@ class XenditServiceTest extends TestCase
      * @param  string  $body  Body supplied by the fake provider.
      * @param  string  $message  Text expected by API callers.
      *
-     * @return void Verifies that every operation returns the same error shape.
+     * @return void Verifies that every operation returns the same message, and that a
+     *              disbursement rejection also carries the Xendit error code.
      */
     #[DataProvider('errorBodies')]
     public function test_client_errors_return_a_string_message(string $body, string $message): void
@@ -94,12 +113,58 @@ class XenditServiceTest extends TestCase
         $expected = ['status' => 'error', 'message' => $message];
         // --- step 1 - Supply provider rejections - end ---
 
-        // --- step 2 - Check the error envelopes - start ---
+        // --- step 2 - Check the virtual account error envelopes - start ---
         $this->assertSame($expected, $service->createVirtualAccount());
         $this->assertSame($expected, $service->simulateVirtualAccountPool());
         $this->assertSame($expected, $service->simulateVirtualAccountFixed());
-        $this->assertSame($expected, $service->disbursement());
-        // --- step 2 - Check the error envelopes - end ---
+        // --- step 2 - Check the virtual account error envelopes - end ---
+
+        // --- step 3 - Check the disbursement error envelope - start ---
+        // None of these bodies carries an error code, so the code stays null.
+        $this->assertSame([...$expected, 'error_code' => null], $service->disbursement());
+        // --- step 3 - Check the disbursement error envelope - end ---
+    }
+
+    /**
+     * Keeps the Xendit error code of a disbursement rejection for the withdrawal record.
+     *
+     * @return void Checks a 400 and a 429, which both mean Xendit did not accept the request.
+     */
+    public function test_disbursement_rejections_return_the_error_code(): void
+    {
+        // --- step 1 - Supply a validation error and a rate limit - start ---
+        $service = $this->serviceWithResponses(
+            new Response(
+                HttpStatus::HTTP_BAD_REQUEST,
+                [],
+                '{"error_code":"API_VALIDATION_ERROR","message":"Invalid bank code"}',
+            ),
+            new Response(
+                HttpStatus::HTTP_TOO_MANY_REQUESTS,
+                [],
+                '{"error_code":"RATE_LIMIT_EXCEEDED","message":"Too many requests"}',
+            ),
+        );
+        // --- step 1 - Supply a validation error and a rate limit - end ---
+
+        // --- step 2 - Check both rejections - start ---
+        $this->assertSame(
+            [
+                'status' => 'error',
+                'message' => 'Invalid bank code',
+                'error_code' => 'API_VALIDATION_ERROR',
+            ],
+            $service->disbursement(),
+        );
+        $this->assertSame(
+            [
+                'status' => 'error',
+                'message' => 'Too many requests',
+                'error_code' => 'RATE_LIMIT_EXCEEDED',
+            ],
+            $service->disbursement(),
+        );
+        // --- step 2 - Check both rejections - end ---
     }
 
     /**
@@ -170,25 +235,184 @@ class XenditServiceTest extends TestCase
     }
 
     /**
-     * Keeps disbursement without a timeout until withdrawals can stay pending after a lost answer.
+     * Confirms both disbursement requests carry the limits and the create call its idempotency key.
      *
-     * @return void Checks that the disbursement request carries no connect or total limit.
+     * @return void Checks the options of the create and lookup requests.
      */
-    public function test_disbursement_is_sent_without_a_timeout(): void
+    public function test_disbursement_requests_send_the_timeouts_and_idempotency_key(): void
     {
-        // --- step 1 - Send a disbursement - start ---
-        $handler = new MockHandler([new Response(HttpStatus::HTTP_OK, [], '{}')]);
+        // --- step 1 - Create and look up a disbursement - start ---
+        $handler = new MockHandler([
+            new Response(HttpStatus::HTTP_OK, [], self::PENDING_DISBURSEMENT_BODY),
+            new Response(HttpStatus::HTTP_OK, [], '['.self::PENDING_DISBURSEMENT_BODY.']'),
+        ]);
         $service = $this->serviceWithHandler($handler, new NullLogger());
 
-        $service->disbursement();
-        // --- step 1 - Send a disbursement - end ---
+        // Guzzle moves headers and the query into the request, so those are read from it.
+        $service->disbursement(external_id: self::EXTERNAL_ID);
+        $createOptions = $handler->getLastOptions();
+        $createRequest = $handler->getLastRequest();
 
-        // --- step 2 - Check the request options - start ---
-        // A timeout here would treat a lost answer as a rejection while the money may be sent.
-        $options = $handler->getLastOptions();
-        $this->assertArrayNotHasKey(RequestOptions::CONNECT_TIMEOUT, $options);
-        $this->assertArrayNotHasKey(RequestOptions::TIMEOUT, $options);
-        // --- step 2 - Check the request options - end ---
+        $service->findDisbursementByExternalId(self::EXTERNAL_ID);
+        $lookupOptions = $handler->getLastOptions();
+        $lookupRequest = $handler->getLastRequest();
+        // --- step 1 - Create and look up a disbursement - end ---
+
+        // --- step 2 - Check the timeouts of both requests - start ---
+        // Withdrawals are held before the call, so a bounded wait can no longer lose money.
+        foreach (['create' => $createOptions, 'lookup' => $lookupOptions] as $name => $options) {
+            $this->assertSame(
+                self::CONNECT_TIMEOUT_SECONDS,
+                $options[RequestOptions::CONNECT_TIMEOUT] ?? null,
+                $name,
+            );
+            $this->assertSame(
+                self::REQUEST_TIMEOUT_SECONDS,
+                $options[RequestOptions::TIMEOUT] ?? null,
+                $name,
+            );
+        }
+        // --- step 2 - Check the timeouts of both requests - end ---
+
+        // --- step 3 - Check the idempotency key and lookup query - start ---
+        $this->assertSame(self::EXTERNAL_ID, $createRequest?->getHeaderLine('X-IDEMPOTENCY-KEY'));
+        $this->assertSame('external_id='.self::EXTERNAL_ID, $lookupRequest?->getUri()->getQuery());
+        // --- step 3 - Check the idempotency key and lookup query - end ---
+    }
+
+    /**
+     * Treats every disbursement answer that does not prove a rejection as an unknown result.
+     *
+     * @param  Response|Throwable  $failure  What the fake provider returns or throws.
+     * @param  int|null  $httpStatus  Status expected in the log, or null without a response.
+     * @param  int|null  $curlErrno  cURL code expected in the log, or null without one.
+     *
+     * @return void Checks the result and the single warning entry.
+     */
+    #[DataProvider('unansweredDisbursements')]
+    public function test_unanswered_disbursements_are_unknown(
+        Response|Throwable $failure,
+        ?int $httpStatus,
+        ?int $curlErrno,
+    ): void {
+        // --- step 1 - Capture the warning log entry - start ---
+        $contexts = [];
+        $logger = $this->warningRecorder($contexts, 1);
+        // --- step 1 - Capture the warning log entry - end ---
+
+        // --- step 2 - Send the disbursement - start ---
+        $service = $this->serviceWithHandler(new MockHandler([$failure]), $logger);
+
+        $result = $service->disbursement(external_id: self::EXTERNAL_ID);
+        // --- step 2 - Send the disbursement - end ---
+
+        // --- step 3 - Check the result and the logged fields - start ---
+        // An error result would return the balance while the money may already be on its way.
+        $this->assertSame(['status' => 'unknown'], $result);
+        $this->assertSame('create_disbursement', $contexts[0]['operation']);
+        $this->assertSame($httpStatus, $contexts[0]['http_status']);
+        $this->assertSame($curlErrno, $contexts[0]['curl_errno']);
+        // --- step 3 - Check the result and the logged fields - end ---
+    }
+
+    /**
+     * Covers the lost answers of the virtual account test plus a reused idempotency key.
+     *
+     * @return array<string, array{Response|Throwable, int|null, int|null}> Failure and log fields.
+     */
+    public static function unansweredDisbursements(): array
+    {
+        // Xendit answers a reused key with 400, so only the error code tells it from a rejection.
+        $duplicateKey = new Response(HttpStatus::HTTP_BAD_REQUEST, [], self::DUPLICATE_KEY_BODY);
+
+        return [
+            ...self::unansweredFailures(),
+            'duplicate idempotency key' => [$duplicateKey, HttpStatus::HTTP_BAD_REQUEST, null],
+        ];
+    }
+
+    /**
+     * Maps a lookup answer to found, not_found, or unknown.
+     *
+     * @param  Response|Throwable  $answer  What the fake provider returns or throws.
+     * @param  array<string, mixed>  $expected  Lookup result the caller must receive.
+     * @param  int  $warnings  Number of warning entries the lookup must write.
+     *
+     * @return void Checks the result and the number of warnings.
+     */
+    #[DataProvider('lookupAnswers')]
+    public function test_disbursement_lookup_classifies_the_answer(
+        Response|Throwable $answer,
+        array $expected,
+        int $warnings,
+    ): void {
+        // --- step 1 - Look the disbursement up - start ---
+        $contexts = [];
+        $logger = $this->warningRecorder($contexts, $warnings);
+        $service = $this->serviceWithHandler(new MockHandler([$answer]), $logger);
+
+        $result = $service->findDisbursementByExternalId(self::EXTERNAL_ID);
+        // --- step 1 - Look the disbursement up - end ---
+
+        // --- step 2 - Check the result - start ---
+        $this->assertSame($expected, $result);
+        // --- step 2 - Check the result - end ---
+    }
+
+    /**
+     * Covers a found disbursement, the Xendit not-found answer, and answers that prove nothing.
+     *
+     * Each case holds the provider answer, the expected lookup result, and the warning count.
+     *
+     * @return array<string, array{Response|Throwable, array<string, mixed>, int}> Named cases.
+     */
+    public static function lookupAnswers(): array
+    {
+        // --- step 1 - Prepare the answers that settle the lookup - start ---
+        $pending = new Response(HttpStatus::HTTP_OK, [], '['.self::PENDING_DISBURSEMENT_BODY.']');
+        $failed = new Response(
+            HttpStatus::HTTP_OK,
+            [],
+            '[{"id":"disb-2","status":"FAILED","failure_code":"INVALID_DESTINATION"}]',
+        );
+        $notFound = new Response(HttpStatus::HTTP_NOT_FOUND, [], self::NOT_FOUND_BODY);
+
+        $pendingResult = [
+            'status' => 'found',
+            'disbursements' => [self::PENDING_DISBURSEMENT_SUMMARY],
+        ];
+        $failedResult = [
+            'status' => 'found',
+            'disbursements' => [
+                ['id' => 'disb-2', 'status' => 'FAILED', 'failure_code' => 'INVALID_DESTINATION'],
+            ],
+        ];
+        // --- step 1 - Prepare the answers that settle the lookup - end ---
+
+        // --- step 2 - Prepare the answers that prove nothing - start ---
+        // Only the documented not-found code may lead to a refund; anything else stays unknown.
+        $bareNotFound = new Response(HttpStatus::HTTP_NOT_FOUND, [], '{}');
+        $unauthorized = new Response(
+            HttpStatus::HTTP_UNAUTHORIZED,
+            [],
+            '{"error_code":"INVALID_API_KEY"}',
+        );
+        $emptyList = new Response(HttpStatus::HTTP_OK, [], '[]');
+        $object = new Response(HttpStatus::HTTP_OK, [], self::PENDING_DISBURSEMENT_BODY);
+        $timeout = self::unansweredFailures()['timeout'][0];
+        $unknown = ['status' => 'unknown'];
+        // --- step 2 - Prepare the answers that prove nothing - end ---
+
+        return [
+            'pending' => [$pending, $pendingResult, 0],
+            'failed with failure code' => [$failed, $failedResult, 0],
+            'not found' => [$notFound, ['status' => 'not_found'], 0],
+            '404 without the not-found code' => [$bareNotFound, $unknown, 1],
+            'unauthorized' => [$unauthorized, $unknown, 1],
+            'empty list' => [$emptyList, $unknown, 1],
+            'object instead of list' => [$object, $unknown, 1],
+            'timeout' => [$timeout, $unknown, 1],
+        ];
     }
 
     /**
@@ -210,14 +434,7 @@ class XenditServiceTest extends TestCase
     ): void {
         // --- step 1 - Capture the warning log entries - start ---
         $contexts = [];
-        $logger = $this->createMock(LoggerInterface::class);
-        $logger->expects($this->exactly(count(self::VIRTUAL_ACCOUNT_OPERATIONS)))
-            ->method('warning')
-            ->willReturnCallback(
-                function (string|Stringable $message, array $context) use (&$contexts): void {
-                    $contexts[] = $context;
-                },
-            );
+        $logger = $this->warningRecorder($contexts, count(self::VIRTUAL_ACCOUNT_OPERATIONS));
         // --- step 1 - Capture the warning log entries - end ---
 
         // --- step 2 - Supply the same failure for every operation - start ---
@@ -292,6 +509,28 @@ class XenditServiceTest extends TestCase
             'server error' => [$serverError, HttpStatus::HTTP_SERVICE_UNAVAILABLE, null],
             'connection reset' => [$connectionReset, null, 56],
         ];
+    }
+
+    /**
+     * Builds a logger mock that expects a number of warnings and keeps each context.
+     *
+     * @param  list<array<string, mixed>>  $contexts  Receives the context of every warning.
+     * @param  int  $expectedWarnings  Exact number of warnings the code under test must write.
+     *
+     * @return LoggerInterface Logger that fails the test on a different warning count.
+     */
+    private function warningRecorder(array &$contexts, int $expectedWarnings): LoggerInterface
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->exactly($expectedWarnings))
+            ->method('warning')
+            ->willReturnCallback(
+                function (string|Stringable $message, array $context) use (&$contexts): void {
+                    $contexts[] = $context;
+                },
+            );
+
+        return $logger;
     }
 
     /**
