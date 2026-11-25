@@ -16,7 +16,7 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Mendaftarkan singleton service pembayaran dan client Meilisearch yang dikonfigurasi aplikasi.
      *
-     * Service pembayaran menerima API key, batas waktu request virtual account, dan logger
+     * Service pembayaran menerima API key, batas waktu semua request Xendit, dan logger
      * aplikasi. Batas waktu divalidasi saat service pertama kali dibuat.
      *
      * @return void Dependency tersedia melalui service container setelah registrasi selesai.
