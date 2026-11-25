@@ -2,12 +2,15 @@
 
 namespace App\Services;
 
+use App\Enums\WithdrawalStatus;
 use App\Models\SaldoHistory;
 use App\Models\SaldoUser;
 use App\Models\User;
 use Carbon\Carbon;
 use DB;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use RuntimeException;
 
 /**
  * @phpstan-type SaldoHistoryRow array{
@@ -16,11 +19,14 @@ use Illuminate\Support\Collection;
  *     title: string,
  *     date: string,
  *     price: float|numeric-string|null,
- *     description: string
+ *     description: string,
+ *     withdrawal_status: 'processing'|'completed'|'failed'|null
  * }
  * @phpstan-type SaldoDeductionResult array{status: 'error', message: string}|array{
  *     status: 'success',
- *     saldoHistoryId: string
+ *     saldoHistoryId: string,
+ *     refundPortion: int,
+ *     incomePortion: int
  * }
  */
 class SaldoService
@@ -125,25 +131,7 @@ class SaldoService
 
         // --- step 2 - bangun query riwayat milik user - start ---
         // Query daftar dibatasi ke pemilik saldo sebelum filter dari client diterapkan.
-        $saldoHistory = SaldoHistory::from('saldo_histories as sh')
-            ->select(
-                'sh.*',
-                'tu.transaction_number',
-                'ti.id as invoice_id',
-                'u.name as buyer_name',
-                'pu.name as payment_name',
-                'pu.account as payment_account',
-                'pl.slug as payment_slug'
-            )
-            // Relasi transaksi untuk riwayat saldo masuk.
-            ->leftJoin('transaction_users as tu', 'tu.id', '=', 'sh.transaction_user_id')
-            ->leftJoin('transaction_invoices as ti', 'ti.id', '=', 'tu.transaction_invoice_id')
-            ->leftJoin('users as u', 'u.id', '=', 'tu.user_id_buyer')
-
-            // Relasi payment untuk riwayat penarikan saldo.
-            ->leftJoin('payment_users as pu', 'pu.id', '=', 'sh.payment_user_id')
-            ->leftJoin('payment_lists as pl', 'pl.id', '=', 'pu.payment_id')
-            ->where('sh.user_id', $user_id);
+        $saldoHistory = $this->historyRowsQuery()->where('sh.user_id', $user_id);
         // --- step 2 - bangun query riwayat milik user - end ---
 
         // --- step 3 - terapkan rentang tanggal - start ---
@@ -197,26 +185,7 @@ class SaldoService
         // --- step 1 - validasi input - end ---
 
         // --- step 2 - cari entri riwayat - start ---
-        $saldoHistory = SaldoHistory::from('saldo_histories as sh')
-            ->select(
-                'sh.*',
-                'tu.transaction_number',
-                'ti.id as invoice_id',
-                'u.name as buyer_name',
-                'pu.name as payment_name',
-                'pu.account as payment_account',
-                'pl.slug as payment_slug'
-            )
-            // Relasi transaksi untuk riwayat saldo masuk.
-            ->leftJoin('transaction_users as tu', 'tu.id', '=', 'sh.transaction_user_id')
-            ->leftJoin('transaction_invoices as ti', 'ti.id', '=', 'tu.transaction_invoice_id')
-            ->leftJoin('users as u', 'u.id', '=', 'tu.user_id_buyer')
-
-            // Relasi payment untuk riwayat penarikan saldo.
-            ->leftJoin('payment_users as pu', 'pu.id', '=', 'sh.payment_user_id')
-            ->leftJoin('payment_lists as pl', 'pl.id', '=', 'pu.payment_id')
-            ->where('sh.id', $id)
-            ->first();
+        $saldoHistory = $this->historyRowsQuery()->where('sh.id', $id)->first();
         // --- step 2 - cari entri riwayat - end ---
 
         // --- step 3 - bentuk detail riwayat - start ---
@@ -231,11 +200,44 @@ class SaldoService
     }
 
     /**
+     * Menyusun query riwayat beserta data transaksi, rekening, dan status penarikan.
+     *
+     * Dipakai daftar riwayat dan detail satu riwayat agar keduanya membaca kolom yang sama.
+     *
+     * @return Builder<SaldoHistory> Query yang belum dibatasi ke user atau ID tertentu.
+     */
+    private function historyRowsQuery(): Builder
+    {
+        return SaldoHistory::from('saldo_histories as sh')
+            ->select(
+                'sh.*',
+                'tu.transaction_number',
+                'ti.id as invoice_id',
+                'u.name as buyer_name',
+                'pu.name as payment_name',
+                'pu.account as payment_account',
+                'pl.slug as payment_slug',
+                'sw.status as withdrawal_status'
+            )
+            // Relasi transaksi untuk riwayat saldo masuk.
+            ->leftJoin('transaction_users as tu', 'tu.id', '=', 'sh.transaction_user_id')
+            ->leftJoin('transaction_invoices as ti', 'ti.id', '=', 'tu.transaction_invoice_id')
+            ->leftJoin('users as u', 'u.id', '=', 'tu.user_id_buyer')
+
+            // Relasi payment untuk riwayat penarikan dan pengembalian saldo.
+            ->leftJoin('payment_users as pu', 'pu.id', '=', 'sh.payment_user_id')
+            ->leftJoin('payment_lists as pl', 'pl.id', '=', 'pu.payment_id')
+
+            // Status pencairan hanya ada untuk baris penarikan sejak TOK-88.
+            ->leftJoin('saldo_withdrawals as sw', 'sw.saldo_history_id', '=', 'sh.id');
+    }
+
+    /**
      * Membentuk baris yang sama untuk daftar riwayat dan detail hasil pencairan.
      *
      * @param  SaldoHistory  $history  Mutasi yang sudah dibaca bersama atribut hasil join.
      *
-     * @return SaldoHistoryRow Baris untuk API dengan jenis dan nominal yang tersimpan.
+     * @return SaldoHistoryRow Baris untuk API dengan jenis, nominal, dan status penarikan.
      *
      * @throws \Carbon\Exceptions\InvalidFormatException Jika waktu mutasi tidak bisa dibaca.
      */
@@ -253,6 +255,7 @@ class SaldoService
         $title = match ($type) {
             'incoming' => 'Pemasukan Saldo',
             'withdrawal' => 'Penarikan Saldo',
+            'withdrawal_refund' => 'Pengembalian Saldo',
             default => 'Mutasi Saldo',
         };
         // --- step 2 - pilih judul mutasi - end ---
@@ -260,7 +263,16 @@ class SaldoService
         // --- step 3 - pilih deskripsi mutasi - start ---
         $description = match ($type) {
             'incoming' => $this->formatIncomingHistoryDescription($history),
-            'withdrawal' => $this->formatWithdrawalHistoryDescription($history),
+            'withdrawal' => $this->formatWithdrawalHistoryDescription(
+                $history,
+                'Penarikan Saldo Sebesar',
+                'Ke',
+            ),
+            'withdrawal_refund' => $this->formatWithdrawalHistoryDescription(
+                $history,
+                'Pengembalian Penarikan Saldo Sebesar',
+                'Dari',
+            ),
             default => 'Jenis mutasi saldo tidak dikenali.',
         };
         // --- step 3 - pilih deskripsi mutasi - end ---
@@ -272,7 +284,27 @@ class SaldoService
             'date' => $date,
             'price' => $history->price,
             'description' => $description,
+            'withdrawal_status' => $this->withdrawalStatusOf($history),
         ];
+    }
+
+    /**
+     * Membaca status penarikan hasil join untuk ditampilkan sebagai label di riwayat.
+     *
+     * @param  SaldoHistory  $history  Mutasi yang dibaca bersama kolom `withdrawal_status`.
+     *
+     * @return 'processing'|'completed'|'failed'|null Status penarikan, atau null untuk baris lain.
+     */
+    private function withdrawalStatusOf(SaldoHistory $history): ?string
+    {
+        // Penarikan sebelum TOK-88 tidak punya row status; hasilnya null, bukan dianggap berhasil.
+        $rawStatus = $history->getAttribute('withdrawal_status');
+
+        if (! is_string($rawStatus)) {
+            return null;
+        }
+
+        return WithdrawalStatus::tryFrom($rawStatus)?->value;
     }
 
     /**
@@ -294,14 +326,19 @@ class SaldoService
     }
 
     /**
-     * Menyusun keterangan penarikan berdasarkan nominal dan rekening yang tersedia.
+     * Menyusun keterangan penarikan atau pengembaliannya berdasarkan nominal dan rekening.
      *
-     * @param  SaldoHistory  $history  Penarikan dengan atribut nominal dan rekening opsional.
+     * @param  SaldoHistory  $history  Penarikan atau pengembalian dengan atribut rekening.
+     * @param  string  $prefix  Awal kalimat sebelum nominal, misalnya `Penarikan Saldo Sebesar`.
+     * @param  string  $direction  Kata sebelum bank: `Ke` untuk penarikan, `Dari` untuk refund.
      *
-     * @return string Deskripsi penarikan untuk daftar dan detail.
+     * @return string Deskripsi untuk daftar dan detail.
      */
-    private function formatWithdrawalHistoryDescription(SaldoHistory $history): string
-    {
+    private function formatWithdrawalHistoryDescription(
+        SaldoHistory $history,
+        string $prefix,
+        string $direction,
+    ): string {
         // --- step 1 - format nominal penarikan - start ---
         // Nominal yang tidak tercatat tidak boleh terbaca sebagai penarikan Rp0.
         $price = $history->price;
@@ -321,28 +358,29 @@ class SaldoService
         $paymentName = $history->getAttribute('payment_name');
         // --- step 2 - ambil keterangan rekening - end ---
 
-        return "Penarikan Saldo Sebesar {$formattedPrice} Ke Bank "
+        return "{$prefix} {$formattedPrice} {$direction} Bank "
             ."{$paymentSlugUpper} {$paymentAccount} ({$paymentName})";
     }
 
     /**
-     * Mengurangi saldo dan mencatat riwayat penarikan setelah disbursement berhasil.
+     * Memotong saldo untuk penarikan dan mencatat riwayatnya sebelum Xendit dipanggil.
      *
      * Nominal harus minimal Rp1 dan user harus ada. Row `saldo_users` lalu dikunci di dalam
      * transaksi, sehingga pengurangan saldo dan row riwayat tersimpan bersama atau tidak sama
      * sekali. Row saldo yang tidak ada atau saldo yang kurang ditolak tanpa perubahan. Jika
      * dipanggil dari transaksi lain, transaksi ini menjadi savepoint dan lock baru dilepas saat
-     * transaksi luar selesai.
+     * transaksi luar selesai. Porsi refund dan income dikembalikan agar pengembalian saldo bisa
+     * mengisi ulang bucket asalnya.
      *
      * @param  string|null  $user_id  ID pemilik saldo yang dikurangi.
      * @param  string|null  $payment_user_id  ID rekening tujuan yang dicatat di riwayat.
      * @param  int  $price  Nominal penarikan dalam rupiah bulat.
      *
-     * @return SaldoDeductionResult ID riwayat penarikan, atau pesan jika tidak ada yang disimpan.
+     * @return SaldoDeductionResult ID riwayat dan porsi potongan, atau pesan jika tidak disimpan.
      *
      * @throws \Throwable Jika query gagal; perubahan saldo dan riwayat di-rollback bersama.
      */
-    public function saveSaldoAfterDisbursement(
+    public function deductWithdrawalBalance(
         ?string $user_id = null,
         ?string $payment_user_id = null,
         int $price = 0,
@@ -383,7 +421,7 @@ class SaldoService
      * @param  string|null  $payment_user_id  ID rekening tujuan yang dicatat di riwayat.
      * @param  int  $price  Nominal penarikan positif dalam rupiah bulat.
      *
-     * @return SaldoDeductionResult ID riwayat penarikan, atau pesan jika saldo tidak ada/kurang.
+     * @return SaldoDeductionResult ID riwayat dan porsi potongan, atau pesan jika saldo kurang.
      */
     private function deductLockedSaldo(
         string $user_id,
@@ -401,9 +439,8 @@ class SaldoService
         // --- step 1 - kunci row saldo user - end ---
 
         // --- step 2 - cek kecukupan saldo - start ---
-        // Sebelumnya kekurangan dipotong diam-diam menjadi nol. Provider sudah mengirim
-        // nominal penuh, sedangkan saldo hanya berkurang sebagian, sehingga perusahaan
-        // menanggung selisihnya.
+        // Sebelumnya kekurangan dipotong diam-diam menjadi nol, sehingga provider mengirim
+        // nominal penuh sedangkan saldo hanya berkurang sebagian.
         $saldoRefund = (int) ($saldoUser->saldo_refund ?? 0);
         $saldoIncome = (int) ($saldoUser->saldo_income ?? 0);
         $saldoBefore = $saldoRefund + $saldoIncome;
@@ -440,6 +477,71 @@ class SaldoService
         ]);
         // --- step 4 - buat riwayat saldo - end ---
 
-        return ['status' => 'success', 'saldoHistoryId' => $saldoHistory->id];
+        return [
+            'status' => 'success',
+            'saldoHistoryId' => $saldoHistory->id,
+            'refundPortion' => $refundDeduction,
+            'incomePortion' => $incomeDeduction,
+        ];
+    }
+
+    /**
+     * Mengembalikan saldo penarikan yang gagal ke bucket asalnya dan mencatat riwayatnya.
+     *
+     * Harus dipanggil di dalam DB::transaction milik pemanggil, setelah row penarikan dikunci,
+     * sehingga satu penarikan tidak bisa dikembalikan dua kali. Row `saldo_users` dikunci dengan
+     * `FOR UPDATE` yang sama seperti kredit income dan penarikan, agar nilai saldo tidak ditimpa
+     * nilai lama. Riwayat `withdrawal_refund` menjaga saldo sebelum dan sesudah tetap nyambung.
+     *
+     * @param  string  $user_id  ID pemilik saldo yang menerima pengembalian.
+     * @param  string|null  $payment_user_id  Rekening tujuan penarikan untuk deskripsi riwayat.
+     * @param  int  $refundPortion  Rupiah yang dulu dipotong dari saldo refund.
+     * @param  int  $incomePortion  Rupiah yang dulu dipotong dari saldo income.
+     *
+     * @return string ID riwayat pengembalian yang baru dibuat.
+     *
+     * @throws RuntimeException Jika row saldo tidak ada; transaksi pemanggil di-rollback.
+     */
+    public function refundWithdrawalBalance(
+        string $user_id,
+        ?string $payment_user_id,
+        int $refundPortion,
+        int $incomePortion,
+    ): string {
+        // --- step 1 - kunci row saldo user - start ---
+        // Row ini pasti ada karena penarikan memotongnya; ketiadaannya berarti data rusak.
+        $saldoUser = SaldoUser::where('user_id', $user_id)
+            ->lockForUpdate()
+            ->first();
+
+        if ($saldoUser === null) {
+            throw new RuntimeException('Saldo row for a withdrawal refund was not found.');
+        }
+        // --- step 1 - kunci row saldo user - end ---
+
+        // --- step 2 - kembalikan saldo ke bucket asal - start ---
+        $saldoRefund = (int) ($saldoUser->saldo_refund ?? 0);
+        $saldoIncome = (int) ($saldoUser->saldo_income ?? 0);
+        $saldoBefore = $saldoRefund + $saldoIncome;
+        $refundTotal = $refundPortion + $incomePortion;
+
+        $saldoUser->saldo_refund = $saldoRefund + $refundPortion;
+        $saldoUser->saldo_income = $saldoIncome + $incomePortion;
+        $saldoUser->save();
+        // --- step 2 - kembalikan saldo ke bucket asal - end ---
+
+        // --- step 3 - buat riwayat pengembalian - start ---
+        $saldoHistory = SaldoHistory::create([
+            'user_id' => $user_id,
+            'transaction_user_id' => null,
+            'payment_user_id' => $payment_user_id,
+            'type' => 'withdrawal_refund',
+            'price' => $refundTotal,
+            'saldo_before' => $saldoBefore,
+            'saldo_after' => $saldoBefore + $refundTotal,
+        ]);
+        // --- step 3 - buat riwayat pengembalian - end ---
+
+        return $saldoHistory->id;
     }
 }

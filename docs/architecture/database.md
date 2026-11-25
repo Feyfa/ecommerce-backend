@@ -368,7 +368,8 @@ Important columns:
 - `user_id`: UUID reference to the user.
 - `transaction_user_id`: optional UUID reference to a seller transaction.
 - `payment_user_id`: optional UUID reference to a withdrawal account.
-- `type`: balance movement type.
+- `type`: balance movement type: `incoming`, `withdrawal`, or
+  `withdrawal_refund` for the balance returned after a failed withdrawal.
 - `price`: movement amount.
 - `saldo_before`: balance before the movement.
 - `saldo_after`: balance after the movement.
@@ -380,6 +381,51 @@ Indexes:
 - `payment_user_id` for withdrawal-related balance history.
 - `created_at` for chronological reports.
 - `user_id, created_at` for user-specific chronological balance history.
+
+### saldo_withdrawals
+
+Stores the Xendit disbursement state of each withdrawal created since TOK-88.
+The balance is deducted when the row is created and held while `status` is
+`processing`. See [Balance](../application/settings/balance.md).
+
+Important columns:
+
+- `id`: UUID primary key.
+- `user_id`: UUID reference to the user.
+- `payment_user_id`: UUID reference to the destination account.
+- `saldo_history_id`: the `withdrawal` history row that recorded the deduction.
+- `refund_saldo_history_id`: the `withdrawal_refund` row, set only after a
+  failure.
+- `external_id`: sent to Xendit as the disbursement `external_id` and the
+  `X-IDEMPOTENCY-KEY`. It is stored before the request.
+- `provider_disbursement_id`: the Xendit disbursement ID, when an answer
+  carried one.
+- `amount`, `refund_portion`, `income_portion`: whole rupiah. The two portions
+  record which balance buckets the deduction came from, so a refund restores
+  them exactly.
+- `status`: `processing`, `completed`, or `failed`.
+- `failure_code`: the Xendit error or failure code, or `NOT_FOUND` when Xendit
+  never received the request.
+- `check_attempts`, `next_check_at`, `last_checked_at`: the status check
+  schedule used by `withdrawal:check`.
+- `overdue_logged_at`: set when the 24-hour critical log was written.
+- `settled_at`: set when the status became `completed` or `failed`.
+
+The time columns are `timestamp` without time zone, like `saldo_histories`, and
+hold Asia/Jakarta time. Laravel writes them without an offset. With
+`timestamptz`, a UTC database session reads `created_at` seven hours ahead, so
+the not-found grace and the overdue alert would fire seven hours late.
+
+The table stores no account number or holder name.
+
+Indexes:
+
+- Unique `external_id` and unique `saldo_history_id`.
+- `user_id`.
+- `status, next_check_at` for the scheduler claim.
+
+Rows are never deleted by the application. Withdrawals made before TOK-88 have
+no row here, and their history rows report `withdrawal_status: null`.
 
 ## Logical Relationships
 
@@ -395,6 +441,10 @@ users
   -> payment_users
   -> saldo_users
   -> saldo_histories
+  -> saldo_withdrawals
+
+saldo_histories
+  -> saldo_withdrawals (withdrawal and refund rows)
 
 users as buyer
   -> keranjangs

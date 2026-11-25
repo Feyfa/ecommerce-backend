@@ -24,8 +24,10 @@ use App\Services\PaymentService;
 use App\Services\ProductAvailabilityService;
 use App\Services\XenditService;
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Arr;
@@ -661,17 +663,49 @@ class CheckoutTest extends TestCase
         $response = $this->processCheckoutFixture($fixture);
         // --- step 3 - Submit the checkout - end ---
 
-        // --- step 4 - Check the rejection - start ---
+        // --- step 4 - Check the rejection left the checkout untouched - start ---
         $response->assertBadRequest()->assertExactJson(['status' => 'error', 'message' => $message]);
-        // --- step 4 - Check the rejection - end ---
+        $this->assertCheckoutLeftUntouched($fixture, $stockBefore);
+        // --- step 4 - Check the rejection left the checkout untouched - end ---
+    }
 
-        // --- step 5 - Check checkout state after rejection - start ---
-        // A buyer must retain their cart if the provider response cannot create an invoice.
-        $this->assertDatabaseCount('transaction_invoices', 0);
-        $this->assertDatabaseCount('outbox_messages', 0);
-        $this->assertDatabaseHas('keranjangs', ['id' => $fixture['cart']->id, 'checkout' => true]);
-        $this->assertSame($stockBefore, $fixture['product']->refresh()->stock);
-        // --- step 5 - Check checkout state after rejection - end ---
+    /**
+     * Verifies a provider that never answers leaves the checkout untouched and hides cURL details.
+     *
+     * @return void Checks the safe response and that nothing from the checkout was saved.
+     */
+    public function test_checkout_reports_an_unanswered_payment_provider(): void
+    {
+        // --- step 1 - Prepare the buyer checkout - start ---
+        $this->withoutMiddleware();
+        $fixture = $this->createCheckoutLockFixture();
+        $stockBefore = $fixture['product']->stock;
+        $this->enableCheckoutPayment();
+        // --- step 1 - Prepare the buyer checkout - end ---
+
+        // --- step 2 - Make the fake provider time out - start ---
+        // Guzzle raises ConnectException for cURL 28 when the request timeout expires.
+        $url = 'https://api.xendit.co/callback_virtual_accounts';
+        $timeout = new ConnectException(
+            "cURL error 28: Operation timed out for {$url}",
+            new Request('POST', $url),
+        );
+        $handler = HandlerStack::create(new MockHandler([$timeout]));
+        $client = new Client(['handler' => $handler]);
+        $this->instance(XenditService::class, new XenditService('test-key', $client));
+        // --- step 2 - Make the fake provider time out - end ---
+
+        // --- step 3 - Submit the checkout - start ---
+        $response = $this->processCheckoutFixture($fixture);
+        // --- step 3 - Submit the checkout - end ---
+
+        // --- step 4 - Check the rejection left the checkout untouched - start ---
+        $response->assertBadRequest()->assertExactJson([
+            'status' => 'error',
+            'message' => XenditService::PROVIDER_UNAVAILABLE_MESSAGE,
+        ]);
+        $this->assertCheckoutLeftUntouched($fixture, $stockBefore);
+        // --- step 4 - Check the rejection left the checkout untouched - end ---
     }
 
     /**
@@ -714,7 +748,29 @@ class CheckoutTest extends TestCase
                 '{"message":["invalid"]}',
                 'Unknown error',
             ],
+            'provider server error' => [
+                HttpStatus::HTTP_SERVICE_UNAVAILABLE,
+                '{"message":"Service Unavailable"}',
+                XenditService::PROVIDER_UNAVAILABLE_MESSAGE,
+            ],
         ];
+    }
+
+    /**
+     * Checks that a rejected payment kept the cart, stock, invoices, and outbox as they were.
+     *
+     * @param  array{cart: Keranjang, product: Product}  $fixture  Checkout rows submitted to pay.
+     * @param  mixed  $stockBefore  Product stock read before checkout; the model does not cast it.
+     *
+     * @return void Fails when any part of the checkout was saved despite the rejection.
+     */
+    private function assertCheckoutLeftUntouched(array $fixture, mixed $stockBefore): void
+    {
+        // A buyer must retain their cart if the provider response cannot create an invoice.
+        $this->assertDatabaseCount('transaction_invoices', 0);
+        $this->assertDatabaseCount('outbox_messages', 0);
+        $this->assertDatabaseHas('keranjangs', ['id' => $fixture['cart']->id, 'checkout' => true]);
+        $this->assertSame($stockBefore, $fixture['product']->refresh()->stock);
     }
 
     /**
