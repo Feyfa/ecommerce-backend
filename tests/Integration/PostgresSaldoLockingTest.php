@@ -252,7 +252,7 @@ class PostgresSaldoLockingTest extends TestCase
     }
 
     /**
-     * Confirms the committed balance and the empty history survived the failed write.
+     * Confirms the committed balance, the empty history, and no held withdrawal survived.
      *
      * @return void Fails when the timed-out write left a change behind.
      */
@@ -263,5 +263,6 @@ class PostgresSaldoLockingTest extends TestCase
             'saldo_income' => self::STARTING_INCOME,
         ]);
         $this->assertDatabaseCount('saldo_histories', 0);
+        $this->assertDatabaseCount('saldo_withdrawals', 0);
     }
 }

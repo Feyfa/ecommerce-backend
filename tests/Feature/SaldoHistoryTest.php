@@ -2,9 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Enums\WithdrawalStatus;
 use App\Models\PaymentList;
 use App\Models\PaymentUser;
 use App\Models\SaldoHistory;
+use App\Models\SaldoWithdrawal;
 use App\Models\TransactionInvoice;
 use App\Models\TransactionUser;
 use App\Models\User;
@@ -191,6 +193,72 @@ class SaldoHistoryTest extends TestCase
 
         $this->assertEquals(0, $row['price']);
         // --- step 3 - periksa pemformatan nominal nol - end ---
+    }
+
+    /**
+     * Menampilkan status penarikan dan baris pengembalian saldo pada daftar dan detail.
+     *
+     * @return void Penarikan baru membawa status, sedangkan penarikan lama dan pengembalian null.
+     */
+    public function test_withdrawal_rows_carry_their_status_and_refunds_are_described(): void
+    {
+        // --- step 1 - siapkan rekening dan riwayat penarikan - start ---
+        $owner = User::factory()->create();
+        $bank = PaymentList::create(['type' => 'withdrawal', 'slug' => 'bca']);
+        $account = PaymentUser::create([
+            'user_id' => $owner->id,
+            'payment_id' => $bank->id,
+            'account' => '001234',
+            'name' => 'Pemilik Uji',
+        ]);
+        $rowFields = [
+            'user_id' => $owner->id,
+            'payment_user_id' => $account->id,
+            'price' => self::HISTORY_PRICE,
+        ];
+
+        $withdrawal = SaldoHistory::create([...$rowFields, 'type' => 'withdrawal']);
+        $refund = SaldoHistory::create([...$rowFields, 'type' => 'withdrawal_refund']);
+        $legacyWithdrawal = SaldoHistory::create([...$rowFields, 'type' => 'withdrawal']);
+        // --- step 1 - siapkan rekening dan riwayat penarikan - end ---
+
+        // --- step 2 - siapkan status penarikan yang gagal - start ---
+        // Penarikan lama sebelum TOK-88 sengaja tidak diberi row status.
+        SaldoWithdrawal::create([
+            'user_id' => $owner->id,
+            'payment_user_id' => $account->id,
+            'saldo_history_id' => $withdrawal->id,
+            'refund_saldo_history_id' => $refund->id,
+            'external_id' => 'dis-bca-riwayat-uji',
+            'amount' => self::HISTORY_PRICE,
+            'refund_portion' => 0,
+            'income_portion' => self::HISTORY_PRICE,
+            'status' => WithdrawalStatus::FAILED,
+        ]);
+        // --- step 2 - siapkan status penarikan yang gagal - end ---
+
+        // --- step 3 - baca daftar riwayat - start ---
+        $service = app(SaldoService::class);
+        $rows = $service->getSaldoHistory($owner->id, '', '')['saldoHistory']->keyBy('id');
+        // --- step 3 - baca daftar riwayat - end ---
+
+        // --- step 4 - periksa status pada setiap baris - start ---
+        $this->assertSame('failed', $rows[$withdrawal->id]['withdrawal_status']);
+        $this->assertNull($rows[$refund->id]['withdrawal_status']);
+        $this->assertNull($rows[$legacyWithdrawal->id]['withdrawal_status']);
+        $this->assertSame(
+            $rows[$withdrawal->id],
+            $service->getSaldoById($withdrawal->id)['saldoHistory'],
+        );
+        // --- step 4 - periksa status pada setiap baris - end ---
+
+        // --- step 5 - periksa baris pengembalian - start ---
+        $this->assertSame('Pengembalian Saldo', $rows[$refund->id]['title']);
+        $this->assertSame(
+            'Pengembalian Penarikan Saldo Sebesar Rp125.000 Dari Bank BCA 001234 (Pemilik Uji)',
+            $rows[$refund->id]['description'],
+        );
+        // --- step 5 - periksa baris pengembalian - end ---
     }
 
     /**

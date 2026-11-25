@@ -13,7 +13,8 @@ use RuntimeException;
 use Tests\TestCase;
 
 /**
- * Verifies the balance deduction that runs after Xendit confirms a withdrawal.
+ * Verifies the balance deduction that holds a withdrawal before Xendit is called, and the refund
+ * that returns it after a confirmed failure.
  */
 class SaldoWithdrawalDeductionTest extends TestCase
 {
@@ -69,7 +70,7 @@ class SaldoWithdrawalDeductionTest extends TestCase
     public function test_refund_is_used_before_income_and_history_records_the_totals(): void
     {
         // --- step 1 - Deduct more than the refund - start ---
-        $result = $this->saldoService->saveSaldoAfterDisbursement(
+        $result = $this->saldoService->deductWithdrawalBalance(
             $this->user->id,
             $this->paymentUserId,
             self::MIXED_WITHDRAWAL,
@@ -84,7 +85,12 @@ class SaldoWithdrawalDeductionTest extends TestCase
         $this->assertBalance(0, $remainingIncome);
         // --- step 2 - Check the remaining balance - end ---
 
-        // --- step 3 - Check the history row - start ---
+        // --- step 3 - Check the portions reported for a later refund - start ---
+        $this->assertSame(self::STARTING_REFUND, $result['refundPortion']);
+        $this->assertSame(self::MIXED_WITHDRAWAL - self::STARTING_REFUND, $result['incomePortion']);
+        // --- step 3 - Check the portions reported for a later refund - end ---
+
+        // --- step 4 - Check the history row - start ---
         $this->assertArrayHasKey('saldoHistoryId', $result);
         $this->assertDatabaseCount('saldo_histories', 1);
         $this->assertDatabaseHas('saldo_histories', [
@@ -97,7 +103,7 @@ class SaldoWithdrawalDeductionTest extends TestCase
             'saldo_before' => $startingTotal,
             'saldo_after' => $remainingIncome,
         ]);
-        // --- step 3 - Check the history row - end ---
+        // --- step 4 - Check the history row - end ---
     }
 
     /**
@@ -110,7 +116,7 @@ class SaldoWithdrawalDeductionTest extends TestCase
         // --- step 1 - Deduct less than the refund - start ---
         $refundOnlyWithdrawal = 20000;
 
-        $result = $this->saldoService->saveSaldoAfterDisbursement(
+        $result = $this->saldoService->deductWithdrawalBalance(
             $this->user->id,
             $this->paymentUserId,
             $refundOnlyWithdrawal,
@@ -124,6 +130,79 @@ class SaldoWithdrawalDeductionTest extends TestCase
         $this->assertBalance($remainingRefund, self::STARTING_INCOME);
         $this->assertDatabaseCount('saldo_histories', 1);
         // --- step 2 - Check the remaining balance - end ---
+
+        // --- step 3 - Check that no income portion was reported - start ---
+        $this->assertSame($refundOnlyWithdrawal, $result['refundPortion']);
+        $this->assertSame(0, $result['incomePortion']);
+        // --- step 3 - Check that no income portion was reported - end ---
+    }
+
+    /**
+     * Returns each held portion to its own bucket and records a refund history row.
+     *
+     * @return void The balance is back to its starting split and the history chain continues.
+     */
+    public function test_refund_returns_each_portion_to_its_bucket(): void
+    {
+        // --- step 1 - Deduct across both buckets - start ---
+        $deduction = $this->saldoService->deductWithdrawalBalance(
+            $this->user->id,
+            $this->paymentUserId,
+            self::MIXED_WITHDRAWAL,
+        );
+
+        // The refund below needs the portions of a successful deduction.
+        $this->assertSame('success', $deduction['status']);
+        // --- step 1 - Deduct across both buckets - end ---
+
+        // --- step 2 - Refund the held portions - start ---
+        $refundHistoryId = $this->saldoService->refundWithdrawalBalance(
+            $this->user->id,
+            $this->paymentUserId,
+            $deduction['refundPortion'],
+            $deduction['incomePortion'],
+        );
+        // --- step 2 - Refund the held portions - end ---
+
+        // --- step 3 - Check the restored balance - start ---
+        // Putting everything back into income would turn refund money into withdrawable income.
+        $this->assertBalance(self::STARTING_REFUND, self::STARTING_INCOME);
+        // --- step 3 - Check the restored balance - end ---
+
+        // --- step 4 - Check the refund history row - start ---
+        $startingTotal = self::STARTING_REFUND + self::STARTING_INCOME;
+        $heldTotal = $startingTotal - self::MIXED_WITHDRAWAL;
+
+        $this->assertDatabaseHas('saldo_histories', [
+            'id' => $refundHistoryId,
+            'user_id' => $this->user->id,
+            'payment_user_id' => $this->paymentUserId,
+            'type' => 'withdrawal_refund',
+            'price' => self::MIXED_WITHDRAWAL,
+            'saldo_before' => $heldTotal,
+            'saldo_after' => $startingTotal,
+        ]);
+        // --- step 4 - Check the refund history row - end ---
+    }
+
+    /**
+     * Refuses a refund for a user whose balance row is missing instead of creating one.
+     *
+     * @return void The caller's transaction must roll back on the exception.
+     */
+    public function test_refund_without_a_balance_row_throws(): void
+    {
+        // Creating a row here would hide data corruption behind a silent refund.
+        $userWithoutBalance = User::factory()->create();
+
+        $this->expectException(RuntimeException::class);
+
+        $this->saldoService->refundWithdrawalBalance(
+            $userWithoutBalance->id,
+            $this->paymentUserId,
+            self::MIXED_WITHDRAWAL,
+            0,
+        );
     }
 
     /**
@@ -135,7 +214,7 @@ class SaldoWithdrawalDeductionTest extends TestCase
     {
         // Subtracting a negative amount would raise the balance that can be withdrawn again.
         foreach ([0, -5000] as $amount) {
-            $result = $this->saldoService->saveSaldoAfterDisbursement(
+            $result = $this->saldoService->deductWithdrawalBalance(
                 $this->user->id,
                 $this->paymentUserId,
                 $amount,
@@ -157,7 +236,7 @@ class SaldoWithdrawalDeductionTest extends TestCase
     public function test_insufficient_balance_is_rejected_instead_of_clamped(): void
     {
         // The old code set the balance to zero and still recorded the full withdrawal.
-        $result = $this->saldoService->saveSaldoAfterDisbursement(
+        $result = $this->saldoService->deductWithdrawalBalance(
             $this->user->id,
             $this->paymentUserId,
             self::OVERDRAWN_WITHDRAWAL,
@@ -178,7 +257,7 @@ class SaldoWithdrawalDeductionTest extends TestCase
         $userNotFound = ['status' => 'error', 'message' => 'user not found'];
 
         foreach ([null, (string) Str::uuid()] as $userId) {
-            $result = $this->saldoService->saveSaldoAfterDisbursement(
+            $result = $this->saldoService->deductWithdrawalBalance(
                 $userId,
                 $this->paymentUserId,
                 self::MIXED_WITHDRAWAL,
@@ -192,7 +271,7 @@ class SaldoWithdrawalDeductionTest extends TestCase
         // The old code called save() on null here and failed with an Error.
         $userWithoutBalance = User::factory()->create();
 
-        $result = $this->saldoService->saveSaldoAfterDisbursement(
+        $result = $this->saldoService->deductWithdrawalBalance(
             $userWithoutBalance->id,
             $this->paymentUserId,
             self::MIXED_WITHDRAWAL,
@@ -221,7 +300,7 @@ class SaldoWithdrawalDeductionTest extends TestCase
         $exception = null;
 
         try {
-            $this->saldoService->saveSaldoAfterDisbursement(
+            $this->saldoService->deductWithdrawalBalance(
                 $this->user->id,
                 $this->paymentUserId,
                 self::MIXED_WITHDRAWAL,
@@ -253,7 +332,7 @@ class SaldoWithdrawalDeductionTest extends TestCase
         // --- step 2 - Record the deduction queries - start ---
         DB::enableQueryLog();
 
-        $this->saldoService->saveSaldoAfterDisbursement(
+        $this->saldoService->deductWithdrawalBalance(
             $this->user->id,
             $this->paymentUserId,
             self::MIXED_WITHDRAWAL,

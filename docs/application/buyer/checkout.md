@@ -386,6 +386,17 @@ For BCA Virtual Account, the controller creates a closed, single-use Xendit virt
 
 Xendit errors return HTTP 400 with the message from the
 [Xendit adapter](../integrations/xendit.md#adapter-result-contract).
+The virtual account request has a connect and a total time limit (5 and 20
+seconds by default, see
+[Request Timeouts](../integrations/xendit.md#request-timeouts)). The request
+runs inside the checkout transaction while the cart, product, and address rows
+are locked, so the limit also bounds how long other checkouts of the same
+products wait. A timeout, failed connection, or 5xx response returns HTTP 400
+with `Layanan Pembayaran Sedang Bermasalah, Silakan Coba Lagi`, and the
+transaction rolls back like any other payment error. If Xendit created the
+virtual account before the answer was lost, no invoice refers to it. The buyer
+never sees that number, and it expires one day later; retrying checkout creates
+a new virtual account.
 Checkout requires `account_number` and `external_id` as non-blank strings.
 A scalar response or a nonempty payload with an invalid payment field returns
 HTTP 400 with `Payment creation failed` before creating the invoice, removing

@@ -11,6 +11,7 @@ Buyer and seller authenticated users.
 - `routes/api.php`
 - `app/Http/Controllers/SaldoController.php`
 - `app/Services/SaldoService.php`
+- `app/Services/WithdrawalService.php`
 - `app/Services/PaymentService.php`
 - `app/Services/TransactionService.php`
 - `app/Services/XenditService.php`
@@ -72,10 +73,22 @@ Description rules:
 - Withdrawal balance rows include the formatted withdrawal amount, payment slug, account number, and account holder name.
 - If a withdrawal has no recorded amount, its description uses `—`
   and the response keeps `price: null`.
+- A `withdrawal_refund` row returns the balance of a failed withdrawal. Its
+  title is `Pengembalian Saldo` and its description is
+  `Pengembalian Penarikan Saldo Sebesar {amount} Dari Bank {slug} {account} ({name})`.
 - An unrecognized or null type uses the title `Mutasi Saldo` and the description
   `Jenis mutasi saldo tidak dikenali.` The response keeps the stored type and price.
 - The `price` field preserves the database driver's representation as a JSON
   number, a numeric string such as `"450000"`, or `null` if no amount is recorded.
+
+Every row also carries `withdrawal_status`:
+
+| Value | Meaning |
+| --- | --- |
+| `processing` | The balance is held while Xendit has not confirmed the transfer. |
+| `completed` | Xendit reported the transfer as `COMPLETED`. |
+| `failed` | The withdrawal failed and a `withdrawal_refund` row returned the balance. |
+| `null` | Not a withdrawal, or a withdrawal made before TOK-88, which has no tracked status. |
 
 Success response:
 
@@ -126,28 +139,58 @@ string `message`:
     amount. The balance is read under the row lock described below. A user
     without a balance row has a total of Rp0.
 
-Every rejection happens before the Xendit request and before any balance or
-history change. The parsed integer is the only amount used for the response
+Every rejection above happens before the Xendit request and before any balance
+or history change. The parsed integer is the only amount used for the response
 messages, the Xendit request, and the balance deduction.
 
-Side effects:
+Withdrawal flow since TOK-88:
 
-- Calls Xendit disbursement using the saved payment account.
-- Deducts balance after successful disbursement, refund first and then income.
-- Creates a withdrawal balance history row.
-- Returns the new balance history item.
+1. **Hold.** One short transaction locks the balance row, checks the balance,
+   deducts the amount (refund first, then income), writes a `withdrawal`
+   history row, and creates a `saldo_withdrawals` row with status `processing`.
+   The row stores a new `external_id` (`dis-{slug}-{ulid}`) before anything is
+   sent. See [saldo_withdrawals](../../architecture/database.md#saldo_withdrawals).
+2. **Send.** After the transaction commits, the controller calls Xendit with
+   that `external_id` as the body field and the `X-IDEMPOTENCY-KEY`. No
+   database lock is held during the request.
+3. **Apply the answer.** The answer is classified by the
+   [Xendit adapter](../integrations/xendit.md#disbursement-results):
 
-An Xendit rejection returns HTTP 400 with the message from the
-[Xendit adapter](../integrations/xendit.md#adapter-result-contract) before the
-controller attempts to change the balance or write a history row.
+| Xendit answer | Withdrawal | Balance | Response |
+| --- | --- | --- | --- |
+| `success`, status `PENDING` | `processing`; the Xendit ID is stored | held | HTTP 200 |
+| `success`, status `COMPLETED` | `completed` | deducted | HTTP 200 |
+| `success`, status `FAILED` | `failed` | returned | HTTP 400 `Penarikan Gagal, Saldo Sudah Dikembalikan` |
+| `error` (4xx) | `failed`; the error code is stored | returned | HTTP 400 with the Xendit message |
+| `unknown` (timeout, 5xx, reused key, 408, 409) | `processing` | held | HTTP 200 |
+
+A returned balance goes back to the same refund and income buckets it came
+from, through a `withdrawal_refund` history row. A rejected request therefore
+leaves two history rows: the failed withdrawal and its refund.
+
+If saving the answer fails with a database error, the endpoint logs an `error`
+with the withdrawal ID and external ID and still returns HTTP 200 with
+`processing`. The balance is already held, and `withdrawal:check` reads the
+real status later. A Xendit answer can therefore no longer leave money sent
+without a deduction.
+
+The success response contains the withdrawal history row, including
+`withdrawal_status`. Xendit normally answers `PENDING`, so a new withdrawal
+usually shows `processing` until `withdrawal:check` sees `COMPLETED`.
 
 Concurrency:
 
-- After the account lookup, the balance check, the Xendit request, and the
-  balance deduction run inside one database transaction. The transaction locks
-  the user's `saldo_users` row with `FOR UPDATE`.
-- A second withdrawal for the same user waits until the first transaction
-  ends, then reads the reduced balance.
+- The hold transaction locks the user's `saldo_users` row with `FOR UPDATE`
+  only while it checks and deducts the balance.
+- A second withdrawal for the same user waits until the first hold commits,
+  then reads the reduced balance.
+- The Xendit request runs after the hold commits. Before TOK-88 the lock was
+  held during the request, which had no timeout.
+- Applying an answer locks the `saldo_withdrawals` row and changes it only
+  while it is still `processing`. The endpoint and `withdrawal:check` can
+  therefore never return the same balance twice. A refund then locks the
+  `saldo_users` row. The hold only inserts a new withdrawal row, so this order
+  cannot deadlock with a hold or an income credit.
 - A seller income credit from transaction approval
   (`TransactionService::transferSaldo()`) locks the same row. It waits for a
   running withdrawal instead of overwriting the deduction with a stale
@@ -163,23 +206,10 @@ Concurrency:
   credits also queue on the row lock. Before this, the losing approval of two
   concurrent first credits failed on the unique `user_id` and returned HTTP
   `500`. Withdrawals never create the row.
-- The lock is held during the Xendit HTTP request. The Xendit client has no
-  timeout, so a hanging request also delays other balance writes for that
-  user.
 - SQLite ignores the lock clause. The opt-in
   `tests/Integration/PostgresSaldoLockingTest.php` verifies the wait on
   PostgreSQL, and `tests/Integration/PostgresSaldoFirstCreditLockingTest.php`
   verifies that a first credit waits for a concurrent first row.
-
-Failure after disbursement: when the balance deduction fails after Xendit
-accepted the disbursement, the transaction rolls back and the balance and
-history stay unchanged, although the provider may still send the money. The
-endpoint logs a critical event with the user ID, the amount, and the Xendit
-external ID, without the account number or holder name. A rejected deduction
-returns HTTP 500 with
-`Penarikan Sudah Diproses Tetapi Saldo Gagal Diperbarui, Jangan Ulangi Penarikan`.
-A database error returns the framework's HTTP 500 response. Reconciliation
-with Xendit is manual.
 
 The returned history item uses the same description and amount representation
 as the history list.
@@ -192,3 +222,51 @@ Success response:
   "saldoHistory": {}
 }
 ```
+
+## Withdrawal Status Checks
+
+`php artisan withdrawal:check` reads the Xendit status of `processing`
+withdrawals. The `backend-scheduler` container runs it every minute with
+`withoutOverlapping(10)`, so a slow run never overlaps the next one. Settings
+live in `config/withdrawal.php`.
+
+Each run:
+
+1. Claims at most `check_batch_size` (20) due withdrawals in a short
+   transaction. PostgreSQL uses `FOR UPDATE SKIP LOCKED`, so a manual run next
+   to the scheduler claims different rows.
+2. Schedules the next check before calling Xendit. The delays after each check
+   are 1, 2, 5, 15, and then 60 minutes (`check_backoff_minutes`). A crashed run
+   therefore waits for the next delay instead of retrying every minute.
+3. Calls `GET /disbursements?external_id=` without holding a database lock and
+   applies the answer:
+
+| Lookup result | Action |
+| --- | --- |
+| `COMPLETED` | `completed` |
+| `FAILED` | `failed`, balance returned, Xendit `failure_code` stored |
+| `PENDING` or another status | stays `processing` (an unknown status also logs `warning`) |
+| Not found, withdrawal older than 10 minutes | `failed` with `NOT_FOUND`, balance returned |
+| Not found, withdrawal 10 minutes old or less | stays `processing` |
+| No usable answer (timeout, 5xx, other 4xx) | stays `processing` |
+| Several disbursements for one external ID | stays `processing`, logs `critical` |
+
+The 10-minute grace (`not_found_grace_minutes`) covers a request Xendit had not
+finished storing. After it, a missing disbursement means Xendit never received
+the request, for example when the connection failed or the process stopped
+after the hold. If Xendit did receive a request but still answers not-found
+after 10 minutes, the balance is returned while the money may be sent. This
+risk was accepted for TOK-88.
+
+Time alone never returns a balance. A withdrawal still `processing` after
+`overdue_hours` (24) writes one `critical` log with the withdrawal ID, user ID,
+amount, external ID, and check count. The balance stays held until Xendit
+confirms a result. Logs never contain the account number or holder name.
+
+`php artisan withdrawal:status` is the read-only command for that manual check.
+It shows the count per status, the oldest `processing` withdrawal, and a table
+of withdrawals processing longer than 24 hours with their IDs, amount, external
+ID, creation time, check count, and last check. It does not call Xendit.
+
+Both commands skip with a warning when the `saldo_withdrawals` table does not
+exist yet, for example while a deploy has not run its migration.

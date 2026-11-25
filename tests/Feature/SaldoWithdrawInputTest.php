@@ -2,31 +2,33 @@
 
 namespace Tests\Feature;
 
+use App\Enums\WithdrawalStatus;
 use App\Http\Middleware\AuthenticateApiRequest;
 use App\Models\PaymentList;
 use App\Models\PaymentUser;
-use App\Models\SaldoHistory;
 use App\Models\SaldoUser;
+use App\Models\SaldoWithdrawal;
 use App\Models\User;
-use App\Services\SaldoService;
 use App\Services\XenditService;
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
+use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Mockery\MockInterface;
 use Psr\Http\Message\RequestInterface;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Response as HttpStatus;
 use Tests\TestCase;
+use Throwable;
 
 /**
- * Verifies withdrawal input parsing, the locked balance check before Xendit disbursement, and
- * the balance write after it.
+ * Verifies withdrawal input parsing, the locked balance hold before the Xendit disbursement, and
+ * how each Xendit answer leaves the withdrawal and the balance.
  */
 class SaldoWithdrawInputTest extends TestCase
 {
@@ -54,9 +56,6 @@ class SaldoWithdrawInputTest extends TestCase
     private const MINIMUM_MESSAGE = 'Nominal Minimal Rp1';
 
     private const MAXIMUM_MESSAGE = 'Nominal Tidak Boleh Lebih Dari Rp1.000.000';
-
-    private const UNSAVED_WITHDRAWAL_MESSAGE = 'Penarikan Sudah Diproses Tetapi Saldo Gagal '
-        .'Diperbarui, Jangan Ulangi Penarikan';
 
     private const WITHDRAWAL_AMOUNT = 100000;
 
@@ -335,62 +334,211 @@ class SaldoWithdrawInputTest extends TestCase
     }
 
     /**
-     * Returns 500 and logs a critical event when the deduction is rejected after Xendit accepted.
+     * Holds an accepted withdrawal as processing and sends its stored external ID as the key.
      *
-     * @return void The balance stays unchanged and the log carries the provider external ID.
+     * @return void Xendit's PENDING answer keeps the balance deducted until a final status.
      */
-    public function test_rejected_deduction_after_disbursement_returns_500_and_is_logged(): void
+    public function test_accepted_withdrawal_is_held_as_processing(): void
     {
-        // --- step 1 - Reject the deduction after the real balance check - start ---
-        // The partial mock keeps lockSaldoTotal() real, so the request reaches Xendit.
-        $this->partialMock(SaldoService::class, function (MockInterface $mock): void {
-            $mock->shouldReceive('saveSaldoAfterDisbursement')
-                ->once()
-                ->andReturn(['status' => 'error', 'message' => 'saldo is not enough']);
-        });
-        Log::spy();
+        // --- step 1 - Request the withdrawal - start ---
         $this->actingAs($this->user);
-        // --- step 1 - Reject the deduction after the real balance check - end ---
-
-        // --- step 2 - Request the withdrawal - start ---
-        $expectedResponse = ['status' => 'error', 'message' => self::UNSAVED_WITHDRAWAL_MESSAGE];
 
         $this->postJson(self::WITHDRAW_ENDPOINT, $this->amountPayload(self::WITHDRAWAL_AMOUNT))
-            ->assertStatus(HttpStatus::HTTP_INTERNAL_SERVER_ERROR)
-            ->assertExactJson($expectedResponse);
-        // --- step 2 - Request the withdrawal - end ---
+            ->assertOk()
+            ->assertJsonPath('saldoHistory.type', 'withdrawal')
+            ->assertJsonPath('saldoHistory.withdrawal_status', 'processing');
+        // --- step 1 - Request the withdrawal - end ---
 
-        // --- step 3 - Check the unsaved disbursement - start ---
-        $this->assertBalanceUnchangedAfterDisbursement();
-        $this->assertCriticalWithdrawalLog();
-        // --- step 3 - Check the unsaved disbursement - end ---
+        // --- step 2 - Check the stored withdrawal - start ---
+        $withdrawal = SaldoWithdrawal::sole();
+
+        $this->assertSame(WithdrawalStatus::PROCESSING, $withdrawal->status);
+        $this->assertSame('disb-test', $withdrawal->provider_disbursement_id);
+        $this->assertSame(self::WITHDRAWAL_AMOUNT, $withdrawal->amount);
+        $this->assertSame(0, $withdrawal->refund_portion);
+        $this->assertSame(self::WITHDRAWAL_AMOUNT, $withdrawal->income_portion);
+        // --- step 2 - Check the stored withdrawal - end ---
+
+        // --- step 3 - Check the external ID sent to Xendit - start ---
+        // The same stored value is the body field and the idempotency key, so a lost answer can
+        // be looked up and a repeated send cannot pay twice.
+        $request = $this->providerRequests[0]['request'];
+
+        // A lowercase ULID after the bank slug, unique across environments like Xendit requires.
+        $externalIdPattern = '/\Adis-bca-[0-9a-z]{26}\z/';
+
+        $this->assertMatchesRegularExpression($externalIdPattern, $withdrawal->external_id);
+        $this->assertSame($withdrawal->external_id, $this->providerPayload(0)['external_id']);
+        $this->assertSame($withdrawal->external_id, $request->getHeaderLine('X-IDEMPOTENCY-KEY'));
+        // --- step 3 - Check the external ID sent to Xendit - end ---
+
+        // --- step 4 - Check the held balance - start ---
+        $this->assertDatabaseHas('saldo_users', [
+            'user_id' => $this->user->id,
+            'saldo_income' => self::STARTING_INCOME - self::WITHDRAWAL_AMOUNT,
+        ]);
+        // --- step 4 - Check the held balance - end ---
     }
 
     /**
-     * Logs a critical event and rolls back the balance when the history write fails after Xendit.
+     * Sends the disbursement only after the balance transaction has committed.
      *
-     * @return void The exception still ends as HTTP 500 through the framework handler.
+     * @return void Xendit sees the same transaction depth as the test itself.
      */
-    public function test_failed_deduction_after_disbursement_is_logged_and_rolled_back(): void
+    public function test_xendit_is_called_after_the_balance_transaction_ends(): void
     {
-        // --- step 1 - Make the history write fail - start ---
-        // The listener runs after the balance row was saved inside the same transaction.
-        SaldoHistory::creating(function (): never {
-            throw new RuntimeException('History write failed.');
-        });
-        Log::spy();
+        // --- step 1 - Record the transaction depth at send time - start ---
+        // RefreshDatabase wraps the test in one transaction; a deeper level would mean the
+        // balance row lock is still held while Xendit answers.
+        $testDepth = DB::transactionLevel();
+        $sendDepths = [];
+
+        $this->useProviderAnswers(
+            [$this->acceptedResponse()],
+            function () use (&$sendDepths): void {
+                $sendDepths[] = DB::transactionLevel();
+            },
+        );
         $this->actingAs($this->user);
-        // --- step 1 - Make the history write fail - end ---
+        // --- step 1 - Record the transaction depth at send time - end ---
 
         // --- step 2 - Request the withdrawal - start ---
         $this->postJson(self::WITHDRAW_ENDPOINT, $this->amountPayload(self::WITHDRAWAL_AMOUNT))
-            ->assertStatus(HttpStatus::HTTP_INTERNAL_SERVER_ERROR);
+            ->assertOk();
         // --- step 2 - Request the withdrawal - end ---
 
-        // --- step 3 - Check the rolled-back disbursement - start ---
-        $this->assertBalanceUnchangedAfterDisbursement();
-        $this->assertCriticalWithdrawalLog();
-        // --- step 3 - Check the rolled-back disbursement - end ---
+        // --- step 3 - Check the send happened outside the balance transaction - start ---
+        $this->assertSame([$testDepth], $sendDepths);
+        // --- step 3 - Check the send happened outside the balance transaction - end ---
+    }
+
+    /**
+     * Keeps the balance held when Xendit's answer is lost.
+     *
+     * @return void The user sees a processing withdrawal instead of a rejection.
+     */
+    public function test_unanswered_withdrawal_keeps_the_balance_held(): void
+    {
+        // --- step 1 - Make the provider time out - start ---
+        // Before TOK-88 this became a 400 without a deduction while the money might be sent.
+        $timeout = new ConnectException(
+            'cURL error 28: Operation timed out',
+            new Request('POST', 'https://api.xendit.co/disbursements'),
+            null,
+            ['errno' => 28, 'error' => 'Operation timed out'],
+        );
+
+        $this->useProviderAnswers([$timeout]);
+        $this->actingAs($this->user);
+        // --- step 1 - Make the provider time out - end ---
+
+        // --- step 2 - Request the withdrawal - start ---
+        $this->postJson(self::WITHDRAW_ENDPOINT, $this->amountPayload(self::WITHDRAWAL_AMOUNT))
+            ->assertOk()
+            ->assertJsonPath('saldoHistory.withdrawal_status', 'processing');
+        // --- step 2 - Request the withdrawal - end ---
+
+        // --- step 3 - Check the held withdrawal - start ---
+        $withdrawal = SaldoWithdrawal::sole();
+
+        $this->assertSame(WithdrawalStatus::PROCESSING, $withdrawal->status);
+        $this->assertNull($withdrawal->provider_disbursement_id);
+        $this->assertDatabaseCount('saldo_histories', 1);
+        $this->assertDatabaseHas('saldo_users', [
+            'user_id' => $this->user->id,
+            'saldo_income' => self::STARTING_INCOME - self::WITHDRAWAL_AMOUNT,
+        ]);
+        // --- step 3 - Check the held withdrawal - end ---
+    }
+
+    /**
+     * Returns the balance and Xendit's message when Xendit rejects the disbursement.
+     *
+     * @return void History keeps the failed withdrawal and adds a refund row.
+     */
+    public function test_rejected_withdrawal_returns_the_balance(): void
+    {
+        // --- step 1 - Make the provider reject the request - start ---
+        $rejection = new Response(
+            HttpStatus::HTTP_BAD_REQUEST,
+            [],
+            '{"error_code":"API_VALIDATION_ERROR","message":"Invalid account"}',
+        );
+
+        $this->useProviderAnswers([$rejection]);
+        $this->actingAs($this->user);
+        // --- step 1 - Make the provider reject the request - end ---
+
+        // --- step 2 - Request the withdrawal - start ---
+        $this->postJson(self::WITHDRAW_ENDPOINT, $this->amountPayload(self::WITHDRAWAL_AMOUNT))
+            ->assertBadRequest()
+            ->assertExactJson(['status' => 'error', 'message' => 'Invalid account']);
+        // --- step 2 - Request the withdrawal - end ---
+
+        // --- step 3 - Check the failed withdrawal - start ---
+        $withdrawal = SaldoWithdrawal::sole();
+
+        $this->assertSame(WithdrawalStatus::FAILED, $withdrawal->status);
+        $this->assertSame('API_VALIDATION_ERROR', $withdrawal->failure_code);
+        $this->assertNotNull($withdrawal->settled_at);
+        // --- step 3 - Check the failed withdrawal - end ---
+
+        // --- step 4 - Check the returned balance - start ---
+        $this->assertDatabaseHas('saldo_users', [
+            'user_id' => $this->user->id,
+            'saldo_income' => self::STARTING_INCOME,
+        ]);
+        $this->assertDatabaseHas('saldo_histories', [
+            'id' => $withdrawal->refund_saldo_history_id,
+            'type' => 'withdrawal_refund',
+            'price' => self::WITHDRAWAL_AMOUNT,
+        ]);
+        $this->assertDatabaseCount('saldo_histories', 2);
+        // --- step 4 - Check the returned balance - end ---
+    }
+
+    /**
+     * Keeps the withdrawal processing when its outcome cannot be saved after Xendit answered.
+     *
+     * @return void The user gets a processing answer and the error log names the withdrawal.
+     */
+    public function test_unsaved_outcome_keeps_the_withdrawal_processing(): void
+    {
+        // --- step 1 - Make the outcome write fail - start ---
+        // The hold is committed before this write, so the balance stays safely held.
+        SaldoWithdrawal::updating(function (): never {
+            throw new RuntimeException('Outcome write failed.');
+        });
+        Log::spy();
+        $this->actingAs($this->user);
+        // --- step 1 - Make the outcome write fail - end ---
+
+        // --- step 2 - Request the withdrawal - start ---
+        $this->postJson(self::WITHDRAW_ENDPOINT, $this->amountPayload(self::WITHDRAWAL_AMOUNT))
+            ->assertOk()
+            ->assertJsonPath('saldoHistory.withdrawal_status', 'processing');
+        // --- step 2 - Request the withdrawal - end ---
+
+        // --- step 3 - Check the held withdrawal - start ---
+        $withdrawal = SaldoWithdrawal::sole();
+
+        $this->assertSame(WithdrawalStatus::PROCESSING, $withdrawal->status);
+        $this->assertDatabaseHas('saldo_users', [
+            'user_id' => $this->user->id,
+            'saldo_income' => self::STARTING_INCOME - self::WITHDRAWAL_AMOUNT,
+        ]);
+        // --- step 3 - Check the held withdrawal - end ---
+
+        // --- step 4 - Check the error log - start ---
+        Log::shouldHaveReceived('error')
+            ->once()
+            ->withArgs(function (string $message, array $context) use ($withdrawal): bool {
+                $namesWithdrawal = $context['withdrawal_id'] === $withdrawal->id
+                    && $context['external_id'] === $withdrawal->external_id;
+
+                return $namesWithdrawal && ! in_array(self::ACCOUNT_NUMBER, $context, true);
+            });
+        // --- step 4 - Check the error log - end ---
     }
 
     /**
@@ -471,44 +619,7 @@ class SaldoWithdrawInputTest extends TestCase
             'saldo_income' => $expectedIncome,
         ]);
         $this->assertDatabaseCount('saldo_histories', 0);
-    }
-
-    /**
-     * Confirms Xendit accepted one disbursement while the balance and history stayed unchanged.
-     *
-     * @return void Fails when the failed deduction left a balance change or a history row.
-     */
-    private function assertBalanceUnchangedAfterDisbursement(): void
-    {
-        $this->assertCount(1, $this->providerRequests);
-        $this->assertDatabaseHas('saldo_users', [
-            'user_id' => $this->user->id,
-            'saldo_income' => self::STARTING_INCOME,
-        ]);
-        $this->assertDatabaseCount('saldo_histories', 0);
-    }
-
-    /**
-     * Confirms one critical log identifies the unsaved disbursement without bank details.
-     *
-     * @return void Fails when the log is missing, repeated, or carries the account number.
-     */
-    private function assertCriticalWithdrawalLog(): void
-    {
-        // The external ID is the only link to the Xendit record during manual reconciliation.
-        $externalId = $this->providerPayload(0)['external_id'];
-
-        Log::shouldHaveReceived('critical')
-            ->once()
-            ->withArgs(function (string $message, array $context) use ($externalId): bool {
-                $identifiesDisbursement = str_starts_with($message, 'Withdrawal was disbursed')
-                    && $context['user_id'] === $this->user->id
-                    && $context['amount'] === self::WITHDRAWAL_AMOUNT
-                    && $context['external_id'] === $externalId;
-
-                return $identifiesDisbursement
-                    && ! in_array(self::ACCOUNT_NUMBER, $context, true);
-            });
+        $this->assertDatabaseCount('saldo_withdrawals', 0);
     }
 
     /**
@@ -562,27 +673,51 @@ class SaldoWithdrawInputTest extends TestCase
      */
     private function useProviderResponses(int $responseCount): void
     {
-        // --- step 1 - Queue accepted disbursement responses - start ---
+        // Xendit answers a new disbursement with PENDING, as seen in the TOK-88 Sandbox probe.
         $responses = [];
 
         for ($index = 0; $index < $responseCount; $index++) {
-            $responses[] = new Response(
-                HttpStatus::HTTP_OK,
-                [],
-                '{"id":"disb-test","status":"PENDING"}',
-            );
+            $responses[] = $this->acceptedResponse();
         }
-        // --- step 1 - Queue accepted disbursement responses - end ---
 
-        // --- step 2 - Record each request sent to the provider - start ---
+        $this->useProviderAnswers($responses);
+    }
+
+    /**
+     * Replaces the Xendit client with queued answers and records each request it sends.
+     *
+     * @param  list<Response|Throwable>  $answers  Responses or failures in request order.
+     * @param  (callable(): void)|null  $beforeSend  Runs just before each request is sent.
+     *
+     * @return void The container resolves the controller's XenditService to this client.
+     */
+    private function useProviderAnswers(array $answers, ?callable $beforeSend = null): void
+    {
+        // --- step 1 - Build the mock transport - start ---
         $this->providerRequests = [];
 
-        $handler = HandlerStack::create(new MockHandler($responses));
+        $handler = HandlerStack::create(new MockHandler($answers));
         $handler->push(Middleware::history($this->providerRequests));
 
+        if ($beforeSend !== null) {
+            $handler->push(Middleware::tap($beforeSend));
+        }
+        // --- step 1 - Build the mock transport - end ---
+
+        // --- step 2 - Bind the adapter to the mock transport - start ---
         $client = new Client(['handler' => $handler]);
         $this->instance(XenditService::class, new XenditService('test-key', $client));
-        // --- step 2 - Record each request sent to the provider - end ---
+        // --- step 2 - Bind the adapter to the mock transport - end ---
+    }
+
+    /**
+     * Builds the answer Xendit gives to a new disbursement.
+     *
+     * @return Response HTTP 200 with a PENDING disbursement.
+     */
+    private function acceptedResponse(): Response
+    {
+        return new Response(HttpStatus::HTTP_OK, [], '{"id":"disb-test","status":"PENDING"}');
     }
 
     /**
