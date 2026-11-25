@@ -89,6 +89,13 @@ the duplicate error when an idempotency key was used before; it does not replay
 the first answer. A reused key therefore means the first request was accepted,
 so it must not return the balance.
 
+`unknown` also covers `408 Request Timeout` and `409 Conflict`, whatever their
+error code. In HTTP, 408 means the server stopped waiting for the request and
+409 means it clashed with existing data, so neither proves a rejection. Xendit
+has not been seen sending either for a disbursement. `withdrawal:check` then
+reads the real status, and a not-found answer still returns the balance after
+the grace period.
+
 `XenditService::findDisbursementByExternalId()` calls
 `GET /disbursements?external_id=` and returns:
 

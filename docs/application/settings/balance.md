@@ -162,7 +162,7 @@ Withdrawal flow since TOK-88:
 | `success`, status `COMPLETED` | `completed` | deducted | HTTP 200 |
 | `success`, status `FAILED` | `failed` | returned | HTTP 400 `Penarikan Gagal, Saldo Sudah Dikembalikan` |
 | `error` (4xx) | `failed`; the error code is stored | returned | HTTP 400 with the Xendit message |
-| `unknown` (timeout, 5xx, reused key) | `processing` | held | HTTP 200 |
+| `unknown` (timeout, 5xx, reused key, 408, 409) | `processing` | held | HTTP 200 |
 
 A returned balance goes back to the same refund and income buckets it came
 from, through a `withdrawal_refund` history row. A rejected request therefore

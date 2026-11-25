@@ -79,6 +79,16 @@ class XenditService
     // diterima, jadi hasilnya tidak boleh dianggap penolakan yang mengembalikan saldo.
     private const DUPLICATE_IDEMPOTENCY_ERROR_CODE = 'DUPLICATE_TRANSACTION_ERROR';
 
+    // Status 4xx yang menurut HTTP tidak membuktikan request ditolak: 408 berarti server berhenti
+    // menunggu request, dan 409 berarti request bentrok dengan data yang sudah ada. Xendit belum
+    // terlihat mengirimnya untuk disbursement. Menganggapnya penolakan akan mengembalikan saldo
+    // padahal dana mungkin terkirim; sebagai hasil tidak pasti, `withdrawal:check` membaca
+    // statusnya, dan not-found tetap mengembalikan saldo setelah masa tunggu.
+    private const UNPROVEN_REJECTION_STATUSES = [
+        HttpStatus::HTTP_REQUEST_TIMEOUT,
+        HttpStatus::HTTP_CONFLICT,
+    ];
+
     // Diverifikasi di Xendit Sandbox (TOK-88): external ID yang tidak dikenal menghasilkan HTTP 404
     // dengan kode ini. 404 tanpa kode ini tidak dianggap bukti bahwa disbursement tidak ada.
     private const DISBURSEMENT_NOT_FOUND_ERROR_CODE = 'DIRECT_DISBURSEMENT_NOT_FOUND_ERROR';
@@ -309,8 +319,8 @@ class XenditService
      * mengeksekusi dua pencairan untuk penarikan yang sama. Hasil `success` berarti Xendit
      * menerima permintaan; status awalnya biasanya `PENDING` dan hasil akhirnya dibaca kemudian.
      * Hasil `error` hanya untuk penolakan 4xx yang jelas, sehingga caller boleh mengembalikan
-     * saldo. Timeout, koneksi gagal, 5xx, key duplikat, dan kegagalan lain menjadi `unknown`
-     * karena dana mungkin sudah dikirim. Method ini tidak mengubah saldo lokal.
+     * saldo. Timeout, koneksi gagal, 5xx, key duplikat, 408, 409, dan kegagalan lain menjadi
+     * `unknown` karena dana mungkin sudah dikirim. Method ini tidak mengubah saldo lokal.
      *
      * @param  string  $external_id  ID penarikan lokal, sekaligus idempotency key di Xendit.
      * @param  int  $amount  Nominal transaksi yang dikirim ke provider.
@@ -420,25 +430,36 @@ class XenditService
     /**
      * Mengelompokkan respons 4xx pembuatan pencairan menjadi penolakan atau hasil tidak pasti.
      *
+     * Key duplikat serta status 408 dan 409 menjadi unknown, karena ketiganya tidak membuktikan
+     * Xendit menolak request. 4xx lain, termasuk 429, adalah penolakan yang mengembalikan saldo.
+     *
      * @param  ClientException  $exception  Respons 4xx dari Xendit.
      *
-     * @return DisbursementRejected|DisbursementUnknown Penolakan, atau unknown untuk key duplikat.
+     * @return DisbursementRejected|DisbursementUnknown Penolakan, atau unknown bila belum pasti.
      */
     private function classifyDisbursementRejection(ClientException $exception): array
     {
-        // --- step 1 - baca pesan dan kode error - start ---
-        $body = $exception->getResponse()->getBody()->getContents();
+        // --- step 1 - baca respons penolakan - start ---
+        $response = $exception->getResponse();
+        $body = $response->getBody()->getContents();
         $errorCode = $this->extractErrorCode($body);
-        // --- step 1 - baca pesan dan kode error - end ---
+        // --- step 1 - baca respons penolakan - end ---
 
-        // --- step 2 - perlakukan key duplikat sebagai hasil tidak pasti - start ---
+        // --- step 2 - tandai 4xx yang belum pasti sebagai unknown - start ---
         // Key duplikat berarti pencairan dengan external ID ini sudah pernah diterima.
-        if ($errorCode === self::DUPLICATE_IDEMPOTENCY_ERROR_CODE) {
+        $isDuplicateKey = $errorCode === self::DUPLICATE_IDEMPOTENCY_ERROR_CODE;
+        $isUnprovenStatus = in_array(
+            $response->getStatusCode(),
+            self::UNPROVEN_REJECTION_STATUSES,
+            true,
+        );
+
+        if ($isDuplicateKey || $isUnprovenStatus) {
             $this->logUnusableAnswer('create_disbursement', $exception);
 
             return ['status' => 'unknown'];
         }
-        // --- step 2 - perlakukan key duplikat sebagai hasil tidak pasti - end ---
+        // --- step 2 - tandai 4xx yang belum pasti sebagai unknown - end ---
 
         return [
             'status' => 'error',

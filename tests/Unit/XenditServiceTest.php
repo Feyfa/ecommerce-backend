@@ -316,7 +316,8 @@ class XenditServiceTest extends TestCase
     }
 
     /**
-     * Covers the lost answers of the virtual account test plus a reused idempotency key.
+     * Covers the lost answers of the virtual account test, a reused idempotency key, and the
+     * 4xx statuses that do not prove a rejection.
      *
      * @return array<string, array{Response|Throwable, int|null, int|null}> Failure and log fields.
      */
@@ -325,9 +326,23 @@ class XenditServiceTest extends TestCase
         // Xendit answers a reused key with 400, so only the error code tells it from a rejection.
         $duplicateKey = new Response(HttpStatus::HTTP_BAD_REQUEST, [], self::DUPLICATE_KEY_BODY);
 
+        // The bodies carry an ordinary error code, so only the status keeps the balance held.
+        $requestTimeout = new Response(
+            HttpStatus::HTTP_REQUEST_TIMEOUT,
+            [],
+            '{"error_code":"REQUEST_TIMEOUT","message":"Request timed out"}',
+        );
+        $conflict = new Response(
+            HttpStatus::HTTP_CONFLICT,
+            [],
+            '{"error_code":"CONFLICT","message":"Conflict"}',
+        );
+
         return [
             ...self::unansweredFailures(),
             'duplicate idempotency key' => [$duplicateKey, HttpStatus::HTTP_BAD_REQUEST, null],
+            '408 request timeout' => [$requestTimeout, HttpStatus::HTTP_REQUEST_TIMEOUT, null],
+            '409 conflict' => [$conflict, HttpStatus::HTTP_CONFLICT, null],
         ];
     }
 
