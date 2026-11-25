@@ -183,9 +183,31 @@ and reads the Xendit status of due withdrawals with per-withdrawal delays.
   single-stage helpers, and restructured the first
   `PaymentReturnCallerCompatibilityTest` test into steps. The SQLite suite
   passed before and after the pass.
-- **TOK-88-BE-29 — Check the full Unit and Feature suites.** Passed. SQLite in
-  memory reported 420 passed and six skips with 5,432 assertions. PostgreSQL
-  16.13 reported 426 tests and 5,450 assertions.
+- **TOK-88-BE-29 — Check the full Unit and Feature suites.** Passed. After the
+  BE-30 and BE-31 fixes, SQLite in memory reported 422 passed and seven skips
+  with 5,442 assertions. PostgreSQL 16.13 reported 429 tests and 5,466
+  assertions, both in the default Asia/Jakarta session and with `PGTZ=UTC`. The
+  opt-in `PostgresWithdrawalClaimTest` and `PostgresSaldoLockingTest` also
+  passed with `PGTZ=UTC`. PHPStan returned `[OK] No errors` and
+  `vendor/bin/pint --test` passed for 204 files.
+- **TOK-88-BE-30 — Read withdrawal times the same in any database session time
+  zone.** Passed. A review found the temporary cluster runs in Asia/Jakarta,
+  which hid a defect: with `PGTZ=UTC` the suite failed two
+  `WithdrawalCheckCommandTest` tests because the `timestamptz` columns read
+  `created_at` seven hours ahead, and not-found stayed `processing` after the
+  grace. The columns are now `timestamp` without time zone, like
+  `saldo_histories`. A new PostgreSQL-only test forces a UTC session, checks
+  that `created_at` and `next_check_at` match the hold time, and fails the
+  withdrawal with a refund 11 minutes after it. Restoring `timestampsTz` failed
+  that test with `+0000` instead of `+0700`. The full suite then passed with
+  `PGTZ=UTC`.
+- **TOK-88-BE-31 — Keep the balance held for 4xx answers that prove no
+  rejection.** Passed. The same review found that a `408` or `409` from the
+  disbursement request returned the balance like a clear rejection, although
+  neither status proves Xendit refused it. `XenditServiceTest` now sends both,
+  each with an ordinary error code, and they return `unknown` with one
+  `warning` that carries the HTTP status. A 400 and a 429 still return `error`.
+  Disabling the status check made both new cases return `error`.
 
 ### Local Coverage
 

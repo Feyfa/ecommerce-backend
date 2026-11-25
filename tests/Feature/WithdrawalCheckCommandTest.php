@@ -22,6 +22,7 @@ use Illuminate\Console\Command;
 use Illuminate\Console\Scheduling\Event;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response as HttpStatus;
@@ -90,6 +91,8 @@ class WithdrawalCheckCommandTest extends TestCase
         $this->useLookupAnswers([]);
         // --- step 4 - Start without provider answers - end ---
     }
+
+    /* ========== XENDIT ANSWERS START ========== */
 
     /**
      * Completes a withdrawal once Xendit reports the transfer as COMPLETED.
@@ -225,6 +228,48 @@ class WithdrawalCheckCommandTest extends TestCase
     }
 
     /**
+     * Reads withdrawal times back unchanged when the PostgreSQL session runs in UTC.
+     *
+     * The application writes Asia/Jakarta times without an offset. With `timestamptz` columns a
+     * UTC session read them seven hours ahead, so the not-found grace ended after about seven
+     * hours. The local test cluster runs in Asia/Jakarta and hid this, so the session is forced.
+     *
+     * @return void The stored times match the hold time and the grace ends after 10 minutes.
+     */
+    public function test_withdrawal_times_do_not_depend_on_the_database_session_time_zone(): void
+    {
+        // --- step 1 - Switch the PostgreSQL session to UTC - start ---
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('The database session time zone applies to PostgreSQL only.');
+        }
+
+        // Reverted with the test transaction, so other tests keep the default session.
+        DB::statement("SET TIME ZONE 'UTC'");
+        // --- step 1 - Switch the PostgreSQL session to UTC - end ---
+
+        // --- step 2 - Check the stored times of a new withdrawal - start ---
+        $startTime = CarbonImmutable::parse(self::START_TIME);
+        $withdrawal = $this->holdWithdrawal()->refresh();
+
+        $this->assertEquals($startTime, $withdrawal->created_at);
+        $this->assertEquals($startTime->addMinute(), $withdrawal->next_check_at);
+        // --- step 2 - Check the stored times of a new withdrawal - end ---
+
+        // --- step 3 - Look the withdrawal up after the grace period - start ---
+        $graceMinutes = config('withdrawal.not_found_grace_minutes');
+
+        $this->useLookupAnswers([$this->notFoundResponse()]);
+        $this->travelTo($startTime->addMinutes($graceMinutes + 1));
+        $this->runCheck();
+        // --- step 3 - Look the withdrawal up after the grace period - end ---
+
+        // --- step 4 - Check the balance was returned - start ---
+        $this->assertSame(WithdrawalStatus::FAILED, $withdrawal->refresh()->status);
+        $this->assertIncome(self::STARTING_INCOME);
+        // --- step 4 - Check the balance was returned - end ---
+    }
+
+    /**
      * Keeps the balance held when the lookup itself gets no usable answer.
      *
      * @return void A timeout is never read as a failed transfer.
@@ -283,6 +328,10 @@ class WithdrawalCheckCommandTest extends TestCase
                 === $withdrawal->id);
         // --- step 2 - Check the held withdrawal and the log - end ---
     }
+
+    /* ========== XENDIT ANSWERS END ========== */
+
+    /* ========== WITHDRAWAL SELECTION START ========== */
 
     /**
      * Leaves withdrawals that are not due yet or already settled alone.
@@ -348,6 +397,22 @@ class WithdrawalCheckCommandTest extends TestCase
         $this->assertSame([1, 1, 0], $attempts);
         // --- step 3 - Check only two were looked up - end ---
     }
+
+    /**
+     * Rejects a limit that is not a positive integer before any withdrawal is claimed.
+     *
+     * @return void The command exits with INVALID.
+     */
+    public function test_invalid_limit_is_rejected(): void
+    {
+        // A zero limit would claim nothing forever while looking like a successful run.
+        $this->artisan('withdrawal:check', ['--limit' => '0'])
+            ->assertExitCode(Command::INVALID);
+    }
+
+    /* ========== WITHDRAWAL SELECTION END ========== */
+
+    /* ========== HELD BALANCE SAFETY START ========== */
 
     /**
      * Logs a withdrawal that is still processing after 24 hours exactly once.
@@ -421,6 +486,10 @@ class WithdrawalCheckCommandTest extends TestCase
         // --- step 3 - Check one refund only - end ---
     }
 
+    /* ========== HELD BALANCE SAFETY END ========== */
+
+    /* ========== STATUS COMMAND START ========== */
+
     /**
      * Shows counts per status and lists only the withdrawals processing past the overdue limit.
      *
@@ -455,17 +524,9 @@ class WithdrawalCheckCommandTest extends TestCase
         // --- step 2 - Show the status - end ---
     }
 
-    /**
-     * Rejects a limit that is not a positive integer before any withdrawal is claimed.
-     *
-     * @return void The command exits with INVALID.
-     */
-    public function test_invalid_limit_is_rejected(): void
-    {
-        // A zero limit would claim nothing forever while looking like a successful run.
-        $this->artisan('withdrawal:check', ['--limit' => '0'])
-            ->assertExitCode(Command::INVALID);
-    }
+    /* ========== STATUS COMMAND END ========== */
+
+    /* ========== SCHEDULER START ========== */
 
     /**
      * Confirms the scheduler runs the check every minute without overlapping runs.
@@ -491,6 +552,10 @@ class WithdrawalCheckCommandTest extends TestCase
         $this->assertTrue($check->withoutOverlapping);
         // --- step 2 - Check its frequency and overlap guard - end ---
     }
+
+    /* ========== SCHEDULER END ========== */
+
+    /* ========== TEST HELPERS START ========== */
 
     /**
      * Holds one withdrawal through the real service, as the withdrawal endpoint does.
@@ -596,4 +661,6 @@ class WithdrawalCheckCommandTest extends TestCase
             'saldo_income' => $income,
         ]);
     }
+
+    /* ========== TEST HELPERS END ========== */
 }

@@ -411,6 +411,11 @@ Important columns:
 - `overdue_logged_at`: set when the 24-hour critical log was written.
 - `settled_at`: set when the status became `completed` or `failed`.
 
+The time columns are `timestamp` without time zone, like `saldo_histories`, and
+hold Asia/Jakarta time. Laravel writes them without an offset. With
+`timestamptz`, a UTC database session reads `created_at` seven hours ahead, so
+the not-found grace and the overdue alert would fire seven hours late.
+
 The table stores no account number or holder name.
 
 Indexes:

@@ -42,16 +42,26 @@ return new class extends Migration
             $table->unsignedBigInteger('income_portion');
             // --- step 3 - nominal dalam rupiah bulat - end ---
 
-            // --- step 4 - status dan jadwal pengecekan - start ---
+            // --- step 4 - status pencairan - start ---
             $table->string('status', 20)->default(WithdrawalStatus::PROCESSING->value);
             $table->string('failure_code', 100)->nullable();
             $table->unsignedSmallInteger('check_attempts')->default(0);
-            $table->timestampTz('next_check_at', 6)->nullable();
-            $table->timestampTz('last_checked_at', 6)->nullable();
-            $table->timestampTz('overdue_logged_at', 6)->nullable();
-            $table->timestampTz('settled_at', 6)->nullable();
-            $table->timestampsTz(6);
-            // --- step 4 - status dan jadwal pengecekan - end ---
+            // --- step 4 - status pencairan - end ---
+
+            // --- step 5 - kolom waktu - start ---
+            // Kolom waktu sengaja tanpa zona waktu, sama seperti `saldo_histories`. Laravel
+            // menulis jam Asia/Jakarta tanpa offset. Pada `timestamptz`, PostgreSQL membaca
+            // jam itu dengan zona sesi koneksi. Dengan sesi UTC, `created_at` terbaca 7 jam di
+            // masa depan, sehingga masa tunggu not-found 10 menit baru habis setelah sekitar
+            // 7 jam 10 menit dan saldo user tertahan selama itu. Zona sesi bergantung pada
+            // server database, karena `config/database.php` maupun service PostgreSQL di CI
+            // dan Docker Compose tidak mengaturnya.
+            $table->timestamp('next_check_at', 6)->nullable();
+            $table->timestamp('last_checked_at', 6)->nullable();
+            $table->timestamp('overdue_logged_at', 6)->nullable();
+            $table->timestamp('settled_at', 6)->nullable();
+            $table->timestamps(6);
+            // --- step 5 - kolom waktu - end ---
 
             // Claim scheduler mencari status processing yang sudah jatuh tempo.
             $table->index(['status', 'next_check_at'], 'saldo_withdrawals_due_index');
