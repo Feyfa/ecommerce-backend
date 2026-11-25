@@ -62,6 +62,8 @@ class WithdrawalService
         private XenditService $xenditService,
     ) {}
 
+    /* ========== PENAHANAN SALDO START ========== */
+
     /**
      * Memotong saldo dan mencatat penarikan berstatus processing sebelum Xendit dipanggil.
      *
@@ -93,6 +95,51 @@ class WithdrawalService
 
         return $hold;
     }
+
+    /**
+     * Memotong saldo lalu membuat row penarikan di transaksi yang sedang berjalan.
+     *
+     * @param  string  $userId  Pemilik saldo yang menarik dana.
+     * @param  string|null  $paymentUserId  Rekening tujuan yang tersimpan milik user.
+     * @param  int  $amount  Nominal penarikan dalam rupiah bulat.
+     * @param  string  $externalId  External ID unik untuk Xendit.
+     *
+     * @return HoldResult Row penarikan baru, atau pesan jika saldo tidak bisa dipotong.
+     */
+    private function holdInTransaction(
+        string $userId,
+        ?string $paymentUserId,
+        int $amount,
+        string $externalId,
+    ): array {
+        // --- step 1 - potong saldo dan tulis riwayat penarikan - start ---
+        $deduction = $this->saldoService->deductWithdrawalBalance($userId, $paymentUserId, $amount);
+
+        if ($deduction['status'] === 'error') {
+            return ['status' => 'error', 'message' => $deduction['message']];
+        }
+        // --- step 1 - potong saldo dan tulis riwayat penarikan - end ---
+
+        // --- step 2 - catat penarikan yang menunggu Xendit - start ---
+        $withdrawal = SaldoWithdrawal::create([
+            'user_id' => $userId,
+            'payment_user_id' => $paymentUserId,
+            'saldo_history_id' => $deduction['saldoHistoryId'],
+            'external_id' => $externalId,
+            'amount' => $amount,
+            'refund_portion' => $deduction['refundPortion'],
+            'income_portion' => $deduction['incomePortion'],
+            'status' => WithdrawalStatus::PROCESSING,
+            'next_check_at' => $this->nextCheckAt(0, CarbonImmutable::now()),
+        ]);
+        // --- step 2 - catat penarikan yang menunggu Xendit - end ---
+
+        return ['status' => 'success', 'withdrawal' => $withdrawal];
+    }
+
+    /* ========== PENAHANAN SALDO END ========== */
+
+    /* ========== PENGIRIMAN PENCAIRAN START ========== */
 
     /**
      * Mengirim pencairan untuk penarikan yang sudah ditahan, lalu menerapkan jawaban Xendit.
@@ -157,6 +204,27 @@ class WithdrawalService
 
         return ['status' => 'success', 'withdrawalStatus' => $status];
     }
+
+    /**
+     * Membiarkan penarikan processing ketika jawaban Xendit tidak bisa dipakai.
+     *
+     * @param  SaldoWithdrawal  $withdrawal  Penarikan yang hasilnya belum pasti.
+     *
+     * @return WithdrawalStatus Selalu PROCESSING; saldo tetap ditahan.
+     */
+    private function keepProcessingAfterUnknownAnswer(SaldoWithdrawal $withdrawal): WithdrawalStatus
+    {
+        // Adapter sudah mencatat detail teknis; log ini menambahkan penarikan yang terdampak.
+        Log::warning('Withdrawal outcome is unknown; the balance stays held.', [
+            ...$this->logContext($withdrawal),
+        ]);
+
+        return WithdrawalStatus::PROCESSING;
+    }
+
+    /* ========== PENGIRIMAN PENCAIRAN END ========== */
+
+    /* ========== PENERAPAN STATUS AKHIR START ========== */
 
     /**
      * Menerapkan status pencairan dari Xendit pada penarikan yang masih diproses.
@@ -246,86 +314,6 @@ class WithdrawalService
     }
 
     /**
-     * Menghitung waktu pengecekan berikutnya dari jumlah pengecekan yang sudah dijadwalkan.
-     *
-     * Jeda diambil dari `withdrawal.check_backoff_minutes`. Jeda terakhir dipakai untuk semua
-     * pengecekan berikutnya, sehingga penarikan lama dicek paling jarang sesuai nilai itu.
-     *
-     * @param  int  $checksDone  Jumlah pengecekan yang sudah diambil, nol saat penarikan dibuat.
-     * @param  CarbonImmutable  $from  Waktu acuan, biasanya sekarang.
-     *
-     * @return CarbonImmutable Waktu paling awal penarikan boleh dicek lagi.
-     */
-    public function nextCheckAt(int $checksDone, CarbonImmutable $from): CarbonImmutable
-    {
-        // Jeda bertambah agar penarikan yang lama PENDING tidak menghabiskan rate limit Xendit.
-        /** @var list<int> $backoffMinutes */
-        $backoffMinutes = config('withdrawal.check_backoff_minutes');
-        $lastIndex = count($backoffMinutes) - 1;
-
-        return $from->addMinutes($backoffMinutes[min($checksDone, $lastIndex)]);
-    }
-
-    /**
-     * Menyusun konteks log penarikan tanpa nomor rekening maupun nama pemilik.
-     *
-     * @param  SaldoWithdrawal  $withdrawal  Penarikan yang dicatat.
-     *
-     * @return WithdrawalLogContext ID yang cukup untuk mencari penarikan di database dan Xendit.
-     */
-    public function logContext(SaldoWithdrawal $withdrawal): array
-    {
-        // Satu tempat untuk field log agar data rekening tidak pernah ikut tercatat.
-        return [
-            'withdrawal_id' => $withdrawal->id,
-            'user_id' => $withdrawal->user_id,
-            'amount' => $withdrawal->amount,
-            'external_id' => $withdrawal->external_id,
-        ];
-    }
-
-    /**
-     * Memotong saldo lalu membuat row penarikan di transaksi yang sedang berjalan.
-     *
-     * @param  string  $userId  Pemilik saldo yang menarik dana.
-     * @param  string|null  $paymentUserId  Rekening tujuan yang tersimpan milik user.
-     * @param  int  $amount  Nominal penarikan dalam rupiah bulat.
-     * @param  string  $externalId  External ID unik untuk Xendit.
-     *
-     * @return HoldResult Row penarikan baru, atau pesan jika saldo tidak bisa dipotong.
-     */
-    private function holdInTransaction(
-        string $userId,
-        ?string $paymentUserId,
-        int $amount,
-        string $externalId,
-    ): array {
-        // --- step 1 - potong saldo dan tulis riwayat penarikan - start ---
-        $deduction = $this->saldoService->deductWithdrawalBalance($userId, $paymentUserId, $amount);
-
-        if ($deduction['status'] === 'error') {
-            return ['status' => 'error', 'message' => $deduction['message']];
-        }
-        // --- step 1 - potong saldo dan tulis riwayat penarikan - end ---
-
-        // --- step 2 - catat penarikan yang menunggu Xendit - start ---
-        $withdrawal = SaldoWithdrawal::create([
-            'user_id' => $userId,
-            'payment_user_id' => $paymentUserId,
-            'saldo_history_id' => $deduction['saldoHistoryId'],
-            'external_id' => $externalId,
-            'amount' => $amount,
-            'refund_portion' => $deduction['refundPortion'],
-            'income_portion' => $deduction['incomePortion'],
-            'status' => WithdrawalStatus::PROCESSING,
-            'next_check_at' => $this->nextCheckAt(0, CarbonImmutable::now()),
-        ]);
-        // --- step 2 - catat penarikan yang menunggu Xendit - end ---
-
-        return ['status' => 'success', 'withdrawal' => $withdrawal];
-    }
-
-    /**
      * Menandai penarikan selesai setelah Xendit menyatakan dana terkirim.
      *
      * @param  SaldoWithdrawal  $withdrawal  Penarikan yang selesai.
@@ -367,23 +355,6 @@ class WithdrawalService
     }
 
     /**
-     * Membiarkan penarikan processing ketika jawaban Xendit tidak bisa dipakai.
-     *
-     * @param  SaldoWithdrawal  $withdrawal  Penarikan yang hasilnya belum pasti.
-     *
-     * @return WithdrawalStatus Selalu PROCESSING; saldo tetap ditahan.
-     */
-    private function keepProcessingAfterUnknownAnswer(SaldoWithdrawal $withdrawal): WithdrawalStatus
-    {
-        // Adapter sudah mencatat detail teknis; log ini menambahkan penarikan yang terdampak.
-        Log::warning('Withdrawal outcome is unknown; the balance stays held.', [
-            ...$this->logContext($withdrawal),
-        ]);
-
-        return WithdrawalStatus::PROCESSING;
-    }
-
-    /**
      * Mengunci row penarikan dan menerapkan perubahan hanya jika statusnya masih processing.
      *
      * Lock diambil pada row penarikan lebih dulu, lalu pada `saldo_users` saat pengembalian.
@@ -417,4 +388,53 @@ class WithdrawalService
             return $locked->status;
         });
     }
+
+    /* ========== PENERAPAN STATUS AKHIR END ========== */
+
+    /* ========== JADWAL PENGECEKAN START ========== */
+
+    /**
+     * Menghitung waktu pengecekan berikutnya dari jumlah pengecekan yang sudah dijadwalkan.
+     *
+     * Jeda diambil dari `withdrawal.check_backoff_minutes`. Jeda terakhir dipakai untuk semua
+     * pengecekan berikutnya, sehingga penarikan lama dicek paling jarang sesuai nilai itu.
+     *
+     * @param  int  $checksDone  Jumlah pengecekan yang sudah diambil, nol saat penarikan dibuat.
+     * @param  CarbonImmutable  $from  Waktu acuan, biasanya sekarang.
+     *
+     * @return CarbonImmutable Waktu paling awal penarikan boleh dicek lagi.
+     */
+    public function nextCheckAt(int $checksDone, CarbonImmutable $from): CarbonImmutable
+    {
+        // Jeda bertambah agar penarikan yang lama PENDING tidak menghabiskan rate limit Xendit.
+        /** @var list<int> $backoffMinutes */
+        $backoffMinutes = config('withdrawal.check_backoff_minutes');
+        $lastIndex = count($backoffMinutes) - 1;
+
+        return $from->addMinutes($backoffMinutes[min($checksDone, $lastIndex)]);
+    }
+
+    /* ========== JADWAL PENGECEKAN END ========== */
+
+    /* ========== KONTEKS LOG START ========== */
+
+    /**
+     * Menyusun konteks log penarikan tanpa nomor rekening maupun nama pemilik.
+     *
+     * @param  SaldoWithdrawal  $withdrawal  Penarikan yang dicatat.
+     *
+     * @return WithdrawalLogContext ID yang cukup untuk mencari penarikan di database dan Xendit.
+     */
+    public function logContext(SaldoWithdrawal $withdrawal): array
+    {
+        // Satu tempat untuk field log agar data rekening tidak pernah ikut tercatat.
+        return [
+            'withdrawal_id' => $withdrawal->id,
+            'user_id' => $withdrawal->user_id,
+            'amount' => $withdrawal->amount,
+            'external_id' => $withdrawal->external_id,
+        ];
+    }
+
+    /* ========== KONTEKS LOG END ========== */
 }

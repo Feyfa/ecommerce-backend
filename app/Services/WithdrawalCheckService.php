@@ -43,6 +43,8 @@ class WithdrawalCheckService
         private XenditService $xenditService,
     ) {}
 
+    /* ========== KETERSEDIAAN TABEL START ========== */
+
     /**
      * Menentukan apakah migration penarikan sudah tersedia di environment ini.
      *
@@ -53,6 +55,10 @@ class WithdrawalCheckService
         // Scheduler bisa berjalan sebelum migration deploy selesai.
         return Schema::hasTable('saldo_withdrawals');
     }
+
+    /* ========== KETERSEDIAAN TABEL END ========== */
+
+    /* ========== PENGECEKAN PENARIKAN START ========== */
 
     /**
      * Mengambil penarikan yang jatuh tempo lalu mengecek masing-masing ke Xendit.
@@ -84,48 +90,6 @@ class WithdrawalCheckService
         // --- step 2 - cek setiap penarikan - end ---
 
         return $summary;
-    }
-
-    /**
-     * Merangkum penarikan per status dan daftar penarikan yang terlalu lama untuk dicek manual.
-     *
-     * Dipakai `withdrawal:status`. Hanya membaca database; Xendit tidak dipanggil.
-     *
-     * @return StatusSummary Jumlah per status, processing tertua, batas jam, dan yang overdue.
-     */
-    public function status(): array
-    {
-        // --- step 1 - hitung penarikan per status - start ---
-        $counts = [];
-
-        foreach (WithdrawalStatus::cases() as $status) {
-            $counts[$status->value] = SaldoWithdrawal::query()
-                ->where('status', $status->value)
-                ->count();
-        }
-        // --- step 1 - hitung penarikan per status - end ---
-
-        // --- step 2 - cari penarikan processing tertua - start ---
-        $processing = SaldoWithdrawal::query()
-            ->where('status', WithdrawalStatus::PROCESSING->value)
-            ->orderBy('created_at');
-
-        $oldest = (clone $processing)->first();
-        // --- step 2 - cari penarikan processing tertua - end ---
-
-        // --- step 3 - cari penarikan processing yang overdue - start ---
-        $overdueHours = $this->positiveIntegerConfig('withdrawal.overdue_hours');
-        $overdueBefore = CarbonImmutable::now()->subHours($overdueHours);
-
-        $overdue = (clone $processing)->where('created_at', '<=', $overdueBefore)->get();
-        // --- step 3 - cari penarikan processing yang overdue - end ---
-
-        return [
-            'counts' => $counts,
-            'oldest_processing_at' => $oldest?->created_at,
-            'overdue_hours' => $overdueHours,
-            'overdue' => $overdue,
-        ];
     }
 
     /**
@@ -316,6 +280,56 @@ class WithdrawalCheckService
         // --- step 3 - tulis log critical - end ---
     }
 
+    /* ========== PENGECEKAN PENARIKAN END ========== */
+
+    /* ========== LAPORAN STATUS START ========== */
+
+    /**
+     * Merangkum penarikan per status dan daftar penarikan yang terlalu lama untuk dicek manual.
+     *
+     * Dipakai `withdrawal:status`. Hanya membaca database; Xendit tidak dipanggil.
+     *
+     * @return StatusSummary Jumlah per status, processing tertua, batas jam, dan yang overdue.
+     */
+    public function status(): array
+    {
+        // --- step 1 - hitung penarikan per status - start ---
+        $counts = [];
+
+        foreach (WithdrawalStatus::cases() as $status) {
+            $counts[$status->value] = SaldoWithdrawal::query()
+                ->where('status', $status->value)
+                ->count();
+        }
+        // --- step 1 - hitung penarikan per status - end ---
+
+        // --- step 2 - cari penarikan processing tertua - start ---
+        $processing = SaldoWithdrawal::query()
+            ->where('status', WithdrawalStatus::PROCESSING->value)
+            ->orderBy('created_at');
+
+        $oldest = (clone $processing)->first();
+        // --- step 2 - cari penarikan processing tertua - end ---
+
+        // --- step 3 - cari penarikan processing yang overdue - start ---
+        $overdueHours = $this->positiveIntegerConfig('withdrawal.overdue_hours');
+        $overdueBefore = CarbonImmutable::now()->subHours($overdueHours);
+
+        $overdue = (clone $processing)->where('created_at', '<=', $overdueBefore)->get();
+        // --- step 3 - cari penarikan processing yang overdue - end ---
+
+        return [
+            'counts' => $counts,
+            'oldest_processing_at' => $oldest?->created_at,
+            'overdue_hours' => $overdueHours,
+            'overdue' => $overdue,
+        ];
+    }
+
+    /* ========== LAPORAN STATUS END ========== */
+
+    /* ========== KONFIGURASI START ========== */
+
     /**
      * Membaca konfigurasi penarikan yang wajib berupa bilangan bulat positif.
      *
@@ -338,4 +352,6 @@ class WithdrawalCheckService
 
         return $value;
     }
+
+    /* ========== KONFIGURASI END ========== */
 }
